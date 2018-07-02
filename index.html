@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Scalar field generation and color mapping</title>
+
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="//d3js.org/d3.v3.min.js"></script>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<!--<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>-->
+	<script src="src/scalar.js"></script>
+	<script src="src/colormap.js"></script>
+	<script src="src/profile.js"></script>
+	<script src="src/ts.js"></script>
+	<script src="kissfft/a.out.js"></script>
+	<script src="kissfft/kissfft.js"></script>
+	<script src="src/gistfile1.js"></script>
+	<script src="src/download-data-uri.js"></script>
+
+	<style>
+		body {
+			font-family: Helvetica;
+		}
+		svg, text {
+			cursor: default;
+			-webkit-touch-callout: none; /* iOS Safari */
+				-webkit-user-select: none; /* Chrome/Safari/Opera */
+				-khtml-user-select: none; /* Konqueror */
+				-moz-user-select: none; /* Firefox */
+				-ms-user-select: none; /* Internet Explorer/Edge */
+				user-select: none; /* Non-prefixed version, currently
+				                                  not supported by any browser */
+		}
+
+		.histogramRect {
+			fill: #cccccc;
+			stroke: none;
+		}
+
+		.colorMapButton {
+			font-family: Helvetica;
+			font-size: 20px;
+			background-color: white;
+			width: 50px;
+		}
+
+		.xaxis, .yaxis {
+			shape-rendering: crispEdges;
+			font-size: 15px;
+			font-weight: normal;
+
+		}
+
+		.xaxis line, .yaxis line,
+		.xaxis path, .yaxis path {
+			fill: none;
+			stroke: #000;
+		}
+		
+		.powerCurve {
+			stroke-width: 1.5px;
+		}
+		.powerCurve line {
+			shape-rendering: crispEdges;
+		}
+
+		input {
+			font-size: 16px;
+		}
+
+		.marker 
+		{
+			font-family: Helvetica;
+			font-size: 30px;
+			font-weight: 100;
+			fill: black;
+			stroke: none;
+		}
+
+		.datasetLabel {
+			font-family: Helvetica;
+			font-size: 15px;
+			font-weight: normal;
+			fill: black; stroke: none;
+		}
+
+		.profile {
+			position: absolute;
+			left: 1600px;
+			z-index: 100;
+			border: solid 1px black;
+		}
+
+		.simprofile {
+			position: absolute;
+			left: 1780px;
+			z-index: 100;
+			font-size: 16px;
+			font-weight: bold;
+			color: black;
+		}
+
+	</style>
+</head>
+
+<body>
+	<div style="position: absolute; top: 20px; left: 10px">
+		<div>
+			<svg id="svgOverlay" width="1024" height="786" style="position: absolute; top: 20px; left: 10px; border: solid 1px black; z-index: 1000">
+			<defs>
+				<filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+					<feGaussianBlur stdDeviation="2 2" result="glow"/>
+					<feMerge>
+						<feMergeNode in="glow"/>
+						<feMergeNode in="glow"/>
+						<feMergeNode in="glow"/>
+					</feMerge>
+				</filter>
+			</defs>
+
+			</svg>
+			<canvas id="canvas" width="1024" height="786" style="position: absolute; top: 20px; left: 10px; border: solid 1px black"></canvas>
+
+		</div>
+
+		<div style="position: absolute; top: 820px; left: 10px;">	
+			<input type="button" value="add marker" onclick='addMarker()'>&nbsp;&nbsp;&nbsp;
+			<input type="button" value="download scalar data" onclick="downloadFile()">
+			<span id="rawDataLink"></span>
+
+			<div style="width: 1100px; font-family: Monaco; font-size: 18px">
+				<input type="checkbox" id="showQuadrants" onclick="toggleQuadrants()">show quadrants</input>
+				<p><div id="divQuadrantStats"></div>
+				<div id="divMarkers">
+					<span style="color: blue">Markers: </span>
+					<input id="markerString" style="font-family: Monaco; font-size: 13px;" type="text" value="">
+				</div>
+			</div>
+			<!--<input type="button" value="remove marker"></input>-->
+		</div>
+	</div>
+
+	<!-- color scale -->
+	<canvas id="canvasColorScale" style="position: absolute; left: 1055px; top: 140px" width="150" height="500"></canvas>
+
+
+	<!-- datasets list -->
+	<div style="position: absolute; top: 20px; left: 1525px">
+		<input type="button" value="sort datasets" onclick="sortDatasets()">
+		<div style="border: solid 1px black; width: 300px; height: 367px; overflow-x: hidden; overflow-y: scroll; padding: 0px 0px">
+			<svg z-index="200" id="svgDatasets" style="width: 300px; height: 1000px; overflow-y: scroll; border: soldi 1px black; background-color: white">
+			</svg>
+		</div>
+	</div>
+
+	<!-- file upload and color mapping -->
+	<div style="padding: 10px 10px; border: solid 1px black; position: absolute; top: 20px; left: 1200px; width: 300px; height: 375px; background-color: #d3d3d3">
+
+			<div>
+				<span style="font-size: 19px"><b>Select image file</b></span><br>
+				<input style="background-color: white; font-size: 17px; width: 300px" id="fileLoader" name="file" type="file" multiple><br>
+				<input type="checkbox" id="checkScale" checked>scale to fit
+			</div>
+
+		<p>
+
+		<!--
+		<p><span style="font-size: 19px"><b>Scalar generator</b></span><br>
+		<p><table cellspacing="3">
+			<tr>
+				<td>scale</td>
+				<td><div id="sliderScale" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+			</tr>
+
+			<tr>
+				<td>octaves</td>
+				<td><div id="sliderOctaves" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+			</tr>
+
+			<tr>
+				<td>persistence</td>
+				<td><div id="sliderPersistence" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+			</tr>
+		</table>
+		-->
+		<p><span style="font-size: 18px">Image modification:</span>
+			<input class="colorMapButton" type="button" value="V flip" style="width: 60px" onClick="flipV()">
+			<input class="colorMapButton" type="button" value="H flip" style="width: 60px" onClick="flipH()">
+		
+		<p><span style="font-size: 18px">Color Map</span><br>
+		<button value="" class="colorMapButton" onClick="addColor()">+</button>
+		<button value="" class="colorMapButton" onClick="removeColor()">-</button>
+		<button value="" class="colorMapButton" onClick="drawFFT()">FFT</button>
+		<p>
+		
+		<div style="border: solid 1px black; width: 300px; height: 180px; overflow-x: hidden; overflow-y: scroll; padding: 0px 0px">
+
+		<svg id="svgColorMap" width="300" height="1800" style="border: solid 1px black; background-color: white">
+			<g id="colorPresets" transform="translate(125,15)"></g>
+		</svg>
+		</div>
+	</div>
+
+
+	<svg id="svgStats" style="position: absolute; left: 1200px; top: 420px; padding: 10px 10px; width: 605px; height: 370px; border: solid 0px black"></svg>
+	
+	<canvas id="canvasProfile1" class="profile" style="top: 440px" width="170" height="70"></canvas>
+	<canvas id="canvasProfile2" class="profile" style="top: 510px" width="170" height="70"></canvas>
+	<canvas id="canvasProfile3" class="profile" style="top: 580px" width="170" height="70"></canvas>
+	<canvas id="canvasProfile4" class="profile" style="top: 650px" width="170" height="70"></canvas>
+	<canvas id="canvasProfile5" class="profile" style="top: 720px" width="170" height="70"></canvas>
+	<canvas id="canvasProfile6" class="profile" style="top: 790px" width="170" height="70"></canvas>
+
+	<span id="simProfile1" class="simprofile" style="top: 440px"></span>
+	<span id="simProfile2" class="simprofile" style="top: 510px"></span>
+	<span id="simProfile3" class="simprofile" style="top: 580px"></span>
+	<span id="simProfile4" class="simprofile" style="top: 650px"></span>
+	<span id="simProfile5" class="simprofile" style="top: 720px"></span>
+	<span id="simProfile6" class="simprofile" style="top: 790px"></span>
+
+	<script>
+		
+		var CROP_TO_CANVAS = true;
+		var profileShapeVis = null, profileShapeComplimentary = [];
+		var curveColors = ['rgb(228,26,28)','rgb(55,126,184)','rgb(77,175,74)','rgb(152,78,163)','rgb(255,127,0)','#a65628'];
+		var binaryFiles = {};
+		var powerChart = null;
+		var datasets = [], datasetsSorted = false;
+		var markers = [], selectedMarker = null, destinationMarker = null, travelLine = null;
+		var curDataset = null;
+		var scalarField = null;
+		var histogram = null;
+		var powerSpectra = null;
+		var SPECTRA_COLOR = ['rgb(166,206,227)','rgb(31,120,180)','rgb(178,223,138)','rgb(51,160,44)','rgb(251,154,153)','rgb(227,26,28)','rgb(253,191,111)','rgb(255,127,0)','rgb(202,178,214)','rgb(106,61,154)'];
+		var shiftKey = false, ctrlKey = false;
+
+		// size of spectra chart
+		var SPECTRA_CHART_W = 300;
+		var SPECTRA_CHART_H = 300;
+		var SPECTRA_CHART_OFFSET = [30, 10]
+
+		$(document).ready(function() {
+			createUI();
+		});
+
+		function isScale()
+		{
+			return d3.select("#checkScale").node().checked;
+		}
+		function showQuadrants() {
+			return d3.select('#showQuadrants').node().checked;
+		}
+		function packRawData() 
+		{
+			if (scalarField) 
+			{
+				var base64Code = base64ArrayBuffer(scalarField.buffer);
+				var update = d3.select('#rawDataLink').selectAll('a').data([base64Code]);
+				update.enter().append('a')
+					.attr('target', '_blank')
+					.html('download raw data file')
+					.attr('download', "rawdata.ddd");
+
+				update.attr('href', function(d) 
+				{
+					return 'data:octet-stream;charset=utf-16le;base64,' + d;
+				});
+
+				console.log("base64 length: " + base64Code.length);
+			}
+		}
+		function downloadFile()
+		{
+			if (scalarField)
+			{
+				var blob;
+				try {
+					// This is the recommended method:
+					blob = new Blob([scalarField.buffer], {type: 'application/octet-stream'});
+				} catch (e) {
+					// The BlobBuilder API has been deprecated in favour of Blob, but older
+					// browsers don't know about the Blob constructor
+					// IE10 also supports BlobBuilder, but since the `Blob` constructor
+					//  also works, there's no need to add `MSBlobBuilder`.
+					var bb = new (window.WebKitBlobBuilder || window.MozBlobBuilder);
+					bb.append(arraybuffer);
+					blob = bb.getBlob('application/octet-stream'); // <-- Here's the Blob
+				}
+
+				// Use the URL object to create a temporary URL
+				var url = (window.webkitURL || window.URL).createObjectURL(blob);
+				location.href = url; // <-- Download!
+
+				/*
+				var base64Data = base64ArrayBuffer(scalarField.buffer);
+				window.open('data:octet-stream;charset=utf-16le;headers=Content-Disposition%3A%20attachment%3B%20filename%3D%22with%20spaces.txt;base64,' + base64Data);
+				//downloadDataURI({ filename: "check.png", data: 'data:octet-stream;charset=utf-16le;base64' + base64Data});
+				*/
+			}
+		}
+
+		function blur() 
+		{
+			var dataset = curDataset;
+
+			if (scalarField) 
+			{
+				scalarField.blur();
+				visualizeScalarField();
+			}
+
+			if (showQuadrants()) {
+				calcQuadrantStats();
+			}
+
+			var spatialAnalysis = analyzeSpatialFrequency();
+			
+			if (dataset.powerSpectraCurve) {
+				dataset.powerSpectraCurve.remove();
+				dataset.powerSpectraCurve = undefined;
+			}
+			if (dataset.medianFreqLine) {
+				dataset.medianFreqLine.remove();
+				dataset.medianFreqLine = undefined;
+			}
+
+			dataset.powerSpectraCurve = powerChart.plotSpectra(spatialAnalysis.powerSpectra);
+			if (!dataset.showCurve) {
+				dataset.powerSpectraCurve.attr('visibility', 'hidden');
+			}
+
+			// draw a line for x=median frequency
+			dataset.medianFreqLine = powerChart.plotMedian(spatialAnalysis.medianFreq);
+			if (!dataset.showMedianFreq) {
+				dataset.medianFreqLine.attr('visibility', 'hidden');
+			}
+
+			// update median frequency
+			dataset.txtMedianFreq.html('mF: ' + spatialAnalysis.medianFreq);
+			dataset.medianFreq = spatialAnalysis.medianFreq;
+
+			// update colors of the different curves
+			updatePowerCurveColors();
+
+		}
+
+		function flipH() {
+			if (scalarField) {
+				scalarField.flipH();
+				visualizeScalarField();
+				
+				var midX = Math.floor(scalarField.w/2);
+				var odd = scalarField.w % 2 != 0;
+				
+				// flip markers
+				for (var i=0; i<markers.length; i++) {
+					var m = markers[i];
+					var x = m.getX();
+					if (x < midX) {
+						x = (scalarField.w-1)-x;
+					}
+					else if (odd && x == midY)
+					{
+
+					}
+					else
+					{
+						x = (midX-1)-(x-midX)
+					}
+					m.updatePosition(x, null); 
+				}
+
+				// update quadrant stats
+				if (showQuadrants()) {
+					calcQuadrantStats();
+				}
+
+			}
+		}
+
+		function flipV() {
+			if (scalarField) 
+			{
+				scalarField.flipV();
+				visualizeScalarField();
+
+				var midY = Math.floor(scalarField.h/2);
+				var odd = scalarField.h % 2 != 0;
+				
+				// flip markers
+				for (var i=0; i<markers.length; i++) {
+					var m = markers[i];
+					var y = m.getY();
+					if (y < midY) {
+						y = (scalarField.h-1)-y;
+					}
+					else if (odd && y == midY)
+					{
+
+					}
+					else
+					{
+						y = (midY-1)-(y-midY)
+					}
+					m.updatePosition(null, y); 
+				}
+
+				// update quadrant stats
+				if (showQuadrants()) {
+					calcQuadrantStats();
+				}
+			}
+				
+
+		}
+
+		function toggleQuadrants()
+		{
+			var showQuadrants = d3.select('#showQuadrants').node().checked;
+			var canvas = d3.select('#canvas');
+			
+			var canvasW = canvas.node().width;
+			var canvasH = canvas.node().height;
+			var w = scalarField ? scalarField.w : canvasW;
+			var h = scalarField ? scalarField.h : canvasH;
+
+			if (showQuadrants) 
+			{
+				d3.select('#svgOverlay').selectAll('rect.quadrantGlow').data([ [0,0], [1,0], [1,1], [0,1] ]).enter().append('rect')
+					.attr('class', 'quadrantGlow')
+					.attr('x', function(d) { return d[0] * w/2;} )
+					.attr('y', function(d) { return d[1] * h/2;} )
+					.attr('width', w/2).attr('height', h/2)
+					.style('stroke', '#cccccc')
+					.style('stroke-width', '1px')
+					.style('fill', 'none')
+					.style('filter', 'url(#glow)');
+
+
+				d3.select('#svgOverlay').selectAll('rect.quadrant').data([ [0,0], [1,0], [1,1], [0,1] ]).enter().append('rect')
+					.attr('class', 'quadrant')
+					.attr('x', function(d) { return d[0] * w/2;} )
+					.attr('y', function(d) { return d[1] * h/2;} )
+					.attr('width', w/2).attr('height', h/2)
+					.style('stroke', 'black')
+					.style('stroke-width', '1px')
+					.style('fill', 'none');
+				calcQuadrantStats();		
+			}
+			else
+			{
+				d3.select('#svgOverlay').selectAll('rect.quadrantGlow').remove();
+				d3.select('#svgOverlay').selectAll('rect.quadrant').remove();
+			}
+		}
+
+		function calcQuadrantStats()
+		{
+			if (!scalarField) {
+				return;
+			}
+			var quadrantStats = [];
+			var w = scalarField.w;
+			var h = scalarField.h;
+
+			var divHTML = "";
+
+			for (var r=0; r<2; r++) 
+			{
+				for (var c=0; c<2; c++) 
+				{
+					var q = 
+					{
+						number: (r == 0 && c == 0) ? 1 : (r == 0 && c == 1) ? 2 : (r == 1 && c == 1) ? 3 : 4,
+						coordinates: [c, r],
+						stats: scalarField.getSubregionStats(c * w/2+2, r * h/2+2, w/2-4, h/2-4),
+					}
+
+					quadrantStats.push(q);
+				}
+			}
+
+			// sort based on number
+			quadrantStats.sort(function(a, b) {
+				return a.number-b.number;
+			});
+			for (var i=0; i<quadrantStats.length; i++) {
+				var q = quadrantStats[i];
+				divHTML += '# ' + q.number + ' -- (' + q.coordinates[0] + ',' + q.coordinates[1] + '): ' + /*'mean: ' + q.stats.mean.toFixed(3) + ', std: ' + q.stats.std.toFixed(3) + ',' + */' peak: ' + q.stats.minmax[1].toFixed(3) + ', steepness (max): ' + q.stats.steepness.toFixed(3) + ' (' + q.stats.maxSteepness.toFixed(3) + ')<br>';
+			}
+			divHTML += '<br>';
+
+			// calculate rankings:
+			quadrantStats.sort(function(a, b) {
+				return b.stats.minmax[1]-a.stats.minmax[1];
+			})
+			divHTML += '<b style="color: blue">height ranking: ';
+			for (var i=0; i<quadrantStats.length; i++) {
+				divHTML += quadrantStats[i].number + (i < quadrantStats.length-1 ? ', ' : '');
+			}
+			divHTML += '</b><br>';
+
+			// variance (std)
+			quadrantStats.sort(function(a, b) {
+				return b.stats.std-a.stats.std;
+			});
+
+			/*
+			divHTML += 'variance ranking: ';
+			for (var i=0; i<quadrantStats.length; i++) {
+				divHTML += quadrantStats[i].number + (i < quadrantStats.length-1 ? ', ' : '');
+			}
+			divHTML += '<br>';
+			*/
+
+			// steepness
+			quadrantStats.sort(function(a, b) {
+				return b.stats.steepness-a.stats.steepness;
+			});
+			divHTML += '<b style="color: blue">steepness ranking: ';
+			for (var i=0; i<quadrantStats.length; i++) {
+				divHTML += quadrantStats[i].number + (i < quadrantStats.length-1 ? ', ' : '');
+			}
+			divHTML += '</b><br>';
+
+
+			
+			quadrantStats.sort(function(a, b) {
+				return b.stats.maxSteepness-a.stats.maxSteepness;
+			});
+			divHTML += 'MAX steepness ranking: ';
+			for (var i=0; i<quadrantStats.length; i++) {
+				divHTML += quadrantStats[i].number + (i < quadrantStats.length-1 ? ', ' : '');
+			}
+			divHTML += '<br>';
+			
+
+
+			// dispaly the stats about the quadrants
+			d3.select('#divQuadrantStats').html(divHTML);
+			printMarkers();
+
+			return quadrantStats;
+		}
+
+		function printMarkers() 
+		{
+
+			var output = "";
+			for (var i=0, len=markers.length; i<len; i++) {
+				var m = markers[i];
+				output += m.getLabel() + "," + Math.floor(.5 + m.getX()) + ',' + Math.floor(.5 + m.getY());
+				if (i != len-1) {
+					output += ','
+				}
+			}
+			d3.select("#markerString").node().value = output;
+
+
+			return output;
+		}
+
+		function createThumb(image, w, h) {
+			if (w === null) {
+				var scaleFactor = h/image.height;
+				w = Math.floor(.5 + scaleFactor * image.width);
+			}
+			else if (h === null) {
+				var scaleFactor = w/image.width;
+				h = Math.floor(.5 + scaleFactor * image.height);	
+			}
+
+			var internalCanvas = document.createElement('canvas');
+			internalCanvas.width = w;
+			internalCanvas.height = h;
+			internalCanvas.getContext('2d').drawImage(image, 0, 0, w, h);
+			return internalCanvas;
+
+		}
+		
+		function sortDatasets() {
+			if (datasets.length < 1) {
+				return;
+			}
+
+			if (datasetsSorted) {
+				datasets.sort(function(a, b) {
+					return a.loadOrder-b.loadOrder;
+				});
+			}
+			else
+			{
+				datasets.sort(function(a, b) {
+					return a.medianFreq-b.medianFreq;
+				});
+			}
+			addDataset();
+			datasetsSorted = !datasetsSorted;
+		}
+		function addDataset(filename, image, scalar, medianFreq) {
+
+			var IMG_THUMB_H = 30;
+			var RECT_CHECK_H = 15;
+			var IMG_THUMB_OFFSET = 4;
+			
+			var newDataset = null;
+			if (filename && image && scalar) {
+				// create thumb
+				var thumb = createThumb(image, null, IMG_THUMB_H)
+
+				// create object for new dataset and add it to list
+				newDataset = {
+					filename: filename,
+					scalar: scalar,
+					thumb: thumb,
+					medianFreq: medianFreq,
+					loadOrder: datasets.length,
+					showCurve: true,
+					showMedianFreq: false
+				}
+				datasets.push( newDataset );
+			}
+
+
+			// update the sets
+			var update = d3.select('#svgDatasets').selectAll('g.dataset').data(datasets, function(d) { return d.loadOrder; });
+			
+			var enter = update.enter()
+			enter.append('g')
+				.attr('class', 'dataset')
+				.each(function(d) {
+					var thumb = d3.select(this).append('image')
+						.attr('width', function(d) { return d.thumb.width; }).attr('height', function(d) { return d.thumb.height; })
+						.attr('xlink:href', function(d) { return d.thumb.toDataURL(); });
+
+					(function(thumb, d) {
+						thumb.on("click", function() {
+							curDataset = d;
+							scalarField = d.scalar;
+
+							if (d.renderedImage) {
+								var canvas = $('#canvas').get(0);
+								var context = canvas.getContext('2d');
+								context.clearRect(0, 0, canvas.width, canvas.height);			
+								context.putImageData(d.renderedImage, 0, 0);
+							}
+
+							if (d3.select('#showQuadrants').node().checked) {
+								calcQuadrantStats();
+							}
+						});
+					})(thumb, d);
+
+					d3.select(this).append('rect')
+						.attr('x', 50).attr('y', 0).attr('width', IMG_THUMB_H).attr('height', IMG_THUMB_H)
+						.attr('class', 'referenceColor')
+						.style('stroke', 'none')
+						.style('fill', 'white')
+						.on('click', function(d, i) {
+							if (d.incrementColor === undefined) {
+								d.incrementColor = 1;
+							}
+							else
+							{
+								d.incrementColor++;
+							}
+							var newI = (d.incrementColor + d.loadOrder) % curveColors.length;
+							d.curveColor = curveColors[newI];
+							if (d.powerSpectraCurve) {
+								d.powerSpectraCurve.style('stroke', d.curveColor);
+								d.medianFreqLine.style('stroke', d.curveColor)
+							}
+							d3.select(this).style('fill', d.curveColor);
+
+						})
+
+					d.chkCurve = d3.select(this).append('rect')
+						.attr('x', 50 + IMG_THUMB_H + 5)
+						.attr('y', (IMG_THUMB_H-RECT_CHECK_H) / 2)
+						.attr('width', RECT_CHECK_H)
+						.attr('height', RECT_CHECK_H)
+						.attr('stroke', 'black')
+						.attr('fill', d.showCurve ? 'black' : 'white')
+						.on('click', function() {
+							d.showCurve = !d.showCurve;
+							d.powerSpectraCurve.attr('visibility', d.showCurve ? 'visible' : 'hidden');
+							d3.select(this).attr('fill', d.showCurve ? 'black' : 'white');
+						})
+
+					d.chkMedianFreq = d3.select(this).append('rect')
+						.attr('x', 50 + IMG_THUMB_H + RECT_CHECK_H + 5*2)
+						.attr('y', (IMG_THUMB_H-RECT_CHECK_H) / 2)
+						.attr('width', RECT_CHECK_H)
+						.attr('height', RECT_CHECK_H)
+						.attr('stroke', 'black')
+						.attr('fill', d.showMedianFreq ? 'black' : 'white')
+						.on('click', function() {
+							d.showMedianFreq = !d.showMedianFreq;
+							d.medianFreqLine.attr('visibility', d.showMedianFreq ? 'visible' : 'hidden');
+							d3.select(this).attr('fill', d.showMedianFreq ? 'black' : 'white');
+						})
+
+
+
+					// append median frequency
+					d.txtMedianFreq = d3.select(this).append('text')
+						.attr('class', 'datasetLabel')
+						.attr('x', 50 + IMG_THUMB_H + 2*RECT_CHECK_H + 5*3).attr('y', 20)
+						.html('mF: ' + d.medianFreq);
+
+				})
+				.on("mouseover", function(d, i) {
+					d3.select('#svgStats').selectAll('.powerCurve')
+						.style('stroke-opacity', '0.2');
+					d.powerSpectraCurve.style('stroke-opacity', '1.0');
+					d.medianFreqLine.style('stroke-opacity', '1.0')
+
+				})
+				.on("mouseout", function(d, i) {
+					d3.select('#svgStats').selectAll('.powerCurve')
+						.style('stroke-opacity', '1.0');				
+				});
+
+
+			// assign curve color
+			if (newDataset)
+			{
+				update.each(function(d, i) {
+					d.incrementColor = undefined;
+					var g = d3.select(this);
+					if (d.loadOrder < curveColors.length) {
+						d.curveColor = curveColors[d.loadOrder];
+					}
+					else
+					{
+						d.curveColor = 'black'
+					}
+					g.select('rect').style('fill', d.curveColor);
+				});
+			}
+
+			// update position
+			update
+				.transition()
+				.attr('transform', function(d, i) {
+					return 'translate(15,' + (i*(IMG_THUMB_H+IMG_THUMB_OFFSET)) + ')';
+				});
+
+			// calculate quadrant statistics
+			if (d3.select('#showQuadrants').node().checked) {
+				calcQuadrantStats();
+			}
+			return newDataset;
+		}
+
+		function updatePowerCurveColors()
+		{
+			var update = d3.select('#svgDatasets').selectAll('g.dataset')
+			update.each(function(d, i) {
+				if (d.powerSpectraCurve) {
+					d.powerSpectraCurve.style('stroke', d.curveColor);
+					d.medianFreqLine.style('stroke', d.curveColor);
+
+				}
+			});
+		}
+
+		function createUI()
+		{
+			/*
+			$('#sliderOctaves').slider();
+			$('#sliderScale').slider();
+			$('#sliderPersistence').slider();
+			*/
+
+			d3.select('#fileLoader').on('change', function() {
+				loadFiles();
+			});
+
+			drawColorPresets(d3.select('#colorPresets'), function(colorMap) 
+			{
+				if (scalarField)
+				{
+					scalarField.setColorMap(colorMap);
+					scalarField.getColorMap().visualize(d3.select('#svgColorMap'));
+					visualizeScalarField();
+					
+				}
+			});
+
+			d3.select(document)
+				.on('keydown', function() 
+				{
+					var keyCode = d3.event.keyCode;
+					if (selectedMarker)
+					{
+						if (keyCode >= 65 && keyCode <= 90) {
+							if (document.activeElement) {
+								if (d3.select(document.activeElement).attr('id') == 'markerString') {
+									return;
+								}
+							}
+
+							var letter = String.fromCharCode(keyCode).toUpperCase();
+							selectedMarker.changeMarkerLetter(letter);
+						}
+						else if (keyCode == 8) 
+						{
+							// backspace, remove selected marker
+							// although, make sure active element is not markerString textbox
+							if (document.activeElement) {
+								if (d3.select(document.activeElement).attr('id') == 'markerString') {
+									return;
+								}
+							}
+
+							var index = markers.findIndex(function(e) {
+								return e == selectedMarker;
+							});
+							if (index !== undefined) {
+								markers.splice(index, 1);
+								selectedMarker.remove();
+							}
+							selectedMarker = null;
+						}
+					}
+
+					if (keyCode == 16) {
+						shiftKey = true;
+					}
+					else if (keyCode == 17) {
+						ctrlKey = true;
+						d3.select('#canvas').style('z-index', '2000');
+					}
+					else if (keyCode == 219) {
+						// open braker
+						console.log("shape tolerance: " + incrementProfileShapeTolerance(-1));
+						visualizeProfileLines();
+					}
+					else if (keyCode == 221) {
+						console.log("shape tolerance: " + incrementProfileShapeTolerance(+1));
+						visualizeProfileLines();
+					}
+					else if (keyCode == 32)
+					{
+						console.log("blurring...");
+						blur();
+					}
+				})
+				.on("keyup", function() 
+				{
+					var keyCode = d3.event.keyCode;
+					if (keyCode == 16) {
+						shiftKey = false;
+					}
+					else if (keyCode == 17) {
+						ctrlKey = false;
+						d3.select('#canvas').style('z-index', null);
+
+					}
+
+				});
+			
+			d3.select("#markerString").on("keydown", function() {
+				var keyCode = d3.event.keyCode;
+				if (keyCode == 13)
+				{
+					var markerString = this.value;
+					parseMarkers(markerString);
+				}
+			});
+
+		}
+
+		function drawFFT() {
+			var fftMagnitude = scalarField.drawFFT();
+			var canvas = $('#canvas').get(0);
+			var context = canvas.getContext('2d');
+			context.clearRect(0, 0, canvas.width, canvas.height);			
+			context.putImageData(fftMagnitude, 0, 0);			
+		}
+		function addColor() {
+
+			if (scalarField)
+			{
+				var colorMap = scalarField.getColorMap();
+				colorMap.addColor();
+				colorMap.visualize(d3.select('#svgColorMap'));
+				visualizeScalarField();
+			}
+		}
+
+		function removeColor() {
+			if (scalarField) {
+				var colorMap = scalarField.getColorMap();
+				colorMap.removeColor();
+				colorMap.visualize(d3.select('#svgColorMap'));
+				visualizeScalarField();
+			}
+		}
+
+		function analyzeSpatialFrequency(_scalarField)
+		{
+			var field = _scalarField || scalarField;
+
+			// show frequency histogram
+			var freqHistogram = field.calcSpatialFrequency();
+
+			// figure out median power spectra
+			var powerOrderedSpectra = freqHistogram.powerSpectra.slice(0);
+			powerOrderedSpectra.sort(function(a, b) { return b.y-a.y});
+			var medianPower, medianFreq;
+			if (powerOrderedSpectra.length % 2 == 0) {
+				var i = powerOrderedSpectra.length / 2;
+				medianPower = (powerOrderedSpectra[i].x + powerOrderedSpectra[i-1].x) / 2;
+			}
+			else
+			{
+				var i = Math.floor(powerOrderedSpectra.length / 2);
+				medianPower = powerOrderedSpectra[i].x;
+			}
+
+			// find the frequency associated with the median power
+			var powerSpectra = freqHistogram.powerSpectra;
+			var cummulativePower = 0;
+			for (var i=0, len=powerSpectra.length; i<len; i++) {
+				cummulativePower += powerSpectra[i].y;
+			}
+			var halfSplitPower = cummulativePower/2;
+			for (var i=0, cumm=0, len=powerSpectra.length; i<len; i++) {
+				cumm += powerSpectra[i].y;
+				if (cumm >= halfSplitPower) {
+					medianFreq = powerSpectra[i].f;
+					break;
+				}
+			}
+
+			return {
+				medianFreq: medianFreq,
+				medianPower: medianPower,
+				powerSpectra: powerSpectra,
+			}
+		}
+
+		function newScalarField(filename, image, _scalarField) {
+
+			var field = _scalarField || scalarField;
+			field.normalize();
+
+			// two passes of blur
+			//field.blur(); //field.blur();
+
+			// assign a default color scale to the scalar field
+			field.setColorMap( getColorPreset('rainbowcie') );
+
+			// draw the color map
+			field.getColorMap().visualize(d3.select("#svgColorMap"));
+
+			// show frequency histogram
+			var spatialAnalysis = analyzeSpatialFrequency(); 
+
+			// add the dataset
+			var dataset = addDataset(filename, image, field, spatialAnalysis.medianFreq);
+
+			// set current dataset
+			curDataset = dataset;
+
+			// draw it
+			visualizeScalarField(field);
+
+			createPowerPlot(spatialAnalysis.powerSpectra, spatialAnalysis.medianFreq);
+		}
+
+		function createPowerPlot(powerSpectra, medianFreq)
+		{
+			var dataset = curDataset;
+
+			// create the chart
+			if (!powerChart)
+			{
+				powerChart = new PowerSpectraChart(d3.select('#svgStats'), SPECTRA_CHART_W, SPECTRA_CHART_H)
+			}
+
+			// plot power spectrum
+			dataset.powerSpectraCurve = powerChart.plotSpectra(powerSpectra);
+			if (!dataset.showCurve) {
+				dataset.powerSpectraCurve.attr('visibility', 'hidden');
+			}
+
+			// draw a line for x=median frequency
+			dataset.medianFreqLine = powerChart.plotMedian(medianFreq);
+			if (!dataset.showMedianFreq) {
+				dataset.medianFreqLine.attr('visibility', 'hidden');
+			}
+
+			// update colors of the different curves
+			updatePowerCurveColors();
+
+		}
+
+		function visualizeScalarField(_field) 
+		{
+			var field = _field || scalarField
+			var canvas = scalarField.generatePicture();
+			var imgData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+
+			var canvas = $('#canvas').get(0);
+			var context = canvas.getContext('2d');
+			context.clearRect(0, 0, canvas.width, canvas.height);			
+			context.putImageData(imgData, 0, 0);
+
+			if (curDataset) {
+				curDataset.renderedImage = imgData;
+			}
+
+			// draw color scale on the side
+			var colorScaleCanvas = d3.select('#canvasColorScale').node();
+			var colorMap = scalarField.getColorMap();
+			var scaleContext = colorScaleCanvas.getContext('2d');
+
+			// clear
+			scaleContext.clearRect(0, 0, colorScaleCanvas.width, colorScaleCanvas.height);	
+
+			var w = 75;
+			var h = colorScaleCanvas.height;
+			colorMap.drawColorScale(w, h, Math.floor(h/2), 'vertical', colorScaleCanvas);
+
+			// visualize tick marks
+			var TICKS =9;
+			var TICK_LENGTH = 10;
+			var FONT_SIZE = 18;
+
+			scaleContext.moveTo(0, 0);
+			scaleContext.lineTo(0, colorScaleCanvas.height);
+			scaleContext.stroke();
+
+			var MIN_VAL = 0, MAX_VAL = 1000;
+			for (var i=0; i<TICKS; i++) 
+			{
+				var n = i/(TICKS-1);
+				var v = n * (MAX_VAL-MIN_VAL)
+				var y = Math.floor((1-n)*(h-2) +.5) + 1;
+
+				scaleContext.moveTo(i == TICKS-1 || i == 0 ? 0 : w, y);
+				scaleContext.lineTo(w+TICK_LENGTH, y);
+				scaleContext.stroke();
+
+				scaleContext.font = FONT_SIZE + "px Monaco";
+				scaleContext.fillStyle = 'rgb(0,0,0)'
+				
+				if (i == TICKS-1) {
+					y+= FONT_SIZE;
+				}
+				else if (i != 0) {
+					y+= Math.floor(FONT_SIZE/2);
+				}
+				else if (i == 0) {
+					y -= 1;
+				}
+				scaleContext.fillText(v, w+TICK_LENGTH+3, y);
+
+			}
+		}
+
+		function drawHistogram(svg, w, h, histogram, xScale) {
+
+			var g = svg.append('g');
+			var histMax = d3.max(histogram);
+
+			g.selectAll('rect').data(histogram).enter().append('rect')
+				.attr('width', function(d) { return w / histogram.length })
+				.attr('height', function(d) { return h*d/histMax; })
+				.attr('x', function(d, i) { return i*w/histogram.length; })
+				.attr('y', function(d) { return h*(1-d/histMax); })
+				.attr('class', 'histogramRect');
+
+			// lines
+			g.append('line')
+				.attr('x1', 0).attr('x2', w).attr('y1', h).attr('y2', h)
+				.style('stroke', 'black').style('storke-width', '1px')
+
+			g.append('line')
+				.attr('x1', 0).attr('x2', 0).attr('y1', 0).attr('y2', h)
+				.style('stroke', 'black').style('storke-width', '1px')
+
+			return g;
+		}
+
+
+		// ===========================================
+		// Power spectra chart
+		// ============================================
+		function PowerSpectraChart(svg, w, h, maxFreq, maxPower)
+		{
+			this.w = w;
+			this.h = h;
+
+			// make a group for the chart
+			this.g = svg.append('g').attr('class', 'powerChart')
+				.attr('class', 'powerSpectraChart')
+				.attr('transform', 'translate(' + SPECTRA_CHART_OFFSET[0] + ',' + SPECTRA_CHART_OFFSET[1] + ')');
+
+
+			var xScale = d3.scale.log().domain([1, 2000 /*maxFreq+1*/]).range([0, w]);
+			var yScale = d3.scale.log().domain([1, 2000 /*maxPower+1*/]).range([h, 0]);
+			this.xScale = xScale; this.yScale = yScale;
+
+			// path generator for power spectra curves
+			this.pathGenerator = d3.svg.line()
+				.x(function(d) { return xScale(d.x+1); })
+				.y(function(d) { return yScale(d.y+1); })
+
+			// groups for the axes
+			this.xAxisG = this.g.append("g").attr('class', 'xaxis').attr('transform', 'translate(0,'+h+')');
+			this.yAxisG = this.g.append('g').attr('class', 'yaxis');
+
+			// axes
+			this.xAxis = d3.svg.axis()
+				.scale(xScale)
+				.ticks(0, ".1s")
+				.orient('bottom');
+			this.xAxisG.call(this.xAxis);
+
+			this.yAxis = d3.svg.axis()
+				.scale(yScale)
+				.ticks(0, ".1s")
+				.orient('left')
+			this.yAxisG.call(this.yAxis);
+
+		}
+
+		PowerSpectraChart.prototype.plotSpectra = function(powerSpectra)
+		{
+			var curveCommand = this.pathGenerator(powerSpectra);
+			var path = this.g.append('path')
+				.attr('class', 'powerCurve')
+				.attr('d', curveCommand)
+				.style('stroke', 'black')
+				.style('fill', 'none');
+			return path;
+		}
+		PowerSpectraChart.prototype.plotMedian = function(medianFreq)
+		{
+			var x = this.xScale(medianFreq);
+			var medianLine = this.g.append('line')
+				.attr('class', 'powerCurve')
+				.attr('x1', x).attr('x2', x)
+				.attr('y1', 0)
+				.attr('y2', this.h-1);
+			return medianLine;
+		}
+
+
+
+
+		// ===============================================
+		// File loading
+		// ================================================
+		function loadFiles() 
+		{
+			var preview = document.querySelector('#preview');
+			var files   = document.querySelector('input[type=file]').files;
+
+			function readAndPreview(file) 
+			{
+				// Make sure `file.name` matches our extensions criteria
+				if ( /\.(jpe?g|png|gif|tif|tiff)$/i.test(file.name) ) 
+				{
+					var reader = new FileReader();
+
+					// attach event listener listener
+					reader.addEventListener("load", function () 
+					{
+						var image = new Image();
+						var image = new Image();
+						image.onload = function() {
+							var internalCanvas = document.createElement('canvas');
+							internalCanvas.width = image.width;
+							internalCanvas.height = image.height;
+							var context = internalCanvas.getContext('2d');
+							context.drawImage(image, 0, 0);
+
+							// get image data
+							var imgData = context.getImageData(0, 0, image.width, image.height);
+							scalarField = scalarFromImageData(imgData);
+							scalarField.normalize();
+							newScalarField(scalarField);
+								
+							// draw the image on the canvas
+							var canvas = $('#canvas').get(0);
+							var canvasW = canvas.width;
+							var canvasH = canvas.height;
+							var w = image.width, h = image.height;
+							var scaledW, scaledH, scaleFactor = 1;
+
+							if (isScale())
+							{
+								if (w > canvasW)
+								{
+									scaleFactor = w/canvasW;
+
+									// prioritize maintaining width over height
+									scaledW = canvasW;
+									scaledH = Math.floor(h/scaleFactor);
+
+									if (scaledW % 2 != 0) scaledW--;
+									if (scaledH % 2 != 0) scaledH--;
+								}
+							}
+							
+							if (scaleFactor == 1)
+							{
+								var readW = w, readH = h;
+								if (CROP_TO_CANVAS) {
+									readW = Math.min(readW, canvasW);
+									readH = Math.min(readH, canvasH);
+								}
+								if (readW % 2 != 0) readW--;
+								if (readH % 2 != 0) readH--;
+
+								scalarField = scalarFromImageData(imgData, readW, readH);
+							}
+							else
+							{
+								scalarField = scalarFromImageData(imgData, w, h);
+								var cropH = CROP_TO_CANVAS ? Math.min(scaledH, canvasH) : null
+								console.log("scalling from " + w + "x" + h + " to " + scaledW + "x" + (cropH || scaledH));
+								scalarField.scale(scaledW, scaledH, null, cropH);
+							}
+							
+							newScalarField(file.name, image, scalarField);
+						}
+						image.title = file.name;
+						image.src = this.result;
+						
+
+					}, false);
+					
+					// read the file
+					reader.readAsDataURL(file);
+				}
+				else if ( /\.(hdr)$/i.test(file.name) )
+				{
+					// see if we have the file name
+					var filename = removeExtension(file.name);
+					var fileRecord = binaryFiles[filename];
+					if (fileRecord === undefined || fileRecord === null) 
+					{
+						fileRecord = {
+							filename: filename,
+							headerFile: file.name
+						};
+						binaryFiles[filename] = fileRecord;
+					}
+
+					// parse the header
+					(function(file, fileRecord) 
+					{
+						parseHDR(file, function(header) 
+						{
+							fileRecord.header = header;
+							if (fileRecord.dataview) 
+							{
+								readGridFloat(fileRecord);
+							}
+						});
+					})(file, fileRecord);
+				}
+				else if ( /\.(flt|dat)$/i.test(file.name) )
+				{
+					var canvas = d3.select('#canvas').node();
+					var reader = new FileReader();
+					reader.onload = function(event) 
+					{
+						var result = event.target.result;
+						console.log("Binary file length: " + result.byteLength);
+
+						// create a data view
+						var floatview = new Float32Array(result);
+						var dataview = new DataView(result);
+
+						// see if we have a header/file record for this file
+						var filename = removeExtension(file.name)
+						var fileRecord = binaryFiles[ filename ];
+						if (!fileRecord) {
+							fileRecord = {
+								filename: filename,
+								dataview: dataview,
+								floatview: floatview
+							};
+							binaryFiles[ filename ] = fileRecord;
+							
+							if (result.byteLength == 4 * canvas.width * canvas.height) 
+							{
+								console.log("matches canvas dimensions");
+								// create header on the assumption that the file matches the dimensions
+								// of our canvas
+								fileRecord.header = {
+									byteorder: 'LSBFIRST',
+									ncols: canvas.width,
+									nrows: canvas.height
+								};
+								readGridFloat(fileRecord);	
+							}
+
+						}
+						else
+						{
+							fileRecord.dataview = dataview;
+							if (fileRecord.header) {
+								readGridFloat(fileRecord);
+							}
+						}
+					}
+
+					reader.readAsArrayBuffer(file);
+				}
+			}
+
+			if (files) {
+				[].forEach.call(files, readAndPreview);
+			}
+		}
+
+		function parseHDR(file, callback)
+		{
+			var reader = new FileReader();
+			reader.onload = function(event) 
+			{
+				var result = event.target.result;
+
+				// parse lines
+				var lines = result.split('\n');
+				var header = {};
+
+				for (var i=0; i<lines.length; i++) {
+					var meta = lines[i].match(/\S+/g);
+					if (meta !== null) {
+						header[ meta[0] ] = isNaN(meta[1]) ? meta[1] : Number(meta[1]);
+					}
+				}
+
+				callback(header);
+			}
+			reader.readAsText(file);
+		}
+
+		function readGridFloat(fileRecord) 
+		{
+			console.log("read grid float: " + fileRecord.header.ncols + " x " + fileRecord.header.nrows );
+			
+			var canvas = d3.select('#canvas');
+			var canvasW = +canvas.attr('width');
+			var canvasH = +canvas.attr('height');
+			var w = fileRecord.header.ncols;
+			var h = fileRecord.header.nrows;
+
+			var sW = w, sH = h, scaledW, scaledH, scaleFactor = 1;
+
+			if (isScale())
+			{
+				if (w > canvasW)
+				{
+					scaleFactor = w/canvasW;
+
+					// prioritize maintaining width over height
+					scaledW = canvasW;
+					scaledH = Math.floor(h/scaleFactor);
+
+					if (scaledW % 2 != 0) scaledW--;
+					if (scaledH % 2 != 0) scaledH--;
+				}
+			}
+			
+			if (CROP_TO_CANVAS && scaleFactor == 1)
+			{
+				sW = Math.min(sW, canvasW);
+				sH = Math.min(sH, canvasH);
+				if (sW % 2 != 0) sW--;
+				if (sH % 2 != 0) sH--;
+			}
+
+			// make sure width and height are a multiple of two (for FFT to work properly)
+			scalarField = new ScalarField(sW, sH);
+
+			var input = fileRecord.dataview;
+			var finput = fileRecord.floatview;
+			var output = scalarField.view;
+			var endianness = fileRecord.header.byteorder === 'LSBFIRST' ? true : false;
+
+			for (var i=0, r=0, rOffset = 0; r<sH; r++, rOffset += w) 
+			{
+				for (var c=0; c<sW; c++, i++) {
+					output[i] = 
+						//finput[ rOffset+c ];	// <--- this should work is we're in little endian (LSBFIRST)
+						input.getFloat32(4*(rOffset + c), endianness);
+				}
+			}
+
+			// scale
+			if (scaleFactor != 1) 
+			{
+				var cropH = CROP_TO_CANVAS ? Math.min(scaledH, canvasH) : null
+				console.log("scalling from " + w + "x" + h + " to " + scaledW + "x" + (cropH || scaledH));
+				scalarField.scale(scaledW, scaledH, null, cropH);
+			}
+
+			// normalize the scalar field
+			scalarField.normalize();
+
+			// get a greyscale image of the scalar
+			scalarField.setColorMap( getColorPreset('greyscale') );
+			var canvas = scalarField.generatePicture();
+			var image = new Image();
+			image.width = canvas.width;
+			image.height = canvas.height;
+			image.src = canvas.toDataURL();
+
+			// create the new scalar
+			newScalarField(fileRecord.filename, image, scalarField);
+
+			// clear temporary data to reclaim memory
+			binaryFiles[fileRecord.filename] = undefined;
+		}
+
+		function removeExtension(filename) 
+		{
+			var lastDotPosition = filename.lastIndexOf(".");
+			if (lastDotPosition === -1) return filename;
+			else return filename.substr(0, lastDotPosition);
+		}
+
+		// ================================================
+		// Markers
+		// ================================================
+		function parseMarkers(markerString)
+		{
+			for (var i=0; i<markers.length; i++) {
+				markers[i].remove();
+			}
+			markers = []; selectedMarker = null;
+
+
+			var tokens = markerString.split(',');
+			var A = null, B = null;
+			for (var i=0; i<tokens.length; i+=3)
+			{
+				var label = tokens[i];
+				var x = +tokens[i+1];
+				var y = +tokens[i+2];
+
+				var marker = new Marker(d3.select("#svgOverlay"), label, x, y);
+				markers.push( marker );
+			}
+			printMarkers();
+		}
+
+		function addMarker() 
+		{
+			unselectMarker();
+			selectedMarker = new Marker(d3.select('#svgOverlay'));
+			markers.push(selectedMarker);
+
+			// highlight as selected
+			selectedMarker.highlight(true);
+			printMarkers();
+		}
+
+		function unselectMarker() {
+			if (selectedMarker) {
+				selectedMarker.highlight(false);
+			}
+			selectedMarker = null;
+			removeProfileLine();
+		}
+
+		var PROFILE_VIS_W = 170;
+		var PROFILE_VIS_H = 70;
+
+		
+		function visualizeProfileLines()
+		{
+			for (var i=0; i<profileShapeComplimentary.length; i++) 
+			{	
+				// draw to canvas
+				var index = i+1;
+				var canvas = d3.select('#canvasProfile' + index);
+				profileShapeComplimentary[i].visualizeToCanvas(canvas, PROFILE_VIS_W, PROFILE_VIS_H);
+			}
+
+			// show similarity to profile
+			var p0 = profileShapeComplimentary[0];
+			for (var i=0; i<profileShapeComplimentary.length; i++) 
+			{
+				var index = i+1;
+				var similarity = p0.similarity(profileShapeComplimentary[i]);
+				similarity = Math.min(100, Math.floor(.5 + similarity * 100));
+				d3.select("#simProfile" + index).html(similarity + '%');
+			}
+		}
+
+		function addProfileLine() 
+		{
+
+			if (travelLine) {
+				travelLine.remove();
+			}
+
+			var p1 = {
+				x: selectedMarker.getX(),
+				y: selectedMarker.getY()
+			};
+			var p2 = {
+				x: destinationMarker.getX(),
+				y: destinationMarker.getY()
+			};
+			var actualDistance = Math.sqrt(Math.pow(p1.x-p2.x, 2) + Math.pow(p1.y-p2.y, 2));
+
+			travelLine = d3.select('#svgOverlay').append('line')
+				.attr('stroke-dasharray', "5, 5")
+				.style('stroke', 'black')
+				.style('stoke-width', '2px')
+				.attr('x1', p1.x)
+				.attr('y1', p1.y)
+				.attr('x2', p2.x)
+				.attr('y2', p2.y);
+
+			// calculate profile along the line
+			if (profileShapeVis) {
+				profileShapeVis.remove();
+				profileShapeVis = null;
+
+				for (var i=0; i<profileShapeComplimentary.length; i++) {
+					profileShapeComplimentary[i].remove();
+				}
+			}
+			profileShapeComplimentary = [];
+
+			
+			profileShapeVis = new Profile(scalarField, p1, p2);
+			/*
+			profileShapeVis.visualize(d3.select('#svgStats'), PROFILE_VIS_W, PROFILE_VIS_H)
+				.attr('transform', 'translate(' + (SPECTRA_CHART_OFFSET[0] + SPECTRA_CHART_W + 20) + ',' + SPECTRA_CHART_OFFSET[1] + ')');
+			*/
+			profileShapeComplimentary.push( profileShapeVis );
+
+			// generate additional random complimentary points
+			var w = scalarField.w, h = scalarField.h;
+			var lastProfile = null;
+			for (var i=1; i<=5; i++) 
+			{
+				var pp1 = {
+					x: (w-15*2) * Math.random() + 15,
+					y: (h-15*2) * Math.random() + 15				
+				};
+
+				var pp2 = null;
+				while (pp2 == null)
+				{
+					var v = [Math.random(), Math.random()];
+					if (v[0] == 0 && v[1] == 0) {
+						continue;
+					}
+					else
+					{
+						var l = Math.sqrt(Math.pow(v[0],2) + Math.pow(v[1],2));
+						v[0] /= l; v[1]/= l;
+
+						pp2 = {
+							x: pp1.x + actualDistance * v[0], //(w-15*2) * Math.random() + 15,
+							y: pp1.y + actualDistance * v[1]  //(h-15*2) * Math.random() + 15				
+						};
+					}
+
+					if (!(pp2.x >= 0 && pp2.x <=w-1 && pp2.y >= 0 && pp2.y <= h-1)) {
+						pp2 = null;
+						pp1 = {
+							x: (w-15*2) * Math.random() + 15,
+							y: (h-15*2) * Math.random() + 15				
+						};
+
+					}
+				}
+
+				// reverse the previous profile
+				var reverseProfile = null;
+				if (i > 0) 
+				{
+					reverse = profileShapeComplimentary[i-1].getProfile().slice(0); 
+					reverseProfile = new Profile(reverse.reverse());
+				}
+
+				// generate a random profile
+				var randomProfile = new Profile(scalarField, pp1, pp2);
+				
+				if (reverseProfile && (i == 1 || i == 5))
+				{
+					profileShapeComplimentary.push(reverseProfile);
+
+				}
+				else
+				{
+					profileShapeComplimentary.push(randomProfile);
+				}
+			}
+
+			visualizeProfileLines();
+
+			// add events to mark canvas when clicked
+			d3.selectAll('canvas.profile')
+				.on('mousedown', function() {
+
+					d3.selectAll('canvas.profile')
+						.style("border", null)
+						.style("z-index", null);
+
+					d3.select(this)
+						.style("border", "solid 2px red")
+						.style('z-index', 200);
+				});
+		}
+
+		function removeProfileLine() {
+			if (travelLine) {
+				travelLine.remove();
+				travelLine = null;
+			}
+
+			/*
+			if (profileShapeVis) {
+				profileShapeVis.remove();
+				profileShapeVis = null;
+			}
+			*/
+		}
+
+		var TEXT_OFFSET = 10;
+		var CIRCLE_RADIUS = 3;
+
+		function Marker(svg, label, _x, _y) 
+		{
+			var PAD = 30;
+
+
+			var canvas = d3.select('#canvas').node();
+			var w = canvas.width;
+			var h = canvas.height;
+
+			this.x = (_x !== undefined && _x !== null) ? _x : (w-PAD*2) * Math.random() + PAD;
+			this.y = (_y !== undefined && _y !== null) ? _y : (h-PAD*2) * Math.random() + PAD;
+
+			this.g = svg.append('g').attr('transform', 'translate(' + this.x + ',' + this.y + ')');
+			this.circleGlow = this.g.append('circle')
+				.attr('r', CIRCLE_RADIUS)
+				.style('filter', 'url(#glow)')
+				.style('fill', '#dddddd')
+				.style('stroke', 'none');
+
+			this.circle = this.g.append('circle')
+				.attr('r', CIRCLE_RADIUS)
+				.attr('stroke', 'none')
+				.attr('fill', 'black');
+			
+			this.textGlow = this.g.append('text')
+				.attr('class', 'marker')
+				.attr('x', TEXT_OFFSET)
+				.attr('y', -TEXT_OFFSET)
+				.style('filter', 'url(#glow)')
+				.style('fill', '#dddddd')
+				.html(label || 'X');
+
+			this.text = this.g.append('text')
+				.attr('class', 'marker')
+				.attr('x', TEXT_OFFSET)
+				.attr('y', -TEXT_OFFSET)
+				.html(label || 'X');
+
+			(function(marker) {
+				marker.g
+					.on('mousedown', function() 
+					{
+						if (shiftKey && selectedMarker && selectedMarker != marker)
+						{
+							// add a destination marker
+							destinationMarker = marker;
+
+							// add a travel line
+							addProfileLine();
+
+						}
+						else {
+							var mouse = d3.mouse(document.body)
+							marker.mouse = mouse;
+							
+							unselectMarker();
+							selectedMarker = marker;
+							selectedMarker.highlight(true)
+
+							d3.select(document).on('mousemove', function() 
+							{
+								var mouse = d3.mouse(document.body);
+								var dX = mouse[0]-marker.mouse[0];
+								var dY = mouse[1]-marker.mouse[1];
+								var x = marker.x + dX;
+								var y = marker.y + dY;
+								marker.mouse = mouse;
+								marker.updatePosition(x, y);
+								//marker.g.attr('transform', 'translate(' + marker.x + ',' + marker.y + ')');
+
+							});
+
+							d3.select(document).on('mouseup', function() {
+								marker.mouse = undefined;
+								d3.select(document).on('mousemove', null).on('mouseup', null);
+							});
+						}
+
+						d3.event.stopPropagation();
+					});
+			})(this);
+
+			this.markerIndex = markers.length;
+
+			// arm the svg to unselect, if clicked anywhere
+			svg.on("mousedown", function() {
+				unselectMarker();
+			})
+		}
+
+		Marker.prototype.updatePosition = function(x, y) 
+		{
+			if (x !== null && x !== undefined) this.x = x;
+			if (y !== null && y !== undefined) this.y = y;
+
+			this.g.attr('transform', 'translate(' + this.x + ',' + this.y + ')');
+			printMarkers();
+		}
+		Marker.prototype.getX = function() {
+			return this.x;
+		}
+		Marker.prototype.getY = function() {
+			return this.y;
+		}
+		Marker.prototype.getLabel = function() {
+			return this.text.html();
+		}
+
+
+		Marker.prototype.highlight = function(isSelected) 
+		{
+			this.text.style('fill', isSelected ? 'red' : '');
+		}
+
+		Marker.prototype.textOffset = function(offset) {
+			this.g.selectAll('text')
+				.attr('x', offset)
+				.attr('y', -offset);
+		}
+		Marker.prototype.remove = function() {
+			this.g.remove();
+			if (selectedMarker == this) {
+				selectedMarker = null;
+			}
+			printMarkers();
+		}
+
+		Marker.prototype.changeMarkerLetter = function(letter)
+		{
+			this.textGlow.html(letter);
+			this.text.html(letter);
+			printMarkers();
+		}
+
+	</script>
+
+</body>
+</html>

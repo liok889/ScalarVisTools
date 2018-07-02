@@ -1,0 +1,2198 @@
+<html>
+	<head>
+		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+		<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+		<script src="src/scalar.js"></script>
+		<script src="src/colormap.js"></script>
+		<script src="src/profile.js"></script>
+		<script src="src/ts.js"></script>
+		<script src="src/perlin.js"></script>
+		<script src="src/spectrachart.js"></script>
+		<script src="src/markers.js"></script>
+		<script src="src/loadfile.js"></script>
+		<script src="kissfft/a.out.js"></script>
+		<script src="kissfft/kissfft.js"></script>
+		<script src="lib/three.js"></script>
+		<script src="lib/jszip.min.js"></script>
+		<script src="lib/FileSaver.min.js"></script>
+
+		<title>Noise generator</title>
+		<style>
+			body, html 
+			{
+				font-family: sans-serif;
+				font-size: 12px;
+			}
+			td {font-size: 13px;}
+
+			/*
+			svg, text, body 
+			{
+				cursor: default;
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+			*/
+
+			.xaxis, .yaxis 
+			{
+				shape-rendering: crispEdges;
+				font-size: 15px;
+				font-weight: normal;
+			}
+			.xaxis line, .yaxis line,
+			.xaxis path, .yaxis path {
+				fill: none;
+				stroke: #000;
+			}
+
+			.marker 
+			{
+				font-family: Helvetica;
+				font-size: 30px;
+				font-weight: 100;
+				fill: black;
+				stroke: none;
+			}
+
+		</style>
+	</head>
+
+<body>
+
+	<div>
+		<div style="float: left">
+			
+			<div style="top:140px; left: 5px; z-index: 1000; color: ">
+				<font style="font-family: Helvetica; font-weight: 100; font-size: 30px">ChroMap</font>
+			</div>
+     	   <!-- alternative dimensions: 1024 x 786 | *900 x 690* | 850 x 652 | 820 x 630 -->
+
+			<svg id="svgOverlay" width="820" height="630" style="pointer-events: none; position: absolute; top:140px; left: 5px; z-index: 1000">
+			<defs>
+				<filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+					<feGaussianBlur stdDeviation="2 2" result="glow"/>
+					<feMerge>
+						<feMergeNode in="glow"/>
+						<feMergeNode in="glow"/>
+						<feMergeNode in="glow"/>
+					</feMerge>
+				</filter>
+			</defs>
+				<g id="boxOverlay"></g>
+			</svg>
+
+			<svg id="svgTest" width="820" height="400" style="border: dashed 1px black; position: absolute; left: 5px; top: 770px">
+			</svg>
+			<script>
+
+				function printScalarField() {
+					var f = scalarField;
+
+					var SAMPLE_RATE = 50;
+					var QUANT = 100;
+
+					var arr = [];
+					for (var h=0; h<scalarField.h; h+= SAMPLE_RATE) 
+					{
+						var a = [];
+						for (var w=0; w<scalarField.w; w += SAMPLE_RATE) 
+						{	
+							var f = scalarField.view[ h*scalarField.w + w ];
+							var ff = Math.min(QUANT, Math.floor(.5 + QUANT*f));
+							a.push(ff);
+						}
+						arr.push(a);
+					}
+
+					var svg = d3.select('#svgTest');
+					svg.selectAll('*').remove();
+					var g = svg.append('g')
+					g.attr('translate(40,20)');
+
+					var rows = g.selectAll('g.row')
+						.data(arr).enter().append('g')
+						.attr('class', 'row')
+						.attr('transform', function(d, i) { return 'translate(0,' + (i*12) + ')'; });
+
+					rows.selectAll('text').data(function(d, i) { return d; }).enter().append('text')
+						.html(function(d) { return d; })
+						.attr('text-anchor', 'middle')
+						.attr('x', function(d, i) { return i*17})
+						.attr('y', 10)
+						.style('font-family', 'Monaco').style('font-size', '10px');
+				}
+
+			</script>
+			
+     	   <!-- alternative dimensions: 1024 x 786 | *900 x 690* | 850 x 652 | 820 x 630 -->
+			<canvas id="mainCanvas" width="820" height="630" style="position: absolute; top:140px; left: 5px; border: solid 1px black; margin-right: 10px; z-index: 0"></canvas>
+			<canvas id="glCanvas" width="820" height="630" style="position: absolute; top:140px; left: 5px; border: solid 1px black; margin-right: 10px; z-index: 100"></canvas>
+		</div>
+		<div style="position: absolute; top: 5px; left: 830px; border: dashed 1px black; float: left; margin-right: 15px; padding: 5px 5px">
+			<div>
+				<b>File loader <input style="background-color: yellow; font-size: 15px; width: 300px" id="fileLoader" name="file" type="file" multiple><br>
+				<b>Octave optimization</b><br>
+				<table cellspacing="3">
+					<tr>
+						<td>scale</td>
+						<td><div id="sliderScale" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>O 1</td>
+						<td><div id="sliderNoise1" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>O 2</td>
+						<td><div id="sliderNoise2" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>O 3</td>
+						<td><div id="sliderNoise3" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>O 4</td>
+						<td><div id="sliderNoise4" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>O 5</td>
+						<td><div id="sliderNoise5" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>exponent</td>
+						<td><div id="sliderExponent" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>blur</td>
+						<td><div id="sliderBlur" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+					<tr>
+						<td>contour</td>
+						<td><div id="sliderContour" style="width: 80px; height: 5px; font-size: 10px"></div></td>
+					</tr>
+
+				</table><br>
+				<button onclick="regenerate()">regenerate</button>&nbsp;&nbsp;
+				<button onclick="toggleFFT()">FFT</button>&nbsp;&nbsp;
+				<button id="noiseButton" onclick="toggleNoiseFunc()">perlin</button>&nbsp;&nbsp;
+				<button id="" onclick="toggleInversion()">invert</button>&nbsp;&nbsp;	
+				<button id="glButton" onclick="toggleRenderType()">JS</button>			
+
+			</div>
+
+			<div style="overflow-x: hidden; overflow-y: scroll; padding: 0px 0px">
+				<p><b>Color maps</b><br>
+				<svg id="svgColorMap" width="300" height="280" style="border: solid 0px black; background-color: white">
+					<g id="colorPresets" transform="translate(125,15)"></g>
+				</svg>
+
+			</div>
+
+			<div>
+				<svg id="svgStats" width="350" height="200"></svg>
+				<div>median freq: <span id="medianFreq"></span></div>
+			</div>
+		</div>
+		<div style="position: absolute; top: 5px; left: 1220px; border: dashed 1px black; float: left; margin-right: 15px; padding: 5px 5px">
+			<button id="generateProfileButton" onclick="createRandomProfile()">sample profile quiz</button><br>
+			<svg id="svgProfile" width="150" height="300"></svg><br>
+
+			<button id="generateSteepnessButton" onclick="createSteepnessQuiz()">sample steepness quiz</button><br>
+			<p>generate experiment stimuli:<br>
+			<button id="" onclick="createExperimentEnsemble(1)">value estimation (exp 1)</button><br>
+			<button id="" onclick="createExperimentEnsemble(3)">steepness quiz (exp 2)</button><br>
+			
+			<button id="" onclick="createExperimentEnsemble(2)">profile quiz (exp 3)</button><br><br>
+
+
+		</div>
+	</div>
+
+	<div id="taskOutput" style="position: absolute; top: 800px">
+	</div>
+
+	<script type="text/javascript">
+		var STIMULI;
+		var frequencyConditions = 
+		[
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11},
+		];
+
+		var frequencyConditionsExp2 = 
+		[
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 1},
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 2},
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 3},
+
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 1},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 2},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 3},
+
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 1},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 2},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 3},
+
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 1},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 2},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 3},
+
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 1},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 2},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 3},
+		];
+
+		var EXP3_TRIAL_PER_FREQ = 4
+		var frequencyConditionsExp3 = 
+		[
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 1, diffRatio: .90, difficulty: 3},
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 2, diffRatio: .86, difficulty: 2},
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 3, diffRatio: .83, difficulty: 1},
+			{f: 1, noiseScale: 1.00, expectedMedianF: 3, trial: 4, diffRatio: .80, difficulty: 2},
+
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 1, diffRatio: .90, difficulty: 3},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 2, diffRatio: .86, difficulty: 2},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 3, diffRatio: .83, difficulty: 1},
+			{f: 2, noiseScale: 1.75, expectedMedianF: 5, trial: 4, diffRatio: .80, difficulty: 1},
+
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 1, diffRatio: .90, difficulty: 3},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 2, diffRatio: .86, difficulty: 2},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 3, diffRatio: .83, difficulty: 1},
+			{f: 3, noiseScale: 2.60, expectedMedianF: 7, trial: 4, diffRatio: .80, difficulty: 1},
+
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 1, diffRatio: .90, difficulty: 3},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 2, diffRatio: .86, difficulty: 2},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 3, diffRatio: .83, difficulty: 1},
+			{f: 4, noiseScale: 4.10, expectedMedianF: 9, trial: 4, diffRatio: .80, difficulty: 1},
+
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 1, diffRatio: .90, difficulty: 3},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 2, diffRatio: .86, difficulty: 2},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 3, diffRatio: .83, difficulty: 1},
+			{f: 5, noiseScale: 5.20, expectedMedianF: 11, trial: 4, diffRatio: .80, difficulty: 1},
+
+		];
+
+
+		var conditions = [
+			[
+				{colorscale: 'greyscale',			name: 'greyscale'}, 
+				{colorscale: 'cubehelix',			name: 'cubehelix'}, 
+				{colorscale: 'rainbowcie',			name: 'rainbow'}
+			],
+			
+			
+			[
+				{colorscale: 'singlehue',			name: 'singlehue'}, 
+				{colorscale: 'extendedBlackBody',	name: 'extbodyheat'}, 
+				{colorscale: 'spectral',			name: 'spectral'}
+			],
+			
+			[
+				{colorscale: 'bodyheat',			name: 'bodyheat'}, 
+				{colorscale: 'coolwarm',			name: 'coolwarm'},		// formerley blue-red, due to Mooresland
+				{colorscale: 'blueyellow',			name: 'blueyellow'}	// blue-yello saturation
+			]
+		];
+
+
+		function createExperimentEnsemble(experiment)
+		{
+			STIMULI = [];
+			var div = d3.select('#taskOutput');
+			div.selectAll('*').remove();
+
+			var freqs = null;
+			switch (experiment)
+			{
+			case 1:
+				freqs = frequencyConditions;
+				break;
+			case 2:
+				freqs = frequencyConditionsExp2;
+				break;
+			case 3:
+				freqs = frequencyConditionsExp3;
+				break;
+			default:
+				console.error("Invalid experiment number: " + experiment);
+				return;
+			}
+
+			var profiles = null, steepnessQuiz = null;
+			var boxes = null;
+			for (var f=0; f<freqs.length; f++)
+			{
+				// assign noise scale and re-generate noise
+				var seed = null, done = false;
+				var cond = freqs[f];
+
+				while (!done) 
+				{
+					seed = Math.random();
+					noise.seed(seed);
+					refreshNoise(cond.noiseScale);
+
+					// analyze image
+					analyzeImage();
+
+					// get median frequency
+					var medianF = spatialAnalysisResult.medianFreq;
+
+					if (!isNaN(cond.expectedMedianF) && (medianF != cond.expectedMedianF)) 
+					{
+						// generated field doesn't have the specified median frequency
+						console.log("Expected: " + cond.expectedMedianF + ", got: " + medianF);
+					}
+					else
+					{
+
+						switch (experiment)
+						{
+						case 1:
+							// no need for extra stimuli information in experiment 1
+							done = true;
+							break;
+
+						case 2:
+							
+							profiles = createRandomProfile();
+							if (profiles) {
+								done = true;
+							}
+							else
+							{
+								console.warn("Couldn't generate satisfactor profile task. Redoing");
+							}
+							break;
+
+						case 3:
+							steepnessQuiz = createSteepnessQuiz(cond.diffRatio);
+							if (steepnessQuiz) 
+							{
+								done = true;
+							}
+							else
+							{
+								console.warn("Couldn't generate satisfactor steepness quiz. Redoing");		
+							}
+							break;
+						}
+					}
+				}
+
+				// store median frequency
+				freqs[f].medianFreq = spatialAnalysisResult.medianFreq;
+				console.log("medianFreq: " + freqs[f].medianFreq);
+
+
+				// create random profile
+				div.append('p').html("noise scale: " + freqs[f].noiseScale + ", seed: " + seed + ', median freq: ' + freqs[f].medianFreq);
+
+				var table = div.append("table");
+				table.attr('border', '1');
+
+				var tr = table.selectAll('tr').data(conditions).enter().append('tr')
+				var td = tr.selectAll('td').data(function(d) { return d; }).enter().append('td');
+
+				(function(profiles, steepness, td, experiment) 
+				{
+					td.each(function(d, i) 
+					{
+
+						var PROFILE_W = 150;
+						var PROFILE_H = 80;
+
+						var canvasW = +$('#mainCanvas').get(0).width;
+						var canvasH = +$('#mainCanvas').get(0).height;
+						var SCALE = 1/5;
+
+						var thisTD = d3.select(this);
+						var thisTable = thisTD.append('table');
+						var thisTR = thisTable.append('tr');
+
+						var td1 = thisTR.append('td');
+						var td2 = thisTR.append('td');
+
+						var img = td1.append("img");
+
+						// copy scalar field
+						var myField = scalarField.duplicate();
+
+						// flip if needed
+						if (i % 3 == 0) 
+						{
+							// do nothing
+							switch(experiment)
+							{
+
+							case 1:
+								d.markerString = null;
+								break;
+							case 2:
+								d.markerString = 'A,' + markerA.getX() + ',' + markerA.getY() + ',B,' + markerB.getX() + ',' + markerB.getY();
+								break;
+							case 3:
+								d.markerString = 'A,' + 
+									steepness.boxA.x + ',' +
+									steepness.boxA.y + ',' +
+									steepness.boxA.w + ',' +
+									steepness.boxA.h + ',' +
+									'B,' +
+									steepness.boxB.x + ',' +
+									steepness.boxB.y + ',' +
+									steepness.boxB.w + ',' +
+									steepness.boxB.h;
+
+								d.correctAnswer = 
+										steepness.boxA.stats.steepness > steepness.boxB.stats.steepness ? 'A' : 'B';
+
+								d.lowSteepness = Math.min(
+									steepness.boxA.stats.steepness,
+									steepness.boxB.stats.steepness
+								);
+								d.highSteepness = Math.max(
+									steepness.boxA.stats.steepness,
+									steepness.boxB.stats.steepness
+								);
+								
+								break;
+							}
+						}
+						else if (i % 3 == 1) 
+						{
+							myField.flipH();
+							myField.flipV();
+							d.hFlip = true;
+							d.vFlip = true;
+
+							switch (experiment)
+							{
+							case 1:
+								d.markerString = null;
+								break;
+
+							case 2:
+								// flip markers
+								flipHMarkers();
+								flipVMarkers();
+
+								// switch A and B
+								d.markerString = 'A,' + markerB.getX() + ',' + markerB.getY() + ',B,' + markerA.getX() + ',' + markerA.getY();
+
+								// reflip markers
+								flipHMarkers();
+								flipVMarkers();
+								break;
+
+							case 3:
+								{
+									var flippedA = flipHBox(steepness.boxA);
+									flippedA = flipVBox(flippedA);
+
+									var flippedB = flipHBox(steepness.boxB);
+									flippedB = flipVBox(flippedB);
+
+									if (flippedA.x > flippedB.x) {
+										var temp = flippedA;
+										flippedA = flippedB;
+										flippedB = temp;
+									}
+								
+									d.markerString = 'A,' + 
+										flippedA.x + ',' +
+										flippedA.y + ',' +
+										flippedA.w + ',' +
+										flippedA.h + ',' +
+										'B,' +
+										flippedB.x + ',' +
+										flippedB.y + ',' +
+										flippedB.w + ',' +
+										flippedB.h ;
+
+									d.correctAnswer = 
+										flippedA.stats.steepness > flippedB.stats.steepness ? 'A' : 'B';
+
+									d.lowSteepness = Math.min(
+										flippedA.stats.steepness,
+										flippedB.stats.steepness
+									);
+									d.highSteepness = Math.max(
+										flippedA.stats.steepness,
+										flippedB.stats.steepness
+									);
+								}
+
+								break;
+							}
+
+						}
+						else if (i % 3 == 2) 
+						{
+							myField.flipV();
+							d.vFlip = true;
+
+							switch (experiment)
+							{
+							case 1:
+								d.markerString
+								break;
+						
+							case 2:
+
+								// flip markers
+								flipVMarkers();
+
+								d.markerString = 'A,' + markerA.getX() + ',' + markerA.getY() + ',B,' + markerB.getX() + ',' + markerB.getY();
+
+								flipVMarkers();
+								break;
+
+							case 3:
+								{
+									var flippedA = flipVBox(steepness.boxA);
+									var flippedB = flipVBox(steepness.boxB);
+
+									if (flippedA.x > flippedB.x) {
+										var temp = flippedA;
+										flippedA = flippedB;
+										flippedB = temp;
+									}
+								
+									d.markerString = 'A,' + 
+										flippedA.x + ',' +
+										flippedA.y + ',' +
+										flippedA.w + ',' +
+										flippedA.h + ',' +
+										'B,' +
+										flippedB.x + ',' +
+										flippedB.y + ',' +
+										flippedB.w + ',' +
+										flippedB.h;
+									
+									d.correctAnswer = 
+										flippedA.stats.steepness > flippedB.stats.steepness ? 'A' : 'B';
+
+									d.lowSteepness = Math.min(
+										flippedA.stats.steepness,
+										flippedB.stats.steepness
+									);
+									d.highSteepness = Math.max(
+										flippedA.stats.steepness,
+										flippedB.stats.steepness
+									);
+
+								}
+								break;
+							}
+						}
+						//console.log("i: " + i);
+
+						// save string
+						td1.append('br');
+						td1.append("span").html(d.markerString + (experiment==3 ? '<br>correct: ' + d.correctAnswer : ''));
+
+						// store the duplicated scalar field
+						d.fieldRaw = myField;
+
+						// assign colorset
+						var colorMap = getColorPreset(d.colorscale)
+						myField.setColorMap( colorMap );
+
+						// visualize
+						visualizeScalarField(myField, img.node());
+						img
+							.style('width', Math.floor(canvasW * SCALE) + 'px')
+							.style('height', Math.floor(canvasH * SCALE) + 'px');
+
+						// create canvas to draw profiles
+						var pCanvas = document.createElement('canvas');
+						pCanvas.width = PROFILE_W; 
+						pCanvas.height = PROFILE_H;
+
+						var profileImages = [];
+						for (var j=0; profiles && j<profiles.length; j++) 
+						{
+							var profileVis = new Profile(profiles[j].profile);
+							if (i % 3 == 1) {
+								// horizontal flip, reverse the profiles
+								profileVis.reverse();
+							}
+							profileVis.visualizeToCanvas(d3.select(pCanvas), 4);
+
+							var pimg = td2.append('img')
+								.style('width', (PROFILE_W/2) + 'px')
+								.style('height', (PROFILE_H/2) + 'px');
+							var imgData = pCanvas.toDataURL()
+							pimg.node().src = imgData;
+							td2.append('br');
+
+							profileImages.push(imgData);
+						}
+
+
+						// save images
+						d.profileImg = profileImages;
+						d.fieldImg = img.node().src;
+						d.fieldW = myField.w;
+						d.fieldH = myField.h;
+
+						// create color scale
+						var colorScaleCanvas = document.createElement('canvas');
+						colorScaleCanvas.width = 150; colorScaleCanvas.height=500;
+						
+						var w = 75;
+						var h = colorScaleCanvas.height;
+						colorMap.drawColorScale(w, h, Math.floor(h/2), 'vertical', colorScaleCanvas);
+
+						// visualize tick marks
+						var scaleContext = colorScaleCanvas.getContext('2d');
+						var TICKS =9;
+						var TICK_LENGTH = 10;
+						var FONT_SIZE = 18;
+
+						scaleContext.moveTo(0, 0);
+						scaleContext.lineTo(0, colorScaleCanvas.height);
+						scaleContext.stroke();
+
+						var MIN_VAL = 0, MAX_VAL = 1000;
+						for (var i=0; i<TICKS; i++) 
+						{
+							var n = i/(TICKS-1);
+							var v = n * (MAX_VAL-MIN_VAL)
+							var y = Math.floor((1-n)*(h-2) +.5) + 1;
+
+							scaleContext.moveTo(i == TICKS-1 || i == 0 ? 0 : w, y);
+							scaleContext.lineTo(w+TICK_LENGTH, y);
+							scaleContext.stroke();
+
+							scaleContext.font = FONT_SIZE + "px Monaco";
+							scaleContext.fillStyle = 'rgb(0,0,0)'
+							
+							if (i == TICKS-1) {
+								y+= FONT_SIZE;
+							}
+							else if (i != 0) {
+								y+= Math.floor(FONT_SIZE/2);
+							}
+							else if (i == 0) {
+								y -= 1;
+							}
+							scaleContext.fillText(v, w+TICK_LENGTH+3, y);
+						}
+
+						// save color scale
+						d.scaleImg = colorScaleCanvas.toDataURL();
+					});
+
+				})(profiles, steepnessQuiz, td, experiment);
+			
+				// add to stimuli
+				var stimuli = [];
+				for (var i=0; i<conditions.length; i++)
+				{
+					var colorscales = conditions[i];
+					for (var c=0; c<colorscales.length; c++) 
+					{
+						var d = colorscales[c];
+						stimuli.push(
+						{
+							// scalar field
+							w: d.fieldW,
+							h: d.fieldH,
+							fieldRaw: d.fieldRaw,
+							fieldImg: d.fieldImg,
+
+							// color scale
+							colorscale: d.name,
+							scaleImg: d.scaleImg,
+
+							// profiles
+							profileImg: d.profileImg,
+
+							// marker string
+							markerString: d.markerString,
+
+							// correct answer
+							correctAnswer: d.correctAnswer,
+
+							// steepness data
+							lowSteepness: d.lowSteepness,
+							highSteepness: d.highSteepness,
+
+							// field generation parameters
+							hFlip: d.hFlip ? true : false,
+							vFlip: d.vFlip ? true : false,
+
+						});
+					}
+				}
+
+				cond.stimuli = stimuli;
+
+				// store noise generation parameters
+				cond.seed = seed;
+				cond.exponentWeight = exponentWeight;
+				
+			}
+
+			switch (experiment)
+			{
+			case 1:
+				exportEXP1Stimuli();
+				break;
+			case 2:
+				exportEXP2Stimuli();
+				break;
+			case 3:
+				exportEXP3Stimuli();
+			}
+		}
+
+
+		function generateEXP1Sequence() 
+		{
+			var seqSQL = "";
+			var flatScales = [], scalesHash = {}
+			for (var c=0; c<conditions.length; c++) 
+			{
+				var condition = conditions[c];
+				for (var s=0; s<condition.length; s++) {
+					flatScales.push(condition[s].name);
+					scalesHash[condition[s].name] = flatScales.length-1;
+				}
+			}
+
+			var seqNum = 1;
+			for (var c=0; c<conditions.length; c++) 
+			{
+				var condition = conditions[c];
+
+				// loop through all color scales
+				var permutations = [[1,2,3], [2,1,3], [3,2,1], [2,3,1], [1,3,2], [3,1,2]];
+					
+				// loop through all permutations
+				for (var p=0; p<permutations.length; p++) 
+				{
+					var seq = "";
+					perm = permutations[p];
+					for (var pp=0; pp<3; pp++)
+					{
+						var colorscale = condition[perm[pp]-1].name;
+
+						// loop through all frequencies
+						for (var f=0; f<frequencyConditions.length; f++) {
+
+							// loop through all values reading tests
+							seq += '#,';
+							var baseQ = f * 9 * 5 + 1;	// 9 color scales, 5 value reading question in each frequency
+							for (var v=0; v<5; v++) 
+							{
+								var index = baseQ + scalesHash[colorscale]*5 + v
+								seq += index + ",";
+							}
+							seq += '#,';
+						}
+					}
+
+					// remove last comma
+					seq = seq.substr(0, seq.length-1);
+					seqSQL += "INSERT INTO sequence (sequenceid, seqarr) VALUES (" + (seqNum++) + ", '" + seq + "');\n";
+				}
+
+			}
+			return seqSQL;
+		}
+
+		function exportEXP1Stimuli()
+		{	
+			var qbook = "", seq = "", colorDiffs = "";
+			var zip = new JSZip();
+			var fields = zip.folder('fields');
+			var scales = zip.folder('colorscales');
+			var scalesHash = {};
+			var qid = 1;
+
+			var conditionNumber = {};
+			for (var c=0; c<conditions.length; c++) {
+				var cc = conditions[c];
+				for (var j=0; j<cc.length; j++) {
+					conditionNumber[cc[j].name] = c+1;
+				}
+			}
+
+			var csv = "frequency,colorscale,noiseScale,seed,exp,w1,w2,w3,w4,w5,hFlip,vFlip\n";
+			for (var f=0; f<frequencyConditions.length; f++) {
+				var cond = frequencyConditions[f];
+				var stimuli = cond.stimuli;
+
+				for (s=0; s<stimuli.length; s++) 
+				{
+					var stimulus = stimuli[s];
+					var fieldName = 'f' + cond.f + '_' + stimulus.colorscale;
+					
+					// add rendered image file
+					fields.file(fieldName + '.png', stimulus.fieldImg.replace('data:image/png;base64,',''), {base64: true});
+
+					// add raw file
+					fields.file(fieldName + '.flt', stimulus.fieldRaw.buffer, {binary: true});
+					
+					// add rendered color scale if not already there
+					if (!scalesHash[stimulus.colorscale]) 
+					{
+						scales.file(stimulus.colorscale + '.png', stimulus.scaleImg.replace('data:image/png;base64,',''), {base64: true});
+						scalesHash[stimulus.colorscale] = true;
+					}
+
+					// get colormap
+					var colormap = stimulus.fieldRaw.getColorMap();
+
+					// make sql statement
+					for (var v=0; v<5; v++) 
+					{
+						var correct = (v / 4);
+						var elevation = correct * 1000;
+						var questionid = qid++;
+
+						qbook += "INSERT INTO qbook (questionid, frequency, colorscale, expcondition, filename, task, tasktype, correct, text) VALUES ";
+						qbook += "(" + questionid + ", " + cond.expectedMedianF + ", '" + stimulus.colorscale + "', '" + conditionNumber[stimulus.colorscale] + "', '" + fieldName + "', 3, 'click', '" + correct + "', 'Click on a point that has an elevation of exactly <b>" + elevation + "</b> feet');\n";
+
+
+						var cDiff = colormap.computeColorDiffAroundValue(correct);
+						colorDiffs += "UPDATE qbook SET avgColorDiff=" + cDiff.avgColorDiff + ", maxColorDiff=" + cDiff.maxColorDiff + " WHERE questionid=" + questionid + ";\n";
+					}
+
+					// csv
+					csv += cond.expectedMedianF + ',' + stimulus.colorscale + ',' + cond.noiseScale + ',' + cond.seed + ',';
+					csv += exponentWeight + ',' + noiseWeights[0] + ',' + noiseWeights[1] + ',';
+					csv += noiseWeights[2] + ',' + noiseWeights[3] + ',' + noiseWeights[4] + ',';
+					csv += stimulus.hFlip + ',' + stimulus.vFlip + '\n';
+				}
+			}
+			zip.file("stimuli_params.csv", csv);
+			zip.file("qbook.txt", qbook);
+			zip.file("colordiffs.txt", colorDiffs);
+			zip.file("sequence.txt", generateEXP1Sequence());
+			zip.generateAsync({type:"blob"})
+				.then(function(content) {
+					// see FileSaver.js
+					saveAs(content, "example.zip");
+				});
+		}
+		
+		function generateEXP2Sequence(freqs, trialPerFreq) 
+		{
+			if (!trialPerFreq) {
+				trialPerFreq = 3;
+			}
+
+			var seqSQL = "";
+			var flatScales = [], scalesHash = {}
+			for (var c=0; c<conditions.length; c++) 
+			{
+				var condition = conditions[c];
+				for (var s=0; s<condition.length; s++) {
+					flatScales.push(condition[s].name);
+					scalesHash[condition[s].name] = flatScales.length-1;
+				}
+			}
+
+			var seqNum = 1;
+			if (!freqs) { 
+				freqs = frequencyConditionsExp2;
+			}
+
+			for (var c=0; c<conditions.length; c++) 
+			{
+				var condition = conditions[c];
+
+				// loop through all color scales
+				var permutations = [[1,2,3], [2,1,3], [3,2,1], [2,3,1], [1,3,2], [3,1,2]];
+					
+				// loop through all permutations
+				for (var p=0; p<permutations.length; p++) 
+				{
+					var seq = "";
+					perm = permutations[p];
+					for (var pp=0; pp<3; pp++)
+					{
+						var colorscale = condition[perm[pp]-1].name;
+
+						// loop through all frequencies
+						var trials = 0;
+
+						for (var f=0; f<freqs.length; f++) {
+
+							// loop through all values reading tests
+							if (trials == 0) {
+								seq += '#,';
+							}
+							trials++;
+
+							var baseQ = f * 9 * 1 + 1;	// 9 color scales, 1 profile question in each frequency
+							for (var v=0; v<1; v++) 
+							{
+								var index = baseQ + scalesHash[colorscale]*1 + v
+								seq += index + ",";
+							}
+
+							if (trials == trialPerFreq) {
+								seq += '#,';
+								trials=0;
+							}
+						}
+					}
+
+					// remove last comma
+					seq = seq.substr(0, seq.length-1);
+					seqSQL += "INSERT INTO sequence (sequenceid, seqarr) VALUES (" + (seqNum++) + ", '" + seq + "');\n";
+				}
+
+			}
+			return seqSQL;
+		}
+
+		function exportEXP2Stimuli()
+		{	
+			var qbook = "", seq = "", trials = "";
+			var zip = new JSZip();
+			var fields = zip.folder('fields');
+			var scales = zip.folder('colorscales');
+			var scalesHash = {};
+			var qid = 1;
+
+			var conditionNumber = {};
+			for (var c=0; c<conditions.length; c++) {
+				var cc = conditions[c];
+				for (var j=0; j<cc.length; j++) {
+					conditionNumber[cc[j].name] = c+1;
+				}
+			}
+
+			var csv = "frequency,colorscale,noiseScale,seed,exp,w1,w2,w3,w4,w5,hFlip,vFlip\n";
+			var freqs = frequencyConditionsExp2;
+
+			for (var f=0; f<freqs.length; f++) 
+			{
+				var cond = freqs[f];
+				var stimuli = cond.stimuli;
+
+				for (s=0; s<stimuli.length; s++) 
+				{
+					var stimulus = stimuli[s];
+					var fieldName = 'f' + cond.f + '_' + stimulus.colorscale + '_' + (f%3);
+					
+					// add rendered image file
+					fields.file(fieldName + '.png', stimulus.fieldImg.replace('data:image/png;base64,',''), {base64: true});
+
+					// add raw file
+					//fields.file(fieldName + '.flt', stimulus.fieldRaw.buffer, {binary: true});
+
+					// add profiles
+					var profileImg = stimulus.profileImg;
+					for (var k=0; k<profileImg.length; k++) {
+						fields.file(fieldName + "_p" + (k+1) + '.png', profileImg[k].replace('data:image/png;base64,',''), {base64: true});
+					}
+					
+					// add rendered color scale if not already there
+					if (!scalesHash[stimulus.colorscale]) 
+					{
+						scales.file(stimulus.colorscale + '.png', stimulus.scaleImg.replace('data:image/png;base64,',''), {base64: true});
+						scalesHash[stimulus.colorscale] = true;
+					}
+
+					// get colormap
+					var colormap = stimulus.fieldRaw.getColorMap();
+					var questionid = qid++;
+
+					// make sql statement
+					qbook += "INSERT INTO qbook (questionid, frequency, colorscale, expcondition, trial, filename, task, tasktype, correct, text, markers) VALUES ";
+					qbook += "(" + questionid + ", " + cond.expectedMedianF + ", '" + stimulus.colorscale + "', '" + conditionNumber[stimulus.colorscale] + "', " + cond.trial + ", '" + fieldName + "', 5, 'profile', 'p1', 'Imagine a line from A to B. Select the elevation profile below that most closely matches its slope.', '" + stimulus.markerString + "');\n";
+
+					// csv
+					csv += cond.expectedMedianF + ',' + stimulus.colorscale + ',' + cond.noiseScale + ',' + cond.seed + ',';
+					csv += exponentWeight + ',' + noiseWeights[0] + ',' + noiseWeights[1] + ',';
+					csv += noiseWeights[2] + ',' + noiseWeights[3] + ',' + noiseWeights[4] + ',';
+					csv += stimulus.hFlip + ',' + stimulus.vFlip + '\n';
+				}
+			}
+			zip.file("stimuli_params.csv", csv);
+			zip.file("qbook.txt", qbook);
+			zip.file("sequence.txt", generateEXP2Sequence());
+			zip.generateAsync({type:"blob"})
+				.then(function(content) {
+					// see FileSaver.js
+					saveAs(content, "example.zip");
+				});
+		}
+
+		function exportEXP3Stimuli()
+		{	
+			var qbook = "", seq = "", trials = "";
+			var zip = new JSZip();
+			var fields = zip.folder('fields');
+			var scales = zip.folder('colorscales');
+			var scalesHash = {};
+			var qid = 1;
+
+			var conditionNumber = {};
+			for (var c=0; c<conditions.length; c++) {
+				var cc = conditions[c];
+				for (var j=0; j<cc.length; j++) {
+					conditionNumber[cc[j].name] = c+1;
+				}
+			}
+
+			var csv = "frequency,colorscale,noiseScale,seed,exp,w1,w2,w3,w4,w5,hFlip,vFlip\n";
+			var freqs = frequencyConditionsExp3;
+
+			var Q_TEXT = "'Terrain is steeper when there is larger change in elevation between adjacent points. Compare the steepness of terrain inside the two boxes, then click on the box that is steeper on average.'";
+
+			for (var f=0; f<freqs.length; f++) 
+			{
+				var cond = freqs[f];
+				var stimuli = cond.stimuli;
+
+				for (s=0; s<stimuli.length; s++) 
+				{
+					var stimulus = stimuli[s];
+					var fieldName = 'f' + cond.f + '_' + stimulus.colorscale + '_' + (f%3);
+					
+					// add rendered image file
+					fields.file(fieldName + '.png', stimulus.fieldImg.replace('data:image/png;base64,',''), {base64: true});
+
+					// add raw file
+					//fields.file(fieldName + '.flt', stimulus.fieldRaw.buffer, {binary: true});
+					
+					// add rendered color scale if not already there
+					if (!scalesHash[stimulus.colorscale]) 
+					{
+						scales.file(stimulus.colorscale + '.png', stimulus.scaleImg.replace('data:image/png;base64,',''), {base64: true});
+						scalesHash[stimulus.colorscale] = true;
+					}
+
+					// get colormap
+					var colormap = stimulus.fieldRaw.getColorMap();
+					var questionid = qid++;
+
+					// make sql statement
+					qbook += "INSERT INTO qbook (questionid, frequency, colorscale, expcondition, trial, filename, task, tasktype, correct, text, markers, lowSteepness, highSteepness) VALUES ";
+					qbook += "(" + questionid + ", " + cond.expectedMedianF + ", '" + stimulus.colorscale + "', '" + conditionNumber[stimulus.colorscale] + "', " + cond.trial + ", '" + fieldName + "', 7, 'clickbox', '" + stimulus.correctAnswer + "', " + Q_TEXT + ", '" + stimulus.markerString + "', ";
+					qbook += stimulus.lowSteepness + ', ' + stimulus.highSteepness + ');\n';
+
+					// csv
+					csv += cond.expectedMedianF + ',' + stimulus.colorscale + ',' + cond.noiseScale + ',' + cond.seed + ',';
+					csv += exponentWeight + ',' + noiseWeights[0] + ',' + noiseWeights[1] + ',';
+					csv += noiseWeights[2] + ',' + noiseWeights[3] + ',' + noiseWeights[4] + ',';
+					csv += stimulus.hFlip + ',' + stimulus.vFlip + '\n';
+				}
+			}
+			zip.file("stimuli_params.csv", csv);
+			zip.file("qbook.txt", qbook);
+
+			// same sequence as experiment 2
+			zip.file("sequence.txt", generateEXP2Sequence(frequencyConditionsExp3, EXP3_TRIAL_PER_FREQ));
+			zip.generateAsync({type:"blob"})
+				.then(function(content) {
+					// see FileSaver.js
+					saveAs(content, "example.zip");
+				});
+		}
+
+
+	</script>
+
+	<!-- shaders -->
+	<script type="x-shader/x-vertex" id="colormapVertex">
+		varying vec2 oTexCoord;
+		void main()	
+		{
+			oTexCoord = uv; //vec2(uv.x, uv.y);
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
+	</script>
+
+	<script type="x-shader/x-fragment" id="colormapFragment">
+		varying vec2 oTexCoord;
+		uniform sampler2D scalarField;
+		uniform sampler2D colormap;
+		uniform float contour;
+
+		void main()
+		{
+			// Left eye is full red and actual green and blue
+			vec4 data = texture2D(scalarField, oTexCoord);
+			vec2 colormapCoord = vec2(data.x, 0.5);
+			if (contour >= 0.0 && abs(data.x-contour) < .015)
+			{
+				gl_FragColor = vec4(1.0);
+			}
+			else
+			{
+				gl_FragColor = texture2D(colormap, colormapCoord);
+			}
+		}
+	</script>
+
+	<script type="text/javascript">
+		var noiseOffset = [0, 0];
+		var noiseZoom = 1;
+		var noiseSimplex = true;
+		var renderGL = true;
+		var inversion = false;
+
+		var exponentWeight = 2.2;
+		var noiseScale = 4;
+		var noiseWeights = [1, 0.75, 0.3, 0.1, 0.05];
+		var noiseOctaves = [1, 2, 4, 8, 16];
+
+		var noiseFunc = function(x, y) 
+		{
+			var theNoise = noiseSimplex ? noise.simplex2 : noise.perlin2;
+			return (inversion ? -1 : 1) * theNoise(x, y)
+		}
+
+		function noiseGenerate(x, y, w, h)
+		{
+			var nx = noiseScale*((x + noiseOffset[0])/(w-1) - 0.5);
+			var ny = noiseScale*((y + noiseOffset[1])/(h-1) - 0.5);
+			var e = 
+				noiseWeights[0] * (.5 + .5 * noiseFunc(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
+				noiseWeights[1] * (.5 + .5 * noiseFunc(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
+				noiseWeights[2] * (.5 + .5 * noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny)) +
+				noiseWeights[3] * (.5 + .5 * noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
+				noiseWeights[4] * (.5 + .5 * noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
+			return Math.pow(e, exponentWeight);					
+		}
+
+		function refreshNoise(_noiseScale)
+		{
+			console.log("noiseScale: " + noiseScale);
+
+			var data = scalarField.view;
+			var w = scalarField.w;
+			var h = scalarField.h;
+			var I = 0;
+
+			if (_noiseScale && !isNaN(_noiseScale)) {
+				noiseScale = _noiseScale
+			}
+			else
+			{
+				noiseScale = +$('#sliderScale').slider('value');
+			}
+
+			noiseWeights = [
+				+$('#sliderNoise1').slider('value'),
+				+$('#sliderNoise2').slider('value'),
+				+$('#sliderNoise3').slider('value'),
+				+$('#sliderNoise4').slider('value'),
+				+$('#sliderNoise5').slider('value')
+			];
+
+			exponentWeight = +$('#sliderExponent').slider('value');
+
+			noiseOffset[0] /= noiseScale / noiseZoom;
+			noiseOffset[1] /= noiseScale / noiseZoom;
+			noiseZoom = noiseScale;
+
+			for (var y=0; y<h; y++)
+			{
+				for (var x=0; x<w; x++) 
+				{
+					var nx = noiseScale*((x + noiseOffset[0])/(w-1) - 0.5);
+					var ny = noiseScale*((y + noiseOffset[1])/(h-1) - 0.5);
+
+					var e = 
+						noiseWeights[0] * (.5 + .5*noiseFunc(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
+						noiseWeights[1] * (.5 + .5*noiseFunc(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
+						noiseWeights[2] * (.5 + .5*noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny)) +
+						noiseWeights[3] * (.5 + .5*noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
+						noiseWeights[4] * (.5 + .5*noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
+					
+					data[I++] = Math.pow(e, exponentWeight);
+				}
+			}
+			scalarField.normalize(); scalarField.generated = true; originalField = scalarField;
+			visualizeScalarField();
+			analyzeImage();
+
+			// return blur slider to 0
+			$('#sliderBlur').val(0);
+		}
+
+		function newScalarField(_field)
+		{
+			var field = _field || scalarField
+			originalField = field;
+			field.generated = false;
+
+			field.setColorMap( field.getColorMap() || getColorPreset('rainbowcie') );
+			visualizeScalarField(field);
+			analyzeImage(field);		
+		}
+
+		var curImage = null;
+		function visualizeScalarField(_field, externalImage) 
+		{
+			var field = _field || scalarField
+			var destCanvas = d3.select(renderGL ? '#glCanvas' : '#mainCanvas').node();
+			var outCanvas = null;
+			
+			if (renderGL) 
+			{
+				// this renders directly to destCanvas
+				outCanvas = field.generatePictureGL(destCanvas);
+			} else 
+			{
+				outCanvas = field.generatePicture(destCanvas);
+			}
+			
+			if (outCanvas)
+			{
+				
+				var imgData = outCanvas.getContext('2d').getImageData(0, 0, outCanvas.width, outCanvas.height);
+
+				var canvas = $('#mainCanvas').get(0);
+				var context = canvas.getContext('2d');
+				context.clearRect(0, 0, canvas.width, canvas.height);			
+				context.putImageData(imgData, 0, 0);
+				curImage = imgData;
+				fftShown = false;
+				
+			}
+
+			if (externalImage)
+			{
+				externalImage.src = destCanvas.toDataURL();
+			}
+		}
+
+		var powerChart = null;
+		var curPlot = null, lastPlot = null;
+		var curMedianLine = null, lastMedianLine = null;
+
+		function createPowerPlot(powerSpectra, medianFreq)
+		{
+			// create the chart
+			if (!powerChart)
+			{
+				powerChart = new PowerSpectraChart(d3.select('#svgStats'));
+			}
+
+			if (lastPlot) {
+				lastPlot.remove();
+				lastPlot = null;
+			}
+			if (lastMedianLine) {
+				lastMedianLine.remove();
+				lastMedianLine = null;
+			}
+
+			if (curPlot) {
+				lastPlot = curPlot; lastPlot.style('stroke', "#cccccc");
+				curPlot = null;
+			}
+			if (curMedianLine) {
+				lastMedianLine = curMedianLine; lastMedianLine.style('stroke', "#cccccc");
+				curMedianLine = null;
+			}
+
+			// plot power spectrum
+			curPlot = powerChart.plotSpectra(powerSpectra); curPlot.style('stroke', 'red');
+
+			// draw a line for x=median frequency
+			if (medianFreq) {
+				curMedianLine = powerChart.plotMedian(medianFreq); curMedianLine.style('stroke', 'red');
+			}
+		}
+
+		var spatialAnalysisResult = null;
+		var amplitudeHistogram = null;
+
+		function analyzeImage(_scalarField)
+		{
+			var field = _scalarField || scalarField;
+
+			// show frequency histogram
+			var freqHistogram = field.calcSpatialFrequency();
+
+			// figure out median power spectra
+			var powerOrderedSpectra = freqHistogram.powerSpectra.slice(0);
+			powerOrderedSpectra.sort(function(a, b) { return b.y-a.y});
+			var medianPower, medianFreq;
+			if (powerOrderedSpectra.length % 2 == 0) {
+				var i = powerOrderedSpectra.length / 2;
+				medianPower = (powerOrderedSpectra[i].x + powerOrderedSpectra[i-1].x) / 2;
+			}
+			else
+			{
+				var i = Math.floor(powerOrderedSpectra.length / 2);
+				medianPower = powerOrderedSpectra[i].x;
+			}
+
+			// find the frequency associated with the median power
+			var powerSpectra = freqHistogram.powerSpectra;
+			var cummulativePower = 0;
+			for (var i=0, len=powerSpectra.length; i<len; i++) {
+				cummulativePower += powerSpectra[i].y;
+			}
+			var halfSplitPower = cummulativePower/2;
+			for (var i=0, cumm=0, len=powerSpectra.length; i<len; i++) {
+				cumm += powerSpectra[i].y;
+				if (cumm >= halfSplitPower) {
+					medianFreq = powerSpectra[i].f;
+					break;
+				}
+			}
+
+			var spatialAnalysis = {
+				medianFreq: medianFreq,
+				medianPower: medianPower,
+				powerSpectra: powerSpectra,
+			}
+			spatialAnalysisResult = spatialAnalysis;
+
+			amplitudeHistogram = field.calcAmplitudeFrequency();
+
+
+			createPowerPlot(spatialAnalysis.powerSpectra, spatialAnalysis.medianFreq)
+			d3.select('#medianFreq').html(spatialAnalysis.medianFreq);
+
+			// draw amplitude histogram
+			drawAmplitudeHistogram(amplitudeHistogram);
+		}
+
+		var downCoord = null;
+		function createUI()
+		{
+			// sliders
+			$('#sliderScale').slider({ step: 0.01, min: 0.01, max: 10, value: noiseScale, change: refreshNoise });		
+			$('#sliderNoise1').slider({ step: 0.001, min: 0, max: 1, value: noiseWeights[0], change: refreshNoise });
+			$('#sliderNoise2').slider({ step: 0.001,min: 0, max: 1, value: noiseWeights[1], change: refreshNoise });
+			$('#sliderNoise3').slider({ step: 0.001,min: 0, max: 1, value: noiseWeights[2], change: refreshNoise });
+			$('#sliderNoise4').slider({ step: 0.001,min: 0, max: 1, value: noiseWeights[3], change: refreshNoise });
+			$('#sliderNoise5').slider({ step: 0.001,min: 0, max: 1, value: noiseWeights[4], change: refreshNoise });
+			$('#sliderExponent').slider({ step: 0.01, min: 0.001, max: 10.0, value: exponentWeight, change: refreshNoise });
+			$('#sliderBlur').slider({ step: 1,min: 0, max: 16, value: 0, change: function() {
+
+				var blurLevel = $('#sliderBlur').slider("value");
+				if (blurLevel == 0) {
+					scalarField = originalField;
+					visualizeScalarField();
+					analyzeImage();
+				}
+				else
+				{
+					var kernelSize = blurLevel * 2;
+					var blurredField = originalField.guassian(kernelSize, originalField.generated ? noiseGenerate : null);
+					
+					blurredField.setColorMap( scalarField.getColorMap() || getColorPreset('rainbowcie') );
+					scalarField = blurredField;
+					visualizeScalarField(blurredField);
+					analyzeImage(blurredField);		
+				}
+			} });
+			$('#sliderContour').slider({ step: 0.01,min: -0.01, max: 1, value: -0.01, slide: function() {
+				var contour = $('#sliderContour').slider("value");
+				scalarField.showContour(contour);
+				if (renderGL) {
+					visualizeScalarField();
+				}
+			}});
+
+
+			// file loading
+			d3.select('#fileLoader').on('change', function() {
+				var canvas = d3.select("#mainCanvas").node();
+				loadFiles(1, +canvas.width, +canvas.height);
+			});
+
+			drawColorPresets(d3.select('#colorPresets'), function(colorMap) 
+			{
+				if (scalarField)
+				{
+					scalarField.setColorMap(colorMap);
+					scalarField.getColorMap().visualize(d3.select('#svgColorMap'));
+					visualizeScalarField();
+					
+				}
+			});
+
+			d3.select('#mainCanvas')
+				.on('mousedown', function() 
+				{
+					downCoord = d3.mouse(d3.select('body').node());
+					d3.select(document)
+						.on('mousemove', function() 
+						{
+							var mouse = d3.mouse(d3.select('body').node());
+							var dMouse = [
+								mouse[0] - downCoord[0],
+								mouse[1] - downCoord[1]
+							];
+
+							if (curImage) {
+								var canvas = $('#mainCanvas').get(0);
+								var context = canvas.getContext('2d');
+								context.clearRect(0, 0, canvas.width, canvas.height);			
+								context.putImageData(curImage, dMouse[0], dMouse[1]);
+							}
+
+						});
+
+					d3.select(document)
+						.on('mouseup', function() 
+						{
+							var mouse = d3.mouse(d3.select('body').node());
+							noiseOffset[0] -= mouse[0]-downCoord[0];
+							noiseOffset[1] -= mouse[1]-downCoord[1];
+							noiseZoom = $('#sliderScale').slider('value');
+
+							refreshNoise();
+
+							d3.select(document)
+								.on('mousemove', null)
+								.on('mouseup', null);
+						})
+				});
+		}
+
+		var ampHist = null, _maxHist = null;;
+		function drawAmplitudeHistogram(histogram)
+		{
+			var HIST_W = SPECTRA_CHART_W;
+			var HIST_H = SPECTRA_CHART_H;
+
+			if (ampHist) {
+				ampHist.remove();
+				ampHist = null;
+			}
+			var maxHist = 0;
+			for (var i=0; i<histogram.length; i++) { 
+				maxHist = Math.max(maxHist, histogram[i]);
+			}
+			_maxHist = maxHist;
+
+			ampHist = d3.select('#svgStats').append('g'); ampHist.attr('transform', 'translate(' + 
+				(SPECTRA_CHART_W + SPECTRA_CHART_OFFSET[0] + 10) + ',' + SPECTRA_CHART_OFFSET[1] + ')');
+			
+			ampHist.selectAll('rect').data(histogram).enter().append('rect')
+				.attr('x', function(d, i) { return i * HIST_W / histogram.length})
+				.attr('y', function(d, i) { return HIST_H * (1-d/maxHist);})
+				.attr('height', function(d, i) { return HIST_H * (d/maxHist);})
+				.attr('width', HIST_W / histogram.length)
+
+				.style('fill', '#cccccc')
+				.style('stroke', 'none');
+		}
+
+		var scalarField = null, originalField = null;
+		function regenerate() {
+			noise.seed(Math.random());
+			refreshNoise();
+		}
+		var fftShown = false;
+		function toggleFFT() 
+		{
+			var canvas = d3.select('#mainCanvas').node();
+			var context = canvas.getContext('2d');
+			context.clearRect(0, 0, canvas.width, canvas.height);
+
+			fftShown = !fftShown;
+			if (fftShown) {
+				
+				var fftData = scalarField.drawFFT();
+				context.putImageData(fftData, 0, 0);
+			} 
+			else if (curImage)
+			{
+				context.putImageData(curImage, 0, 0);
+			}
+		}
+
+		function init()
+		{
+			var canvasW = +$('#mainCanvas').get(0).width;
+			var canvasH = +$('#mainCanvas').get(0).height;
+
+			scalarField = new ScalarField(canvasW, canvasH);
+			originalField = scalarField;
+			scalarField.setColorMap( getColorPreset('rainbowcie') );
+
+			createUI();
+			regenerate();	
+		}
+
+		function toggleNoiseFunc() 
+		{
+			noiseSimplex = !noiseSimplex;
+			refreshNoise();
+			d3.select('#noiseButton').html(noiseSimplex ? 'perlin' : 'simplex');	
+		}
+
+		function toggleRenderType()
+		{
+			renderGL = !renderGL;
+			visualizeScalarField();
+			d3.select('#glButton').html(renderGL ? 'JS' : 'GL');
+			if (renderGL) {
+				d3.select("#mainCanvas").style('z-index', '0');
+				d3.select("#mainCanvas").style('visibility', 'hidden');
+				d3.select("#glCanvas").style('z-index', '100');
+				d3.select("#glCanvas").style('visibility', 'visible');
+			}
+			else
+			{
+				d3.select("#mainCanvas").style('z-index', '100');
+				d3.select("#mainCanvas").style('visibility', 'visible');
+
+				d3.select("#glCanvas").style('z-index', '0');				
+				d3.select("#glCanvas").style('visibility', 'hidden');
+			}
+		}
+		function toggleInversion()
+		{
+			inversion = !inversion;
+			refreshNoise();
+		}
+
+		function randomProfile(method2)
+		{
+			var PROFILE_LENGTH = 350;
+			var PAD = 50;
+			var SAMPLE_COUNT = 100;
+
+			var canvasW = +$('#mainCanvas').get(0).width;
+			var canvasH = +$('#mainCanvas').get(0).height;
+
+			var p1 = null, p2 = null, sample, sampleMin, sampleMax;
+			
+			var trial = 0;
+			var done = false;
+			
+			while (trial++ < 2500 && !done) 
+			{
+				var x, y;
+				if (method2)
+				{
+					while (p2 === null) 
+					{
+						x = PAD + Math.floor(.5 + Math.random() * (canvasW - PAD*2));
+						y = PAD + Math.floor(.5 + Math.random() * (canvasH - PAD*2));
+						p1 = {x: x, y: y};
+
+						for (var k=0; (k<15) && (p2 ===null); k++)
+						{
+							var r = [Math.random(), Math.random()];
+							var l = Math.sqrt(Math.pow(r[0], 2) + Math.pow(r[1], 2));
+							if (l > 0) {
+								
+								var x2 = Math.floor(x + PROFILE_LENGTH * r[0]/l);
+								var y2 = Math.floor(y + PROFILE_LENGTH * r[1]/l);
+
+								if (x2 >= 0 && x2 < canvasW-2 && y2 >= 0 && y2 < canvasH-2) 
+								{
+									p2 = {x: x2, y: y2};
+								}
+							}
+						}
+					}
+
+					// switch p1 and p2 half of the time
+					if (Math.random() > .5) {
+						var temp = p1;
+						p1 = p2;
+						p2 = temp;
+					}
+				}
+				else
+				{
+					x = PAD + Math.floor(.5 + Math.random() * (canvasW - PAD*2 - PROFILE_LENGTH));
+					y = PAD + Math.floor(.5 + Math.random() * (canvasH - PAD*2));
+					p1 = {x: x, y: y};
+					p2 = {x: x+PROFILE_LENGTH, y: y};
+				}
+
+				// sample the profile
+				sample = scalarField.sampleProfile(p1, p2, SAMPLE_COUNT);
+
+				// test for NaN
+				for (var k=0, l=sample.length; k<l; k++) {
+					if (isNaN(sample[k])) {
+						console.error("NaN in profile sample!");
+					}
+				}
+
+				// figure min/max of the sample
+				var sampleExtent = d3.extent(sample);
+
+				if (sample[0] > .8 || sample[0] < .2 || sample[sample.length-1] > .8 || sample[sample.length-1] < .2)
+				{
+					p1 = null;
+					p2 = null;
+				}
+				else
+				{
+					if (sampleExtent[0] <= (method2 ? .3 : .2) && sampleExtent[1] >= (method2 ? .7 : .8)) {
+						done = true;
+					}
+					else
+					{
+						p1 = null;
+						p2 = null;
+					}
+				}
+			}
+			if (!done) {
+				console.log("FAILED to satify profile criteria!");
+				return null;
+			}
+			else {
+				return {
+					p1: p1,
+					p2: p2,
+					profile: sample,
+					profileMin: sampleExtent[0],
+					profileMax: sampleExtent[1]
+				};
+			}
+		}
+
+		function createSteepnessQuiz(diffRatio)
+		{
+			function boxStats(x, y, w, h) 
+			{
+				var sW = scalarField.w, sH = scalarField.h;
+				var data = scalarField.view;
+
+				var m0 = Number.MAX_VALUE, m1 = -Number.MAX_VALUE;
+				var diff = 0;
+
+				for (var r=y, R=y+h; r<R; r++) 
+				{
+					for (var c=x, C=x+w; c<C; c++) 
+					{
+						var I = sW * r + c;
+						var v = data[ I ];
+
+						// min/max
+						m0 = Math.min(m0, v);
+						m1 = Math.max(m1, v);
+
+						// measure 8 neighborhood difference
+						var d = 0;
+						d += Math.abs(v - data[I - 1 ]);
+						d += Math.abs(v - data[I + 1 ]);
+						d += Math.abs(v - data[I - sW]);
+						d += Math.abs(v - data[I + sW]);
+
+						d += Math.abs(v - data[I - 1 - sW]);
+						d += Math.abs(v - data[I - 1 + sW]);
+						d += Math.abs(v - data[I + 1 - sW]);
+						d += Math.abs(v - data[I + 1 + sW]);
+
+						diff += d / 8;
+					}
+				}
+
+				return {
+					min: m0,
+					max: m1,
+					hSpan: m1-m0,
+					steepness: diff / (w*h)
+				};
+			}
+
+			function boxIntersect(a, b)
+			{
+				if (a.x+a.w+40 < b.x) return false; // a is left of b
+				if (a.x-40 > b.x+b.w) return false; // a is right of b
+				if (a.y+a.h+40 < b.y) return false; // a is above b
+				if (a.y-40 > b.y+b.h) return false; // a is below b
+				return true; // boxes overlap
+			}
+
+			var BOX_W = 175;
+			var BOX_H = 175;
+			var BOX_PAD = 30;
+
+			var MIN_STEEPNESS_DIFF = 0.00145;
+			var MAX_STEEPNESS_DIFF = 0.0016;
+			var MIN_STEEPNESS_D = diffRatio ? diffRatio-.01 : .85;
+			var MAX_STEEPNESS_D = diffRatio ? diffRatio     : .90;
+
+			var MIN_BOX_H = 0.3;
+			var MAX_BOX_H = .7;
+
+			// four percent height span difference between the two boxes
+			var MAX_BOX_H_SPAN_DIFF = 0.05;
+
+			var canvasW = +$('#mainCanvas').get(0).width;
+			var canvasH = +$('#mainCanvas').get(0).height;
+
+			// determine top-left corner of boxes
+			var done = false, steepnessDiff;
+			var r;
+
+			for (var tr=0; tr<100 && !done; tr++) 
+			{
+				// select first box
+				var b1 = {
+					x: Math.floor( Math.random() * (canvasW - BOX_W - 2*BOX_PAD) ) + BOX_PAD,
+					y: Math.floor( Math.random() * (canvasH - BOX_H - 2*BOX_PAD) ) + BOX_PAD,
+					w: BOX_W,
+					h: BOX_H
+				};
+
+				var b1Stats = boxStats(b1.x, b1.y, BOX_W, BOX_H), b2Stats = null;
+				if (b1Stats.min > MIN_BOX_H || b1Stats.max < MAX_BOX_H) {
+					continue;
+				}
+
+				for (var trial=0; !done && trial<25; trial++)
+				{
+				
+					var b2 = {
+						x: Math.floor( Math.random() * (canvasW - BOX_W - 2* BOX_PAD) ) + BOX_PAD,
+						y: Math.floor( Math.random() * (canvasH - BOX_H - 2* BOX_PAD) ) + BOX_PAD,
+						w: BOX_W,
+						h: BOX_H
+					};
+
+					// make sure b1 and  b2 are not intersecting
+					if (boxIntersect(b1, b2)) {
+						// the boxes intersect, get another one
+						continue;
+					}
+
+					b2Stats = boxStats(b2.x, b2.y, BOX_W, BOX_H);
+					if (b2Stats.min > MIN_BOX_H || b2Stats.max < MAX_BOX_H) {
+						continue;
+					}
+
+					// compare box 1 and 2 
+					steepnessDiff = Math.abs(b1Stats.steepness - b2Stats.steepness);
+					console.log('1: ' + b1Stats.steepness + ', 2: ' + b2Stats.steepness + ", steepness diff: " + steepnessDiff);
+					if (Math.abs(b1Stats.hSpan-b2Stats.hSpan) < MAX_BOX_H_SPAN_DIFF)
+					{
+						r = Math.min(b2Stats.steepness, b1Stats.steepness) / Math.max(b2Stats.steepness, b1Stats.steepness);
+						if (r > MIN_STEEPNESS_D && r < MAX_STEEPNESS_D) {
+							done = true;
+						}
+
+						/*
+
+						if (steepnessDiff >= MIN_STEEPNESS_DIFF && steepnessDiff <= MAX_STEEPNESS_DIFF) 
+						{
+							done = true;
+						}
+						*/
+					}
+				}
+			}
+			if (!done) {
+				return null;
+			}
+
+			var boxA, boxB;
+			if (b1.x < b2.x) {
+				boxA = b1;
+				boxB = b2;
+				boxA.stats = b1Stats;
+				boxB.stats = b2Stats;
+			}
+			else
+			{
+				boxA = b2;
+				boxB = b1;
+				boxA.stats = b2Stats;
+				boxB.stats = b1Stats;
+			}
+			
+			boxA.label = 'A';
+			boxB.label = 'B';
+
+			console.log('--> A: ' + boxA.stats.steepness + ', B: ' + boxB.stats.steepness + ", diff: " + steepnessDiff + ', r: ' + r);
+
+			// show the boxes in the SVG
+			var g = d3.select('#boxOverlay');
+			g.selectAll('rect').remove();
+			g.selectAll('text').remove();
+
+			g.selectAll('rect.boxShadow').data([boxA, boxB]).enter().append('rect')
+				.attr('x', function(d) { return d.x; })
+				.attr('y', function(d) { return d.y; })
+				.attr('width', function(d) { return d.w; })
+				.attr('height', function(d) { return d.h; })
+				.style('stroke', 'white').style('stroke-width', '2px').style('fill', 'none')
+				.style('filter', 'url(#glow)');
+
+			g.selectAll('rect.boxActual').data([boxA, boxB]).enter().append('rect')
+				.attr('x', function(d) { return d.x; })
+				.attr('y', function(d) { return d.y; })
+				.attr('width', function(d) { return d.w; })
+				.attr('height', function(d) { return d.h; })
+				.style('stroke', 'black').style('stroke-width', '1px').style('fill', 'none');
+
+			g.selectAll('text.shadow').data([boxA, boxB]).enter().append('text')
+				.attr('x', function(d) { return d.x+d.w/2-15; })
+				.attr('y', function(d) { return d.y-5; })
+				.html(function(d) { return d.label; })
+				.attr('class', 'shadow')
+				.style('font-size', '30px')
+				.style('fill', 'white').style('filter', 'url(#glow)');
+
+			g.selectAll('text.actual').data([boxA, boxB]).enter().append('text')
+				.attr('x', function(d) { return d.x+d.w/2-15; })
+				.attr('y', function(d) { return d.y-5; })
+				.html(function(d) { return d.label; })
+				.style('font-size', '30px')
+				.style('fill', 'black');
+
+			return {
+				boxA: boxA,
+				boxB: boxB,
+				steeper: boxA.stats.steepness > boxB.stats.steepness ? 'A' : 'B'
+			};
+		}
+
+		function flipHBox(box)
+		{
+			if (scalarField) 
+			{
+				var midX = Math.floor(scalarField.w/2);
+				var odd = scalarField.w % 2 != 0;
+				var markers = [box.x, box.x+box.w];
+
+				// flip markers
+				for (var i=0; i<markers.length; i++) 
+				{
+					var x = markers[i];
+					if (x < midX) {
+						x = (scalarField.w-1)-x;
+					}
+					else if (odd && x == midY)
+					{
+
+					}
+					else
+					{
+						x = (midX-1)-(x-midX)
+					}
+					markers[i] = x;  
+				}
+
+				return {
+					x: Math.min(markers[0], markers[1]),
+					y: box.y,
+					w: box.w,
+					h: box.h,
+					stats: box.stats
+				}
+			}
+			else {
+				return null;
+			}		
+		}
+
+		function flipVBox(box)
+		{
+			if (scalarField) 
+			{
+				var midY = Math.floor(scalarField.h/2);
+				var odd = scalarField.h % 2 != 0;
+				var markers = [box.y, box.y+box.h];
+
+				// flip markers
+				for (var i=0; i<markers.length; i++) 
+				{
+					var y = markers[i];
+					if (y < midY) {
+						y = (scalarField.h-1)-y;
+					}
+					else if (odd && y == midY)
+					{
+
+					}
+					else
+					{
+						y = (midY-1)-(y-midY)
+					}
+					markers[i] = y;
+				}
+
+				return {
+					x: box.x,
+					y: Math.min(markers[0], markers[1]),
+					w: box.w,
+					h: box.h,
+					stats: box.stats
+				}
+			}
+			else {
+				return null;
+			}			
+		}
+
+
+		function flipHMarkers(marker)
+		{
+			if (scalarField) 
+			{
+				var markers = marker ? [marker] : getAllMarkers();
+				var midX = Math.floor(scalarField.w/2);
+				var odd = scalarField.w % 2 != 0;
+				
+				// flip markers
+				for (var i=0; i<markers.length; i++) {
+					var m = markers[i];
+					var x = m.getX();
+					if (x < midX) {
+						x = (scalarField.w-1)-x;
+					}
+					else if (odd && x == midY)
+					{
+
+					}
+					else
+					{
+						x = (midX-1)-(x-midX)
+					}
+					m.updatePosition(x, null); 
+				}
+			}
+		}
+
+		function flipVMarkers(marker)
+		{
+			if (scalarField) 
+			{
+				var markers = marker ? [marker] : getAllMarkers();
+				var midY = Math.floor(scalarField.h/2);
+				var odd = scalarField.h % 2 != 0;
+				
+				// flip markers
+				for (var i=0; i<markers.length; i++) {
+					var m = markers[i];
+					var y = m.getY();
+					if (y < midY) {
+						y = (scalarField.h-1)-y;
+					}
+					else if (odd && y == midY)
+					{
+
+					}
+					else
+					{
+						y = (midY-1)-(y-midY)
+					}
+					m.updatePosition(null, y); 
+				}
+			}
+		}
+
+		var markerA = null, markerB = null;
+		function createRandomProfile()
+		{
+			var PROFILE_W = 80;
+			var PROFILE_H = 35;
+			
+			// distractor criteria
+			// how similar should the distractors be to the target profile?	
+			var MIN_SIMILARITY = .65; //.50;
+			var MAX_SIMILARITY = .7; //.60;
+			
+			// what is the allowable inter-distractor similarity?
+			var AVG_INTERDISTRACTOR_SIMILARITY = .7;
+			var MAX_INTERDISTRACTOR_SIMILARITY = .775;
+			var MAX_ITERATIONS = 3000;
+
+			removeAllMarkers();
+			
+			// profiles to be generated
+			var profiles = [], distractorProfiles = [];
+			var DISTRACTORS = 5;
+
+			// generate first (target) profile
+			var first = randomProfile();
+			if (!first) {
+				// unable to generate a reasonable profile
+				return null;
+			}
+			else
+			{
+				profiles.push( first );
+			}
+
+			// generate distractors
+			var distCount = 0;
+			var target = new Profile(profiles[0].profile);
+			var iteration = 0;
+			var cummSimilarity;
+
+			while (distCount < DISTRACTORS && (iteration++ < MAX_ITERATIONS)) 
+			{
+				var p;
+				if (false && distCount == 0) 
+				{
+					// invert the first profile and use it for the first distractor
+					var p0 = profiles[0];
+					var sample = p0.profile;
+					var inverted = [];
+					for (var j=0, len=sample.length; j<len; j++) {
+						inverted.push(1 - sample[j]);
+					}
+
+					var sampleExtent = d3.extent(inverted);
+					p = {
+						p1: p0.p2,
+						p2: p0.p1,
+						profile: inverted,
+						profileMin: sampleExtent[0],
+						profileMax: sampleExtent[1]
+					}
+				}
+				else {
+					p = randomProfile(true);
+				}
+
+				// compare the generated profile
+				var distractor = new Profile(p.profile);
+				var targetDistractorSimilarity = target.similarity(distractor);
+
+				//console.logf("distractor sim: " + targetDistractorSimilarity);
+				
+				if (targetDistractorSimilarity > MAX_SIMILARITY || targetDistractorSimilarity < MIN_SIMILARITY) {
+					// reject
+				}
+				else
+				{
+					// test inter-distractor similarity
+					cummSimilarity = 0;
+					var maxSim = 0;
+
+					for (var k=0; k < distractorProfiles.length; k++) 
+					{
+						var interDistractorSim = distractor.similarity( distractorProfiles[k] );
+						cummSimilarity += interDistractorSim
+						maxSim = Math.max(maxSim, interDistractorSim);
+					}
+					
+					// average cummulative similarity
+					if (distractorProfiles.length > 0) {
+						cummSimilarity /= distractorProfiles.length;
+					}
+
+					// average similarity between interdistractor shall not exceed MAX_INTERDISTRACTOR_SIM
+					if (cummSimilarity <= AVG_INTERDISTRACTOR_SIMILARITY && maxSim <= MAX_INTERDISTRACTOR_SIMILARITY)
+					{
+						profiles.push(p);
+						distractorProfiles.push(distractor);
+						distCount++;
+						iteration = 0;
+					}
+					else
+					{
+						// reject
+					}
+				}
+			}
+
+			if (distCount < DISTRACTORS) 
+			{
+				console.log("\tFailed to generate distractors within criteria. Avg inter-distractor similarity: " + cummSimilarity);
+				return null;
+			}
+
+			// quiz profile is the first one
+			var profile = profiles[0];
+			var needle = new Profile(profile.profile);
+
+			// mark te profile end points
+			var A = addMarker('A', profile.p1.x, profile.p1.y);
+			var B = addMarker('B', profile.p2.x, profile.p2.y);
+
+			markerA = A;
+			markerB = B;
+
+			// draw the profile and the distractors
+			var svg = d3.select('#svgProfile');
+			svg.selectAll('g').remove();
+
+			// randomize
+			/*
+			if (Math.random() < .5) {
+				profiles.reverse();
+			}
+			for (var i=0; i<50; i++) {
+				var s = Math.min(profiles.length-1, Math.floor(Math.random() * profiles.length));
+				var t = Math.min(profiles.length-1, Math.floor(Math.random() * profiles.length));
+				if (s == t) { 
+					i--; continue; 
+				}
+				else
+				{
+					var temp = profiles[s];
+					profiles[s] = profiles[t];
+					profiles[t] = temp;
+				}
+			}
+			*/
+			
+			// visualize and calculate similarity / average similarity
+			var avgSim = 0;
+
+			for (var i=0; i<profiles.length; i++)
+			{
+				var g = svg.append('g');
+				g.attr('transform', 'translate(' + 5 + ',' + (i*PROFILE_H + 5) + ')');
+
+				var profileVis = new Profile(profiles[i].profile);
+				profileVis.visualize(g, PROFILE_W, PROFILE_H);
+
+
+				// compute similarity to the needle
+				if (i>=0) {
+					var similarity = Math.floor(.5 + 100*needle.similarity(profileVis));
+					g.append('text')
+						.style('font-size', '15px').style('fill', 'white')
+						.html(similarity + '%')
+						.attr('x', PROFILE_W + 10).attr('y', 25);
+					if (similarity < 100) {
+						avgSim += similarity;
+					}
+				}
+			}
+			avgSim /= profiles.length-1;
+
+			var gg = svg.append('g');
+			gg.attr('transform', 'translate(' + 5 + ',' + (profiles.length*PROFILE_H+5+15) + ')');
+			gg.append('text').html('avg similarity ' + Math.floor(.5 + avgSim) + '%');
+
+			return profiles;
+		}
+
+		init();
+
+	</script>
+
+</body>
+</html>

@@ -1,0 +1,523 @@
+<html>
+<head>
+
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+
+
+	<script src="design/lib/three.js"></script>
+	<script src="design/lib/d3.js"></script>
+	<script src="design/lib/d3-color.v1.min.js"></script>
+	<script src="design/lib/d3-interpolate.v1.min.js"></script>
+
+	<script src="src/perlin.js"></script>
+	<script src="design/src/gl_pipeline.js"></script>
+	<script src="design/src/scalar.js"></script>
+	<script src="design/src/noisegen.js"></script>
+	<script src="design/src/terrain.js"></script>
+	<script src="design/src/coloranalysis.js"></script>
+	
+	<!-- design tool -->
+	<script src="design/src/picker.js"></script>
+	<script src="design/src/colormap.js"></script>
+	<script src="design/src/colorramp.js"></script>
+
+	<style>
+		body {
+			background-color: #eeeeee;
+			font-family: Helvetica;
+			font-size: 14px;
+
+			/* disable selection */
+			-webkit-user-select: none;
+			-moz-user-select: -moz-none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+
+		.controlPoint {
+			fill: #f4d142;
+			stroke: black;
+			stroke-width: 1px;
+		}
+
+		.colorPatch {
+			stroke: black;
+			stroke-width: 0px;
+		}
+		.selectedColorPatch {
+			stroke: black; stroke-width: 2px;
+		}
+
+		.controlPointConnection {
+			stroke: #aaaaaa;
+			stroke-width: 1px;
+		}
+
+		.down {
+			background-color: green;
+		}
+
+		.luminancePlot {
+			stroke: black; stroke-width: 1px;
+			fill: none;
+		}
+
+	</style>
+
+</head>
+
+<body style="margin: 0 0">
+	<div style="padding: 15 15; background-color: #333333; color: white; text-align: center">
+		<span style="font-size: 35px; font-weight: 100"><i>Colour</i>Map</span>
+	</div>
+
+	<div style="margin: 15 15">
+		<div>
+			<!--Color picker<br>-->
+			<div style="float: left">
+				<div id="pickedColor" style="width: 40px; height: 40px; margin-bottom: 5px; float: left"></div>
+				<div id="previewColor" style="width: 40px; height: 40px; margin-bottom: 5px; margin-left: 0px; float: left"></div>
+				<div style="float: right; font-size: 13px">
+					<label for="colorspaceLab">Lab</label>
+					<input type="radio" name="colorspace" id="colorspaceLab" checked="checked">
+					<label for="colorspaceRGB">RGB</label>
+					<input type="radio" name="colorspace" id="colorspaceRGB">
+				</div>
+
+				<div>
+					<canvas id="colorCanvas" width="275" height="275" style="border: solid 1px black"></canvas>
+					<canvas id="channelCanvas" width="30" height="275" style="border: solid 0px black"></canvas>
+				</div>
+			</div>
+
+			<div style="float: left">
+				<svg id="svgColorRamp" width="330" height="360" style="border: solid 1px black"></svg>
+			</div>
+			<div style="float: left; margin-left: 5px">
+				<canvas id="fieldCanvas" width="513" height="513" style="border: solid 1px black"></canvas><br>
+				<canvas id="fieldDiffCanvas" width="513" height="513" style="border: solid 1px black"></canvas>
+
+
+			</div>
+			<div style="margin-left: 5px; float: left; width: 120px; height:100px; border: solid 0px black">
+				spatial frequency<div id="sliderScale" style="width: 80px; height: 5px; font-size: 10px"></div>
+				<br>
+
+				<label for="noiseSimplex">simplex</label>
+				<input type="radio" name="noiseGen" id="noiseSimplex" checked="checked">
+				<label for="noiseTerrain">terrain</label>
+				<input type="radio" name="noiseGen" id="noiseTerrain">
+			</div>
+		</div>
+	</div>
+	<!-- shaders -->
+	<script type="x-shader/x-vertex" id="colormapVertex">
+		varying vec2 oTexCoord;
+		void main()	
+		{
+			oTexCoord = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}
+	</script>
+
+	<script type="x-shader/x-fragment" id="colorDiffFragment">
+
+		const float M_PI = 3.1415926535897932384626433832795;
+		
+		float atan2(float y, float x) 
+		{
+			if (x > 0.0) {
+				return atan(y/x);
+			}
+			else if (y > 0.0) {
+				return M_PI/2.0 - atan(x/y);
+			}
+			else if (y < 0.0) {
+				return -M_PI/2.0 - atan(x/y);
+			}
+			else if (x < 0.0) {
+				return atan(y/x) + M_PI;
+			}
+			else
+			{
+				// undefined
+				return -10000.0;
+			}
+		}
+
+		// based on https://github.com/connorgr/colorgorical
+		float ciede2000(float Lstd, float astd, float bstd, float Lsample,
+		                 float asample, float bsample) 
+		{
+		  const float kl = 1.0;
+		  const float kc = 1.0;
+		  const float kh = 1.0;
+
+		  float Cabstd = sqrt(astd*astd + bstd*bstd);
+		  float Cabsample = sqrt(asample*asample + bsample*bsample);
+		  float Cabarithmean = (Cabstd + Cabsample)/2.0;
+
+		  float G = 0.5 * (1.0 - sqrt(pow(Cabarithmean, 7.0) /
+		             (pow(Cabarithmean, 7.0) + pow(25.0, 7.0))));
+
+		  // calculate a'
+		  float apstd = (1.0+G)*astd;
+		  float apsample = (1.0+G)*asample;
+		  float Cpsample = sqrt(apsample*apsample + bsample*bsample);
+		  float Cpstd = sqrt(apstd*apstd + bstd*bstd);
+
+		  // Compute the product of chromas and locations at which it is 0
+		  float Cpprod = Cpsample*Cpstd;
+
+		  // Make sure that hue is between 0 and 2pi
+		  float hpstd = atan2(bstd, apstd);
+		  if(hpstd < 0.0) hpstd += 2.0 * M_PI;
+
+		  float hpsample = atan2(bsample, apsample);
+		  if(hpsample < 0.0) hpsample += 2.0 * M_PI;
+
+		  float dL = Lsample - Lstd;
+		  float dC = Cpsample - Cpstd;
+		  // Compute hue distance
+		  float dhp = hpsample - hpstd;
+		  if(dhp > M_PI) dhp -= 2.0*M_PI;
+		  if(dhp < -1.0*M_PI) dhp += 2.0*M_PI;
+		  // Set chroma difference to zero if product of chromas is zero
+		  if(Cpprod == 0.0) dhp = 0.0;
+
+		  // CIEDE2000 requires signed hue and chroma differences, differing from older
+		  //  color difference formulae
+		  float dH = 2.0*sqrt(Cpprod)*sin(dhp/2.0);
+
+		  // Weighting functions
+		  float Lp = (Lsample+Lstd)/2.0;
+		  float Cp = (Cpstd+Cpsample)/2.0;
+		  // Compute average hue
+		  // avg hue is computed in radians and converted to degrees only where needed
+		  float hp = (hpstd+hpsample)/2.0;
+		  // Identify positions for which abs hue diff > 180 degrees
+		  if(abs(hpstd-hpsample) > M_PI) hp -= M_PI;
+		  // rollover those that are under
+		  if(hp < 0.0) hp += 2.0 * M_PI;
+		  // if one of the chroma values = 0, set mean hue to the sum of two chromas
+		  if(Cpprod == 0.0) hp = hpstd + hpsample;
+
+		  float Lpm502 = (Lp-50.0)*(Lp-50.0);
+		  float Sl = 1.0 + 0.015*Lpm502 / sqrt(20.0+Lpm502);
+		  float Sc = 1.0 + 0.045*Cp;
+		  float T = 1.0 - 0.17*cos(hp - M_PI/6.0)
+		               + 0.24*cos(2.0*hp)
+		               + 0.32*cos(3.0*hp + M_PI/30.0)
+		               - 0.20*cos(4.0*hp - 63.0*M_PI/180.0);
+		  float Sh = 1.0 + 0.015*Cp*T;
+		  float delthetarad = (30.0*M_PI/180.0) *
+		                       exp(-1.0* ( pow((180.0/M_PI*hp - 275.0)/25.0, 2.0) ));
+		  float Rc = 2.0*sqrt(pow(Cp, 7.0)/(pow(Cp, 7.0) + pow(25.0, 7.0)));
+		  float RT = -1.0 * sin(2.0*delthetarad)*Rc;
+
+		  float klSl = kl*Sl;
+		  float kcSc = kc*Sc;
+		  float khSh = kh*Sh;
+
+		  float de = sqrt( pow(dL/klSl, 2.0) + pow(dC/kcSc, 2.0) + pow(dH/khSh, 2.0) +
+		                    RT*(dC/kcSc)*(dH/khSh) );
+
+		  return de;
+		}
+
+		float labDiff(vec3 c1, vec3 c2) {
+			return ciede2000(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z);
+		}
+
+		// transform from RGB to LAB
+		// adapted for GLSL, original code due to d3-color
+		// https://github.com/d3/d3-color
+		
+		// D65 white point
+		const float Xn = 0.96422;
+		const float Yn = 1.0;
+		const float Zn = 0.82521;
+		const vec3 XYZn = vec3(Xn, Yn, Zn);
+		
+		// _f function
+		const float t0 = 4.0 / 29.0;
+		const float t1 = 6.0 / 29.0;
+		const float t2 = 3.0 * t1 * t1;
+		const float t3 = t1 * t1 * t1;
+
+		vec3 rgb2lrgb(vec3 x) 
+		{
+
+			bvec3 less = lessThanEqual(x, vec3(0.04045));
+			vec3 high  = x / 12.92;
+			vec3 low = pow((x + 0.055) / 1.055, vec3(2.4));
+			
+			// models: 	return (x) <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4);
+			return mix(low, high, vec3(less));
+		}
+
+		vec3 _f(vec3 t) 
+		{
+			bvec3 greater = greaterThan(t, vec3(t3));
+			vec3 low  = t / vec3(t2) + vec3(t0);
+			vec3 high = pow(t, vec3(1.0/3.0));
+
+			// models: return t > t3 ? pow(t, 1.0 / 3.0) : t / t2 + t0;
+			return mix(low, high, vec3(greater));
+		}
+
+		vec3 rgb2lab(vec3 o) 
+		{	
+			// assumes sRGB at D65 white point		
+			const mat3 RGB2XYZ = mat3(
+				0.4360747, 0.3850649, 0.1430804,
+				0.2225045, 0.7168786, 0.0606169,
+				0.0139322, 0.0971045, 0.7141733
+			);
+			vec3 oxyz = _f( (rgb2lrgb(o) * RGB2XYZ) / XYZn );
+			return vec3( 116.0 * oxyz.y - 16.0, 500.0 * (oxyz.x - oxyz.y), 200.0 * (oxyz.y - oxyz.z) );
+		}
+
+		uniform float hPitch;
+		uniform float vPitch;
+
+		varying vec2 oTexCoord;
+		uniform sampler2D scalarField;
+		uniform sampler2D colormap;
+		uniform sampler2D colorDiffScale;
+		
+		float gauss(float x, float mue, float delta) {
+			const float denominator = sqrt(2.0*M_PI);
+			return exp(-0.5 * pow((x-mue)/delta, 2.0)) / (delta * denominator);
+		}
+
+		// kernel half size (3 equates to a 7x7 kernel)
+		const int KHS = 3;
+
+		void main() 
+		{
+			vec3 c00 =  rgb2lab(texture2D(colormap, vec2(texture2D( scalarField, oTexCoord ).x, 0.5)).rgb);
+			float diff = 0.0;
+
+			// run kernel
+			for (int i=-KHS; i<= KHS; i++) 
+			{
+				for (int j=-KHS; j<= KHS; j++) 
+				{
+					vec2 offset = vec2( float(i), float(j) );
+					vec2 texCoord = oTexCoord + offset * vec2(hPitch, vPitch);
+					vec3 c = rgb2lab(texture2D(colormap, vec2(texture2D( scalarField, texCoord ).x, 0.5)).rgb);
+					float cDiff = labDiff(c00, c);
+
+					//diff += cDiff * gauss( sqrt(dot(offset, vec2(1.0))), 0.0, float(KHS) / 2.1 );
+
+					diff = max(diff, labDiff(c00, c));
+				}
+			}
+
+			diff = diff / (10.0*float(1.0));
+			gl_FragColor = texture2D(colorDiffScale, vec2(diff, 0.5));
+		}
+	</script>
+
+	<script type="x-shader/x-fragment" id="secondDerivative">
+
+		varying vec2 oTexCoord;
+		uniform sampler2D field;
+		uniform sampler2D colorDiffScale;
+		uniform float hPitch;
+		uniform float vPitch;
+
+		const int KHS = 3;
+		void main() 
+		{
+			float c00 = texture2D(field, oTexCoord).r;
+			float diff = 0;
+
+			// run kernel
+			for (int i=-KHS; i<= KHS; i++) 
+			{
+				for (int j=-KHS; j<= KHS; j++) 
+				{
+					vec2 offset = vec2( float(i), float(j) );
+					vec2 texCoord = oTexCoord + offset * vec2(hPitch, vPitch);
+					float c = texture2D(field, texCoord).r;
+
+					diff = max(diff, abs(c-c00));
+				}
+			}
+			gl_FragColor = texture2D(colorDiffScale, vec2(diff, 0.5));
+		}
+	</script>
+
+
+	<script type="x-shader/x-fragment" id="colormapFragment">
+		varying vec2 oTexCoord;
+		uniform sampler2D scalarField;
+		uniform sampler2D colormap;
+		uniform float contour;
+
+		void main()
+		{
+			// Left eye is full red and actual green and blue
+			vec4 data = texture2D(scalarField, oTexCoord);
+			vec2 colormapCoord = vec2(data.x, 0.5);
+			if (contour >= 0.0 && abs(data.x-contour) < .015)
+			{
+				gl_FragColor = vec4(1.0);
+			}
+			else
+			{
+				gl_FragColor = texture2D(colormap, colormapCoord);
+			}
+		}
+	</script>
+
+
+	<script type="text/javascript">
+
+		var NOISE_SIMPLEX = 1;
+		var NOISE_TERRAIN = 2;
+		var noiseType = NOISE_SIMPLEX;
+		var terrain = null;
+		
+		function refreshNoise() {
+			switch (noiseType)
+			{
+
+			case NOISE_SIMPLEX:
+				makeNoise(field, $('#sliderScale').slider('value'));
+				break;
+			case NOISE_TERRAIN:
+				if (!terrain) {
+					console.log("new terrain " + Math.log2(field.w-1));
+					terrain = new Terrain(Math.log2(field.w-1), field.view);
+				}
+				terrain.generate(noiseScale*10);
+				field.normalize();
+				break;
+			}
+
+			visualizeScalarField(field);
+
+		}
+
+		function terrainNoise() {
+
+			visualizeScalarField(field);
+		}
+
+		// create UI elements
+		function createUI() {
+			$('#sliderScale').slider({ step: 0.01, min: 0.01, max: 10, value: noiseScale, change: refreshNoise });
+
+			// switch to different noise generators
+			d3.select('#noiseSimplex').on('click', function() {
+				noiseType = NOISE_SIMPLEX;
+				refreshNoise();
+			})
+			d3.select('#noiseTerrain').on('click', function() {
+				noiseType = NOISE_TERRAIN;
+				refreshNoise();
+			});
+		}
+
+		// function to re-draw scalar field
+		var renderGL = true;	
+		
+		function visualizeScalarField(_field) 
+		{
+			var theField = _field || field
+			var destCanvas = d3.select(renderGL ? '#fieldCanvas' : '#fieldCanvas').node();
+			var outCanvases = [];
+			
+			theField.setColorMap(ramp.getColorMap());
+
+			if (renderGL) 
+			{
+				// render color diff
+				/*
+				theField.generateColorDiffGL(d3.select(destCanvas).node());
+				
+				// read the color diff
+				var gl = destCanvas.getContext('webgl');
+				var pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+				gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+				// copy them to the 'DiffCanvas'
+				var ctx = d3.select("#fieldDiffCanvas").node().getContext('2d');
+				var imgData = ctx.getImageData(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+				imgData.data.set(pixels);
+				ctx.putImageData(imgData, 0, 0);
+
+				*/
+				// render the actual field
+				theField.generatePictureGL(d3.select(destCanvas).node());
+
+
+				// run the color diff pipelibne
+				if (colorPipeline.ready()) {
+					colorPipeline.run("diff");
+				}
+
+			} 
+			else 
+			{
+				outCanvases = [ theField.generatePicture(destCanvas) ];
+			}
+		}
+		
+		// color analysis pipeline
+		var colorPipeline = null;
+		function initColorAnalysis() {
+			colorPipeline = new ColorAnalysis(field, d3.select("#fieldCanvas").node());
+		}
+
+	</script>
+
+	<script type="text/javascript">
+		var SHIFT=false;
+		$(document).ready(function() 
+		{
+			$( "input" ).checkboxradio({
+				icon: false
+			});
+		});
+
+		// create a test scalar field, which we will fill with Simplex/Perlin noise
+		var fieldCanvas = d3.select("#fieldCanvas").node();
+		var field = new ScalarField(fieldCanvas.width, fieldCanvas.height);
+
+		// create color picker
+		var picker = new ColorPicker(
+			d3.select("#colorCanvas").node(),
+			d3.select("#channelCanvas").node()
+		);
+
+		// create color ramp
+		var ramp = new ColorRamp(null, d3.select("#svgColorRamp"), picker);
+		ramp.registerCallback(function() {
+			visualizeScalarField(field);
+		});
+
+
+		// create noise
+		seedNoise();
+		makeNoise(field);
+
+		// initialize color analysis pipeline
+		initColorAnalysis();
+
+		// visualize the initial field
+		visualizeScalarField(field);
+
+		createUI();
+
+	</script>
+
+</body>
+
+</html>
