@@ -25,15 +25,15 @@ ColorAnalysis = function(field, glCanvas)
 			.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
 			.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
 			.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
-			//.defer( gLoadShader, object, 'src/shader/vis.frag', 'vis')
+			.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
 
 			.awaitAll(function(error, results) 
 			{
 				if (error) { 
 					throw error;
 				}
-				else {
-					console.log("shaders loaded");
+				else 
+				{
 					object.createPipelines();
 					object.isReady = true;
 				}
@@ -52,6 +52,19 @@ ColorAnalysis.prototype.createPipelines = function()
 	var c = getColorPreset('extendedBlackBody');
 	this.gpuDiffColormapTexture = c.createGPUColormap()
 
+	var visPipeline = new GLPipeline(this.glCanvas);
+	visPipeline.addStage({
+		uniforms: {
+			scalarField: {},
+			colormap: {},
+			contour: {value: -1.0}
+		},
+		inTexture: 'scalarField',
+		fragment: this.shaders['vis'],
+		vertex: this.shaders['vertex']
+	});
+	this.visPipeline = visPipeline;
+
 	var diffPipeline = new GLPipeline(this.glCanvas);
 	diffPipeline.addStage({
 		uniforms: {
@@ -68,7 +81,7 @@ ColorAnalysis.prototype.createPipelines = function()
 	});
 	this.diffPipeline = diffPipeline;
 
-	var speedPipeline = new GLPipeline(this.glCanvas)
+	var speedPipeline = new GLPipeline(this.glCanvas);
 	
 	// add first stage to perform a cie2000 color-diff
 	speedPipeline.addStage({
@@ -92,6 +105,7 @@ ColorAnalysis.prototype.createPipelines = function()
 			hPitch: {value: 1.0 / this.field.w},
 			vPitch: {value: 1.0 / this.field.h},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
+			outputColor: {value: false}
 		},
 		inTexture: 'colorDiff',
 		fragment: this.shaders['speed'],
@@ -149,7 +163,8 @@ ColorAnalysis.prototype.run = function(analysis)
 		break;
 
 	case 'vis':
-		// simple visualization
+		pipeline = this.visPipeline;
+		break;
 	}
 
 	// initialize stage0 to take scalarField as inTexture
@@ -175,38 +190,41 @@ ColorAnalysis.prototype.run = function(analysis)
 	for (var i=0; i<this.copyList.length; i++) 
 	{
 		var copyTarget = this.copyList[i];
-
-		// read the color diff
-		var gl = this.glCanvas.getContext('webgl');
-		var w = gl.drawingBufferWidth;
-		var h = gl.drawingBufferHeight;
-
-		var pixels = new Uint8Array(w * h * 4);
-		gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-		// flip pixels
-		var flipPixels = new Uint8Array(w * h * 4);
-		var I=0;
-		for (var r=h-1; r>=0; r--) 
-		{
-			var rI = r * w * 4;
-			for (var c=0; c<w; c++, I+=4, rI += 4) 
-			{
-				flipPixels[I] = pixels[rI];
-				flipPixels[I+1] = pixels[rI+1];
-				flipPixels[I+2] = pixels[rI+2];
-				flipPixels[I+3] = pixels[rI+3];
-			}
-		}
-
-		// copy them to the 'DiffCanvas'
-		var ctx = copyTarget.getContext('2d');
-		var imgData = ctx.getImageData(0, 0, w, h);
-		imgData.data.set(flipPixels);
-		ctx.putImageData(imgData, 0, 0);
+		this.copyToCanvas(copyTarget);
 	}
 }
 
+ColorAnalysis.prototype.copyToCanvas = function(copyTarget) 
+{
+	// read the color diff
+	var gl = this.glCanvas.getContext('webgl');
+	var w = gl.drawingBufferWidth;
+	var h = gl.drawingBufferHeight;
+
+	var pixels = new Uint8Array(w * h * 4);
+	gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+	// flip pixels
+	var flipPixels = new Uint8Array(w * h * 4);
+	var I=0;
+	for (var r=h-1; r>=0; r--) 
+	{
+		var rI = r * w * 4;
+		for (var c=0; c<w; c++, I+=4, rI += 4) 
+		{
+			flipPixels[I] = pixels[rI];
+			flipPixels[I+1] = pixels[rI+1];
+			flipPixels[I+2] = pixels[rI+2];
+			flipPixels[I+3] = pixels[rI+3];
+		}
+	}
+
+	// copy them to the 'DiffCanvas'
+	var ctx = copyTarget.getContext('2d');
+	var imgData = ctx.getImageData(0, 0, w, h);
+	imgData.data.set(flipPixels);
+	ctx.putImageData(imgData, 0, 0);
+}
 
 ColorAnalysis.prototype.addCopyCanvas = function(canvas) 
 {

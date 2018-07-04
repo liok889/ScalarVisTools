@@ -1,7 +1,7 @@
 var RAMP_W = 230;
 var RAMP_H = 30;
 var RAMP_OFF_X = 80;
-var RAMP_OFF_Y = 100
+var RAMP_OFF_Y = 100;
 
 var PATCH_W = 15;
 var PATCH_H = 15;
@@ -57,13 +57,22 @@ function ColorRamp(_colors, _svg, _colorPicker)
 		.attr('width', RAMP_W).attr('height', PLOT_H)
 		.style('fill', 'white').style('stroke', 'black')
 	this.lPlot.append('path')
-		.attr('class', 'luminancePlot')
+		.attr('class', 'luminancePlot');
+
+	// color difference plot
+	this.diffPlot = g.append('g');
+	this.diffPlot.attr('transform', 'translate(0,' + 2*(-PLOT_H-PLOT_OFFSET) + ')');
+	this.diffRect = this.diffPlot.append('rect')
+		.attr('width', RAMP_W).attr('height', PLOT_H)
+		.style('fill', 'white').style('stroke', 'black')
+	this.diffPlot.append('path')
+		.attr('class', 'diffPlot');
 
 	// initialize
 	this.selectedControlPoint = null;
 	this.controlPoints = controlPoints;
-	this.updateSVG();
 	this.updateColormap();
+	this.updateSVG();
 
 
 	// keep track of history
@@ -315,6 +324,45 @@ ColorRamp.prototype.updateSVG = function()
 
 	// create luminance plot
 	this.createLPlot();
+
+	// create diff plot
+	this.createDiffPlot();
+}
+
+ColorRamp.prototype.createDiffPlot = function()
+{
+	var res = this.colormap.computeColorDiff();
+	var diffs = res.diffValues;
+	var maxD = res.maxColorDiff;
+	var points = [];
+
+	// round D to the next multiple of 10
+	var scaleMax = Math.ceil(maxD / 10) * 10;
+
+	for (var i=0, len=diffs.length; i<len; i++) 
+	{
+		points.push({
+			value: i/(len-1)*RAMP_W,
+			diff: PLOT_H * (1.0 - diffs[i] / scaleMax)
+		});
+	}
+
+	var lineGen = d3.line()
+		.x(function(d) { return d.value;})
+		.y(function(d) { return d.diff;});
+
+	var diffPath = this.diffPlot.select('path');
+	diffPath.attr('d', lineGen(points));
+
+	var diffText = this.diffPlot.select('text');
+	if (diffText.size() == 0) {
+		diffText = this.diffPlot.append('text');
+	}
+	diffText.html(scaleMax);
+	diffText
+		.style('font-size', '10px')
+		.attr('text-anchor', 'end');
+
 }
 
 ColorRamp.prototype.createLPlot = function(skipControls) 

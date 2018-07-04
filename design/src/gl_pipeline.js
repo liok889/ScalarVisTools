@@ -26,7 +26,6 @@ function getRenderer(nameOrCanvas)
 
 function PipelineStage(stage)
 {
-	this.info = stage;
 	this.inTexture = stage.inTexture;
 
 	// load shader
@@ -55,8 +54,8 @@ PipelineStage.prototype.getUniforms = function()
 
 function GLPipeline(_destCanvas)
 {
+	// destingation canvas
 	this.destCanvas = _destCanvas;
-	this.pipeline = [];
 
 	// get OpenGL context
 	this.renderer = getRenderer(this.destCanvas);
@@ -70,21 +69,35 @@ function GLPipeline(_destCanvas)
 
 GLPipeline.prototype.addStage = function(stage) 
 {
-	if (this.pipeline.length == 0) 
+	if (this.stages.length == 0) 
 	{
 		// no need for extra buffer at this point
 	}
 	else
 	{
-		// creat an offscreen buffer
-		/*
+		// create two offscreen buffers
 		var canvas = this.destCanvas;
-		this.buffers = [
-			new THREE.WebGLRenderTarget( canvas.width, canvas.height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} ),
-			new THREE.WebGLRenderTarget( canvas.width, canvas.height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} )
-		];
+		var w = +canvas.width;
+		var h = +canvas.height;
+
+		for (var i=0; i<2; i++)
+		{
+			var tex = new THREE.WebGLRenderTarget(w, h, { 
+				minFilter: THREE.NearestFilter, 
+				magFilter: THREE.NearestFilter,
+				
+				// floating point texture
+				format: THREE.RGBAFormat,
+				type: THREE.FloatType,
+
+				// clamp to edge
+				wrapS: THREE.ClampToEdgeWrapping,
+				wrapT: THREE.ClampToEdgeWrapping,
+				depthBuffer: false
+			});
+			this.buffers.push(tex);
+		}
 		this.frontBuffer = 0;
-		*/
 	}
 
 	this.stages.push(new PipelineStage(stage));
@@ -94,11 +107,11 @@ GLPipeline.prototype.getFront = function() {
 	return this.buffers[this.frontBuffer];
 }
 GLPipeline.prototype.getBack = function() {
-	return this.buffer[this.frontBuffer == 0 ? 1 : 0];
+	return this.buffers[this.frontBuffer == 0 ? 1 : 0];
 }
 GLPipeline.prototype.flipBuffers = function() {
 	if (this.frontBuffer == 0) {
-		this.fontBuffer = 1;
+		this.frontBuffer = 1;
 	}
 	else {
 		this.frontBuffer = 0;
@@ -112,21 +125,30 @@ GLPipeline.prototype.run = function()
 		var stage = this.stages[i];
 		
 		// set shader to take texture from the previous stage
-		if (i>0) {
-			stage.shader.uniforms[ stage.inTexture ] = this.getFront().texture;
+		if (i>0) 
+		{
+			var u = stage.shader.uniforms;
+			var inTex = stage.inTexture;
+			if (inTex === undefined || inTex === null) {
+				throw ("No inTexture defiend for stage " + i);
+			}
+			else {
+				u[inTex].value = this.getFront().texture;
+			}
 		}
-
 		
 		if (i==len-1) 
 		{
+			// render to canvas
 			this.renderer.render(stage.scene, stage.camera);
 		}
 		else
 		{
+			// render to back buffer
 			this.renderer.render(stage.scene, stage.camera, this.getBack());
 
 			// flip buffers
-			this.flipBuffer();
+			this.flipBuffers();
 		}
 	}
 }

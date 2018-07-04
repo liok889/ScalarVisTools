@@ -325,7 +325,7 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 
 		if (lastCLab) {
 			
-			var d = cie76Diff(lastCLab, cLab);
+			var d = ciede2000(cLab.l, cLab.a, cLab.b, lastCLab.l, lastCLab.a, lastCLab.b);//cie76Diff(lastCLab, cLab);
 			diffValues.push(d);
 			maxDiff = Math.max(d, maxDiff);
 			avgDiff += d;
@@ -340,6 +340,11 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 	this.avgDiff = avgDiff / N;
 	this.colorDiffs = diffValues;
 	this.maxColorDiff = maxDiff;
+	return {
+		avgDiff: this.avgDiff,
+		diffValues: diffValues,
+		maxColorDiff: this.maxColorDiff
+	};
 }
 
 ColorMap.prototype.computeColorDiffAroundValue = function(value)
