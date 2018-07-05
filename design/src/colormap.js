@@ -48,7 +48,14 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 						d3.lab(lab2[0], lab2[1], lab2[2])
 					);
 				}
-				else if (interpTyoe == 'hsl')
+				else if (interpType == 'jab') {
+					var jab1 = d3.jab( d3.lab(lab1[0], lab1[1], lab1[2]) );
+					var jab2 = d3.jab( d3.lab(lab2[0], lab2[1], lab2[2]) );
+					interpolator = d3.interpolateJab(
+						jab1, jab2
+					);
+				}
+				else if (interpType == 'hsl')
 				{
 					interpolator = d3.interpolateHsl(
 						d3.lab(lab1[0], lab1[1], lab1[2]),

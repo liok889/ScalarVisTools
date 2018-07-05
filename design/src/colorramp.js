@@ -477,7 +477,7 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 
 ColorRamp.prototype.updateColormap = function() 
 {
-	this.colormap = new ColorMap(this.colors, 'lab');
+	this.colormap = new ColorMap(this.colors, 'jab');
 
 	// render color ramp
 	var colorScale = document.createElement('canvas');
