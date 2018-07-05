@@ -1,10 +1,18 @@
-
+/* -------------------------------------
+ * Color Picker tool
+ * -------------------------------------
+ */
 
 var COLORSPACE_LAB = 1;
-var COLORSPACE_RGB = 2;
+var COLORSPACE_CAM02 = 2;
+
 
 var A_RANGE=[-115, 115];
 var B_RANGE=[-115, 115];
+
+var JAB_A_RANGE = [-45, 45];
+var JAB_B_RANGE = [-45, 45];
+
 
 var CHANNEL_RAMP_OFFSET = 10;
 
@@ -21,12 +29,19 @@ function ColorPicker(mainCanvas, channelCanvas)
 	this.channelPos = 0.5;
 	this.renderChannel();
 	this.armEvents();
-	this.renderLAB();
+	this.renderPerceptual();
 
 	this.currentColor = null;
 
 	// callbacks, initially empty 
 	this.callbacks = [];
+}
+
+ColorPicker.prototype.changeColorSpace = function(newSpace) {
+	this.colorSpace = newSpace;
+	this.renderChannel();
+	this.renderPerceptual();
+
 }
 
 ColorPicker.prototype.registerCallback = function(event, callback, id) 
@@ -51,12 +66,17 @@ ColorPicker.prototype.renderChannel = function() {
 	switch (this.colorSpace) 
 	{
 
+
+	case COLORSPACE_CAM02:
 	case COLORSPACE_LAB:
 
 		// luminance interpolation
 		for (var i=0; i<height; i++)
 		{
-			var cLAB = d3.lab(100-100*i/(height-1), 0.0, 0.0);
+			var cLAB = this.colorSpace == COLORSPACE_LAB 
+				? d3.lab(100-100*i/(height-1), 0.0, 0.0)
+				: d3.jab(100-100*i/(height-1), 0.0, 0.0);
+
 			var cRGB = d3.rgb(cLAB);
 
 			var I = i * width * 4;
@@ -71,7 +91,12 @@ ColorPicker.prototype.renderChannel = function() {
 		}
 		break;
 
-	case COLORSPACE_RGB:
+	default:
+		for (var i=0; i<height; i++) 
+		{
+			var cCAM = d3.jab(100-100*i/(height-1), 0.0, 0.0);
+
+		}
 
 		break;
 	}
@@ -106,14 +131,6 @@ ColorPicker.prototype.drawChannelSelection = function()
 
 }
 
-ColorPicker.prototype.renderLAB = function() 
-{
-
-	// draw all possible lab colors
-	var context = this.mainCanvas.getContext("2d");
-	var height = this.mainCanvas.height;
-	var width = this.mainCanvas.width;	
-}
 
 ColorPicker.prototype.armEvents = function() {
 
@@ -132,8 +149,9 @@ ColorPicker.prototype.armEvents = function() {
 					// update
 					switch (picker.colorSpace)
 					{
+					case COLORSPACE_CAM02:
 					case COLORSPACE_LAB:
-						picker.renderLAB();
+						picker.renderPerceptual();
 						break;
 					}
 				})
@@ -177,15 +195,24 @@ ColorPicker.prototype.colorFromMouse = function(mouse)
 	var w = +this.mainCanvas.width;
 	var h = +this.mainCanvas.height;
 
+	var xScale, yScale, A, B;
+
 	switch (this.colorSpace)
 	{
 	case COLORSPACE_LAB:
-		var xScale = d3.scaleLinear().domain([0, w-1]).range(A_RANGE);
-		var yScale = d3.scaleLinear().domain([h-1, 0]).range(B_RANGE);			
-		var B = yScale(mouse[1])
-		var A = xScale(mouse[0]);
+		xScale = d3.scaleLinear().domain([0, w-1]).range(A_RANGE);
+		yScale = d3.scaleLinear().domain([h-1, 0]).range(B_RANGE);			
+		B = yScale(mouse[1]);
+		A = xScale(mouse[0]);
 		return d3.lab((1-this.channelPos)*100, A, B);
 		break;
+	
+	case COLORSPACE_CAM02:
+		xScale = d3.scaleLinear().domain([0, w-1]).range(JAB_A_RANGE);
+		yScale = d3.scaleLinear().domain([h-1, 0]).range(JAB_B_RANGE);			
+		B = yScale(mouse[1]);
+		A = xScale(mouse[0]);
+		return d3.lab(d3.jab((1-this.channelPos)*100, A, B));	
 	}
 
 }
@@ -194,6 +221,7 @@ ColorPicker.prototype.switchToColor = function(c)
 {
 	switch (this.colorSpace)
 	{
+	case COLORSPACE_CAM02:
 	case COLORSPACE_LAB:
 
 		var cLab = d3.lab(c);
@@ -209,7 +237,7 @@ ColorPicker.prototype.switchToColor = function(c)
 			// change the color div to reflect selection
 			d3.select('#pickedColor')
 				.style('background-color', c.toString());
-			this.renderLAB();
+			this.renderPerceptual();
 			this.markColor(c);
 		}
 
@@ -219,9 +247,25 @@ ColorPicker.prototype.switchToColor = function(c)
 
 ColorPicker.prototype.markColor = function(c) 
 {
+	var a_range, b_range;
+	switch (this.colorSpace)
+	{
+	case COLORSPACE_CAM02:
+		c = d3.jab(c);
+		a_range = JAB_A_RANGE;
+		b_range = JAB_B_RANGE;
+		break;
+
+	case COLORSPACE_LAB:
+		c = d3.lab(c);
+		a_range = A_RANGE;
+		b_range = B_RANGE;
+		break;
+	}
+
 	// draw a simple cross sign
-	var aS = d3.scaleLinear().domain(A_RANGE).range([0, this.mainCanvas.width]);
-	var bS = d3.scaleLinear().domain(B_RANGE).range([this.mainCanvas.height, 0]);
+	var aS = d3.scaleLinear().domain(a_range).range([0, this.mainCanvas.width]);
+	var bS = d3.scaleLinear().domain(b_range).range([this.mainCanvas.height, 0]);
 	var x = aS(c.a);
 	var y = bS(c.b);
 
@@ -241,6 +285,8 @@ ColorPicker.prototype.pickColor = function(c, skipCallback)
 {
 	switch (this.colorSpace)
 	{
+
+	case COLORSPACE_CAM02:
 	case COLORSPACE_LAB:
 
 		var cLab = d3.lab(c);
@@ -266,7 +312,7 @@ ColorPicker.prototype.pickColor = function(c, skipCallback)
 					}
 				}
 			}
-			this.renderLAB();
+			this.renderPerceptual();
 			this.markColor(c);
 		}
 		//this.renderLAB();
@@ -307,12 +353,13 @@ ColorPicker.prototype.previewColor = function(c)
 	}
 }
 
-ColorPicker.prototype.renderLAB = function() 
+ColorPicker.prototype.renderPerceptual = function() 
 {
 
 	// color ranges (actual LAB ranges are -128, 127)
-	var a = A_RANGE;
-	var b = B_RANGE;
+	var a = this.colorSpace == COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
+	var b = this.colorSpace == COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
+
 	var BACKGROUND = [200, 200, 200];
 
 	var canvas = this.mainCanvas;
@@ -333,7 +380,7 @@ ColorPicker.prototype.renderLAB = function()
 		for (var c=0; c<w; c++, I+=4) 
 		{
 			var A = xScale(c);
-			var cLAB = d3.lab(L, A, B);
+			var cLAB = this.colorSpace == COLORSPACE_LAB ? d3.lab(L, A, B) : d3.jab(L, A, B);
 			if (cLAB.displayable()) 
 			{
 				var cRGB = d3.rgb(cLAB);
