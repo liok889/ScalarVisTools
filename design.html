@@ -8,6 +8,9 @@
 
 
 	<script src="design/lib/three.js"></script>
+	<script src="design/lib/TrackballControls.js"></script>
+	<script src="design/lib/OrbitControls.js"></script>
+	
 	<script src="design/lib/d3.js"></script>
 	<script src="design/lib/d3-color.v1.min.js"></script>
 	<script src="design/lib/d3-interpolate.v1.min.js"></script>
@@ -73,6 +76,11 @@
 			fill: none;
 		}
 
+		.colormapCurve {
+			stroke: black; 
+			stroke-width: 2px;
+			fill: none;
+		}
 	</style>
 
 </head>
@@ -86,18 +94,31 @@
 		<div>
 			<!--Color picker<br>-->
 			<div style="float: left">
-				<div id="pickedColor" style="width: 40px; height: 40px; margin-bottom: 5px; float: left"></div>
-				<div id="previewColor" style="width: 40px; height: 40px; margin-bottom: 5px; margin-left: 0px; float: left"></div>
-				<div style="float: right; font-size: 13px">
-					<label for="colorspaceLab">Lab</label>
-					<input type="radio" name="colorspace" id="colorspaceLab" checked="checked">
-					<label for="colorspaceJab">Jab</label>
-					<input type="radio" name="colorspace" id="colorspaceJab">
+				<div>
+					<div id="pickedColor" style="width: 40px; height: 40px; margin-bottom: 5px; float: left"></div>
+					<div id="previewColor" style="width: 40px; height: 40px; margin-bottom: 5px; margin-left: 0px; float: left"></div>
+					<div style="float: right; font-size: 13px">
+						<label for="colorspaceLab">Lab</label>
+						<input type="radio" name="colorspace" id="colorspaceLab" checked="checked">
+						<label for="colorspaceJab">Jab</label>
+						<input type="radio" name="colorspace" id="colorspaceJab">
+					</div>
 				</div>
 
-				<div>
-					<canvas id="colorCanvas" width="275" height="275" style="border: solid 1px black"></canvas>
-					<canvas id="channelCanvas" width="30" height="275" style="border: solid 0px black"></canvas>
+				<div style="float: left">
+					<div style="width: 315px; height: 300px">
+						
+						<canvas id="colorCanvas" width="275" height="275" style="position: absolute; left: 10px; border: solid 1px black"></canvas>
+
+						<svg id="svgColorCanvas" width="275" height="275" style="position: absolute; left: 10px; border: solid 1px black; z-index: 100"></svg>
+						
+						<canvas id="channelCanvas" width="30" height="275" style="position: absolute; left: 300px; border: solid 0px black"></canvas>
+					</div>
+					
+					<div style="width: 315px; height: 300px">
+						<canvas id="threeDCanvas" width="275" height="275" style="border: solid 1px black"></canvas>
+					</div>
+
 				</div>
 			</div>
 
@@ -221,8 +242,10 @@
 
 		// create color picker
 		var picker = new ColorPicker(
+			d3.select("#svgColorCanvas"),
 			d3.select("#colorCanvas").node(),
-			d3.select("#channelCanvas").node()
+			d3.select("#channelCanvas").node(),
+			d3.select("#threeDCanvas").node()
 		);
 
 		// create color ramp

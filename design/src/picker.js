@@ -16,10 +16,16 @@ var JAB_B_RANGE = [-45, 45];
 
 var CHANNEL_RAMP_OFFSET = 10;
 
-function ColorPicker(mainCanvas, channelCanvas) 
+function isArray (value) {
+	return value && typeof value === 'object' && value.constructor === Array;
+}
+
+function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas) 
 {
+	this.svg = svg;
 	this.mainCanvas = mainCanvas;
 	this.channelCanvas = channelCanvas;
+	this.threeDCanvas = threeDCanvas;
 
 	// default to using CIE LAB color space
 	this.colorSpace = COLORSPACE_LAB;
@@ -35,13 +41,31 @@ function ColorPicker(mainCanvas, channelCanvas)
 
 	// callbacks, initially empty 
 	this.callbacks = [];
+
+	// shows color curve
+	this.colorCurve = null;
+
+	// create a 'path' to visualize the map's curve in the color space
+	var g = svg.append('g');
+	this.colormapCurve = g.append('path').attr('class', 'colormapCurve');
+
+	this.bControls = [];
+}
+
+ColorPicker.prototype.addBControl = function(x, y, l) {
+	if (this.bControls.length < 6) {
+		this.bControls.push({x: x, y: y, l: l})
+	}
+}
+ColorPicker.prototype.updateBControl = function() {
+	this.colormapCurve.attr('d', null);
+	
 }
 
 ColorPicker.prototype.changeColorSpace = function(newSpace) {
 	this.colorSpace = newSpace;
 	this.renderChannel();
 	this.renderPerceptual();
-
 }
 
 ColorPicker.prototype.registerCallback = function(event, callback, id) 
@@ -127,10 +151,94 @@ ColorPicker.prototype.drawChannelSelection = function()
 	path.lineTo(width-1, y-6);
 	path.lineTo(width-1, y+6);
 	context.fill(path);
+}
+
+ColorPicker.prototype.plotColormap = function(colorPoints)
+{
+	var coordinates = [];
+	for (var i=0; i<colorPoints.length; i++) 
+	{
+		var p = colorPoints[i];
+		var c = this.coordFromColor(p.color);
+		coordinates.push(c)
+	}
+	this.colormapCoordinates = coordinates;
+
+	// plot the 2D color map curve
+	this.plotColormapCurve2D();
+
+	// plot the 3D color map curve
+	if (this.threeDCanvas) {
+		this.plotColormapCurve3D();
+	}
 
 
 }
+ColorPicker.prototype.plotColormapCurve2D = function() 
+{
+	var w = +this.mainCanvas.width;
+	var h = +this.mainCanvas.height;
+	var lineGen = d3.line()
+		.x(function(d) { return d.x * (w-1);})
+		.y(function(d) { return d.y * (w-1);});
 
+	this.colormapCurve.attr('d', lineGen(this.colormapCoordinates));
+}
+
+ColorPicker.prototype.plotColormapCurve3D = function()
+{
+	if (!this.renderer) 
+	{
+		var canvas = this.threeDCanvas;
+		this.renderer = new THREE.WebGLRenderer({ 
+			canvas: canvas
+		});
+		this.renderer.setClearColor(0xcccccc, 1);
+	
+		var camera = new THREE.PerspectiveCamera( 45, +canvas.width / +canvas.height, 1, 1000 );
+		camera.position.set( 0, 0, 400 );
+		camera.lookAt( new THREE.Vector3( 0, 0, 0 ) );
+
+		// add controls to camera
+		controls = new THREE.OrbitControls( camera, this.renderer.domElement );
+		(function(_controls, picker) {
+			_controls.addUpdateCallback(function() {
+				picker.renderer.render(picker.scene, picker.camera);
+			});
+		})(controls, this)
+		this.camera = camera;
+
+
+		var planeGeom = new THREE.PlaneBufferGeometry( 100, 100, 8, 8 )
+		var mat = new THREE.LineBasicMaterial( { color: 0xffffff, linewidth: 1 } );
+		var wireframe = new THREE.LineSegments( planeGeom, mat );
+		this.plane = wireframe;
+		this.plane.rotateX( Math.PI / 2 )
+	}
+
+	//create a blue LineBasicMaterial
+	var material = new THREE.LineBasicMaterial( { color: 0x0000ff, linewidth: 4.0 } );
+	var geometry = new THREE.Geometry();
+
+	// insert vertices
+	var coordinates = this.colormapCoordinates;
+	var a_range = this.colorSpace == COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
+	var b_range = this.colorSpace == COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
+	
+
+	for (var i=0, len=coordinates.length; i<len; i++)
+	{
+		var p = coordinates[i];
+		geometry.vertices.push(new THREE.Vector3( 100*(p.x-.5), 100*p.z, 100*(p.y-.5) ));
+	}
+	var line = new THREE.Line( geometry, material );
+	var scene = new THREE.Scene();
+	scene.add(line);
+	scene.add(this.plane);
+	this.scene = scene;
+	this.renderer.render( scene, this.camera );
+
+}
 
 ColorPicker.prototype.armEvents = function() {
 
@@ -163,7 +271,7 @@ ColorPicker.prototype.armEvents = function() {
 
 		})
 
-		d3.select(picker.mainCanvas)
+		picker.svg
 			.on('mousemove', function() {
 
 				var c = picker.colorFromMouse(d3.mouse(this));
@@ -187,6 +295,33 @@ ColorPicker.prototype.armEvents = function() {
 				picker.mouseDown = false;
 			});
 	})(this);
+}
+
+ColorPicker.prototype.coordFromColor = function(color)
+{
+	var w = +this.mainCanvas.width, h = +this.mainCanvas.height;
+	var xScale = d3.scaleLinear(), yScale = d3.scaleLinear(), x, y, L, c;
+	switch (this.colorSpace)
+	{
+	case COLORSPACE_LAB:
+		xScale.range([0, 1]).domain(A_RANGE);
+		yScale.range([1, 0]).domain(B_RANGE);	
+		c = d3.lab(color);		
+		L = c.l;
+		break;
+
+	case COLORSPACE_CAM02:
+		xScale.range([0, 1]).domain(JAB_A_RANGE);
+		yScale.range([1, 0]).domain(JAB_B_RANGE);
+		c = d3.jab(color);
+		L = c.J;
+		break;
+	}
+
+	x = xScale(c.a);
+	y = yScale(c.b);
+	z = L/100;
+	return {x: x, y: y, z: z};
 }
 
 ColorPicker.prototype.colorFromMouse = function(mouse) 

@@ -71,9 +71,7 @@ function ColorRamp(_colors, _svg, _colorPicker)
 	// initialize
 	this.selectedControlPoint = null;
 	this.controlPoints = controlPoints;
-	this.updateColormap();
-	this.updateSVG();
-
+	this.updateRamp();
 
 	// keep track of history
 	this.history = [];
@@ -168,8 +166,8 @@ ColorRamp.prototype.addUI = function()
 						lab: c
 					});
 
-					ramp.updateColormap();
-					ramp.updateSVG();
+					ramp.updateRamp();
+					ramp.selectControlPoint(i+1);
 					ramp.colorPicker.switchToColor(d3.lab(c[0], c[1], c[2]));
 					break;
 				}
@@ -226,8 +224,7 @@ ColorRamp.prototype.pickColor = function(color)
 
 		var control = this.colors[ this.selectedControlPoint ];
 		control.lab = [ color.l, color.a, color.b ];
-		this.updateColormap();
-		this.updateSVG();
+		this.updateRamp();
 	}
 }
 
@@ -456,8 +453,7 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 						}
 
 						if (redraw) {
-							ramp.updateColormap();
-							ramp.updateSVG();
+							ramp.updateRamp();
 						}
 
 					})
@@ -487,8 +483,29 @@ ColorRamp.prototype.updateColormap = function()
 	// update the color ramp image
 	this.colorRampImage.attr('xlink:href', colorScale.toDataURL());
 
+	// update the picker
+	var SAMPLES = 50;
+	var points = [];
+	for (var i=0; i<SAMPLES; i++) 
+	{
+		var v = i/(SAMPLES-1);
+		var c = this.colormap.mapValue(v);
+		points.push({
+			value: v,
+			color: d3.lab(d3.rgb(c.r, c.g, c.b))
+		});
+	}
+	this.colorPicker.plotColormap(points);
+
+
 	// notify
 	this.fireUpdate();
+}
+
+ColorRamp.prototype.updateRamp = function() 
+{
+	this.updateColormap();
+	this.updateSVG();
 }
 
 ColorRamp.prototype.removeColor = function(index) {
@@ -504,8 +521,7 @@ ColorRamp.prototype.removeColor = function(index) {
 		else if (index == this.colors.length) {
 			this.colors[index-1].value = 1;
 		}
-		this.updateColormap();
-		this.updateSVG();
+		this.updateRamp()
 
 		if (this.selectedControlPoint === index) {
 			this.unselectControlPoint();
@@ -517,8 +533,7 @@ ColorRamp.prototype.removeColor = function(index) {
 		
 		// move the last control point to the end of the ramp
 		this.colors[ this.colors.length-1 ].value = 1;
-		this.updateColormap();
-		this.updateSVG();
+		this.updateRamp();
 
 		if (!isNaN(this.selectedControlPoint) && this.selectedControlPoint > this.colors.length-1) {
 			this.unselectControlPoint();
@@ -590,7 +605,6 @@ ColorRamp.prototype.insertColor = function(newColor, value)
 		}
 	}
 
-	this.updateColormap();
-	this.updateSVG();
+	this.updateRamp();
 }
 
