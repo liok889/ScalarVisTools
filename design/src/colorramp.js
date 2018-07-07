@@ -40,8 +40,19 @@ function ColorRamp(_colors, _svg, _colorPicker)
 	this.g = g;
 
 	// create an image to be used to render the colormap onto
-	this.colorRampImage = g.append('image')
-		.attr('width', RAMP_W + "px").attr('height', RAMP_H + 'px');
+	(function(ramp) {
+		ramp.colorRampImage = g.append('image')
+			.attr('width', RAMP_W + "px").attr('height', RAMP_H + 'px')
+			.on('mousemove', function() 
+			{
+				var m = d3.mouse(this);
+				var color = ramp.colormap.mapValue(m[0]/RAMP_W);
+				ramp.colorPicker.brushColor(color);
+			})
+			.on('mouseout', function() {
+				ramp.colorPicker.brushColor(null);
+			})
+	})(this)
 
 	this.connectionLines = g.append('g');
 	var controlPoints = g.append('g')

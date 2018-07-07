@@ -401,6 +401,10 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 		var wireframe = new THREE.LineSegments( planeGeom, mat );
 		this.plane = wireframe;
 		this.plane.rotateX( Math.PI / 2 )
+
+
+
+
 	}
 
 	//create a blue LineBasicMaterial
@@ -422,8 +426,16 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 	var scene = new THREE.Scene();
 	scene.add(line);
 	scene.add(this.plane);
+
+	geometry = new THREE.SphereGeometry( 2.5, 32, 32 );
+	material = new THREE.MeshBasicMaterial( {color: 0xff0000, wireframe: true} );
+	var sphere = new THREE.Mesh( geometry, material );
+	scene.add( sphere );
+
+
 	this.scene = scene;
 	this.renderer.render( scene, this.camera );
+	this.sphere = sphere;
 
 }
 
@@ -562,34 +574,40 @@ ColorPicker.prototype.colorFromMouse = function(mouse)
 
 ColorPicker.prototype.switchToColor = function(c)
 {
+	var color, L;
 	switch (this.colorSpace)
 	{
 	case COLORSPACE_CAM02:
-	case COLORSPACE_LAB:
-
-		var cLab = d3.lab(c);
-		if (!cLab.displayable()) {
-			//console.log("\tNon-displayable");
-		}
-		else
-		{
-			// adjust the channel position to match luminance of given color
-			this.channelPos = 1 - cLab.l / 100;
-			this.drawChannelSelection();	
-
-			// change the color div to reflect selection
-			d3.select('#pickedColor')
-				.style('background-color', c.toString());
-			this.renderPerceptual();
-			this.markColor(c);
-		}
-
+		color = d3.jab(c);
+		L = color.J;
 		break;
+	case COLORSPACE_LAB:
+		color = d3.lab(c);
+		L = color.l;
+		break;
+	}
+
+	if (!color.displayable()) {
+		// color not displyable in RGB gamut
+		//console.log("\tNon-displayable");
+	}
+	else
+	{
+		// adjust the channel position to match luminance of given color
+		this.channelPos = 1 - L / 100;
+		this.drawChannelSelection();	
+
+		// change the color div to reflect selection
+		d3.select('#pickedColor')
+			.style('background-color', c.toString());
+		this.renderPerceptual();
+		this.markColor(color);
 	}
 }
 
 ColorPicker.prototype.markColor = function(c) 
 {
+	
 	var a_range, b_range;
 	switch (this.colorSpace)
 	{
@@ -621,7 +639,8 @@ ColorPicker.prototype.markColor = function(c)
 	ctx.beginPath();
 	ctx.moveTo(x, y-5);
 	ctx.lineTo(x, y+5);
-	ctx.stroke();	
+	ctx.stroke();
+		
 }
 
 ColorPicker.prototype.pickColor = function(c, skipCallback) 
@@ -693,6 +712,64 @@ ColorPicker.prototype.previewColor = function(c)
 			d3.select("#previewColor").style('background-color', null);
 		}
 	}
+}
+
+ColorPicker.prototype.brushColor = function(color)
+{
+	if (color)
+	{
+		if (isArray(color)) {
+			color = d3.lab(color[0], color[1], color[2]);
+		}
+		switch(this.colorSpace)
+		{
+		case COLORSPACE_LAB:
+			color = d3.lab(color);
+			break;
+		case COLORSPACE_CAM02:
+			color = d3.jab(color);
+			break;
+		}
+
+		// highlight location in SVG
+		var circle = this.svg.selectAll('circle.brushBall');
+		if (circle.size() == 0) {
+			this.svg.append('circle')
+				.attr('class', 'brushBall')
+				.attr('r', '5');
+		}
+		var coord = this.coordFromColor(color);
+		var w = +this.mainCanvas.width, h = +this.mainCanvas.height;
+		circle
+			.attr('visibility', 'visible')
+			.attr('cx', coord.x * w)
+			.attr('cy', coord.y * h);
+
+		// switch to color
+		this.switchToColor(color);
+
+		if (this.renderer && this.sphere) {
+			this.sphere.position.x = 100*(coord.x-.5); 
+			this.sphere.position.y = 100*(coord.z);
+			this.sphere.position.z = 100*(coord.y-.5);
+			this.sphere.visible = true;
+			this.renderer.render( this.scene, this.camera );
+
+		}
+
+	}
+	else
+	{
+		this.svg.selectAll('circle.brushBall')
+			.attr('visibility', 'hidden');
+		if (this.renderer && this.sphere) {
+			this.sphere.visible = false;
+			this.renderer.render( this.scene, this.camera );
+		}
+
+	}
+
+
 }
 
 ColorPicker.prototype.renderPerceptual = function() 
