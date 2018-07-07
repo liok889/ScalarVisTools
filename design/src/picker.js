@@ -722,6 +722,25 @@ ColorPicker.prototype.renderPerceptual = function()
 		for (var c=0; c<w; c++, I+=4) 
 		{
 			var A = xScale(c);
+			
+			// deal with off-gamut d3-cam02 issue
+			var offgamut = false;
+			if (this.colorSpace == COLORSPACE_CAM02 && L < 40) {
+				var limit = 20+(160-20)*(L/40);
+				var offLimitC = [w/2-limit, w/2+limit];
+				var offLimitR = [h/2+20-limit, h/2+20+limit];
+				if  (!(c >= offLimitC[0] && c <= offLimitC[1] &&
+					 r >= offLimitR[0] && r <= offLimitR[1]))
+				{
+					imageData[I]	= BACKGROUND[0];
+					imageData[I+1] 	= BACKGROUND[1];
+					imageData[I+2]	= BACKGROUND[2];
+					imageData[I+3]	= 255;	
+					offgamut = true;
+					continue;
+				}
+			}
+
 			var cLAB = this.colorSpace == COLORSPACE_LAB ? d3.lab(L, A, B) : d3.jab(L, A, B);
 			if (cLAB.displayable()) 
 			{
@@ -733,7 +752,7 @@ ColorPicker.prototype.renderPerceptual = function()
 				imageData[I+3]	= 255;
 				//displayables++;
 			}
-			else
+			else if (!offgamut)
 			{
 				imageData[I]	= BACKGROUND[0];
 				imageData[I+1] 	= BACKGROUND[1];
