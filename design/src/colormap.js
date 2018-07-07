@@ -177,6 +177,10 @@ ColorMap.prototype.removeColor = function() {
 
 ColorMap.prototype.createGPUColormap = function(colorMap)
 {
+	if (this.gpuTexture !== undefined) {
+		this.dispose();
+	}
+	
 	// create an internal canvas and draw the colorscale onto it
 	var internalCanvas = document.createElement('canvas');
 	internalCanvas.width = 1024;
@@ -206,7 +210,17 @@ ColorMap.prototype.createGPUColormap = function(colorMap)
 		THREE.UnsignedByteType
 	);
 	texture.needsUpdate = true;
+	this.gpuTexture = texture;
 	return texture;
+}
+
+ColorMap.prototype.dispose = function() {
+	if (this.gpuTexture !== undefined) 
+	{
+		console.log("dispose");
+		this.gpuTexture.dispose();
+		this.gpuTexture = undefined;
+	}
 }
 
 ColorMap.prototype.visualize = function(svg) 

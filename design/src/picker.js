@@ -376,17 +376,19 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 {
 	if (!this.renderer) 
 	{
+		// renderer
 		var canvas = this.threeDCanvas;
 		this.renderer = new THREE.WebGLRenderer({ 
 			canvas: canvas
 		});
 		this.renderer.setClearColor(0xcccccc, 1);
 	
+		// camera
 		var camera = new THREE.PerspectiveCamera( 45, +canvas.width / +canvas.height, 1, 1000 );
 		camera.position.set( 0, 0, 400 );
 		camera.lookAt( new THREE.Vector3( 0, 0, 0 ) );
 
-		// add controls to camera
+		// add 'Orbit' controls to camera
 		controls = new THREE.OrbitControls( camera, this.renderer.domElement );
 		(function(_controls, picker) {
 			_controls.addUpdateCallback(function() {
@@ -395,19 +397,36 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 		})(controls, this)
 		this.camera = camera;
 
+		// scene
+		this.scene = new THREE.Scene();
 
+		// plane
 		var planeGeom = new THREE.PlaneBufferGeometry( 100, 100, 8, 8 )
 		var mat = new THREE.LineBasicMaterial( { color: 0xffffff, linewidth: 1 } );
 		var wireframe = new THREE.LineSegments( planeGeom, mat );
 		this.plane = wireframe;
-		this.plane.rotateX( Math.PI / 2 )
+		this.plane.rotateX( Math.PI / 2 );
 
+		// add plane to scene
+		this.scene.add(this.plane);
 
-
-
+		// add sphere to be used for brushing
+		var sphereGeom = new THREE.SphereGeometry( 2.5, 32, 32 );
+		var sphereMaterials = new THREE.MeshBasicMaterial( {color: 0xff0000, wireframe: true} );
+		var sphere = new THREE.Mesh( sphereGeom, sphereMaterials );
+		this.scene.add( sphere );
+		this.sphere = sphere;
+		this.sphere.visible = false;
 	}
 
-	//create a blue LineBasicMaterial
+	// if there is an old scene, dispose of it
+	if (this.lineObject) {
+		this.scene.remove(this.lineObject);
+		doDispose(this.lineObject);
+		this.lineObject = undefined;
+	}
+
+	// create line
 	var material = new THREE.LineBasicMaterial( { color: 0x01188e, linewidth: 4.0 } );
 	var geometry = new THREE.Geometry();
 
@@ -415,27 +434,17 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 	var coordinates = this.colormapCoordinates;
 	var a_range = this.colorSpace == COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
 	var b_range = this.colorSpace == COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
-	
 
 	for (var i=0, len=coordinates.length; i<len; i++)
 	{
 		var p = coordinates[i];
 		geometry.vertices.push(new THREE.Vector3( 100*(p.x-.5), 100*p.z, 100*(p.y-.5) ));
 	}
-	var line = new THREE.Line( geometry, material );
-	var scene = new THREE.Scene();
-	scene.add(line);
-	scene.add(this.plane);
 
-	geometry = new THREE.SphereGeometry( 2.5, 32, 32 );
-	material = new THREE.MeshBasicMaterial( {color: 0xff0000, wireframe: true} );
-	var sphere = new THREE.Mesh( geometry, material );
-	scene.add( sphere );
+	this.lineObject = new THREE.Line( geometry, material );
+	this.scene.add(this.lineObject);
 
-
-	this.scene = scene;
-	this.renderer.render( scene, this.camera );
-	this.sphere = sphere;
+	this.renderer.render( this.scene, this.camera );
 
 }
 
@@ -855,3 +864,32 @@ function getLab(c) {
 		}
 	}
 }
+
+// dispose of three js object and its children
+function doDispose(obj)
+{
+    if (obj !== null)
+    {
+        for (var i = 0; i < obj.children.length; i++)
+        {
+            doDispose(obj.children[i]);
+        }
+        if (obj.geometry)
+        {
+            obj.geometry.dispose();
+            obj.geometry = undefined;
+        }
+        if (obj.material)
+        {
+            if (obj.material.map)
+            {
+                obj.material.map.dispose();
+                obj.material.map = undefined;
+            }
+            obj.material.dispose();
+            obj.material = undefined;
+        }
+    }
+    obj = undefined;
+}
+

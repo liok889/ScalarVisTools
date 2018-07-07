@@ -489,6 +489,11 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 
 ColorRamp.prototype.setColorMap = function(_colormap)
 {
+	// remove existing color map
+	if (this.colormap) {
+		this.colormap.dispose();
+		this.colormap = null;
+	}
 	this.colors = _colormap.getColorSet();
 	this.updateColormap(_colormap, true);
 	this.updateSVG();
