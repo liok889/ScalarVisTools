@@ -10,6 +10,10 @@ function ColorMap(colorset, interpType)
 	}
 }
 
+ColorMap.prototype.getColorSet = function() { 
+	return this.colorMap;
+}
+
 ColorMap.prototype.setMap = function(colorMap, interpType)
 {
 	// force interpolation in the CIELAB color space?

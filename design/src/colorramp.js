@@ -143,6 +143,10 @@ ColorRamp.prototype.addUI = function()
 			ramp.pickColor(c);
 		});
 
+		ramp.colorPicker.registerCallback('instantiateColormap', function(colormap) {
+			ramp.setColorMap(colormap);
+		})
+
 		// ramp image double click adds a new colors
 		ramp.lRect.on('dblclick', function() 
 		{
@@ -246,7 +250,8 @@ ColorRamp.prototype.updateSVG = function()
 			//console.log("d.value" + d.value);
 			return d.value * RAMP_W;
 		})
-		.attr('cy', 0);
+		.attr('cy', 0)
+
 
 
 	// create color patches and connect them to control points on the ramp
@@ -468,12 +473,19 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 					});
 				d3.event.stopPropagation();
 			})
-	})(lControls, this)
+	})(lControls, this);
 }
 
-ColorRamp.prototype.updateColormap = function() 
+ColorRamp.prototype.setColorMap = function(_colormap)
 {
-	this.colormap = new ColorMap(this.colors, 'jab');
+	this.colors = _colormap.getColorSet();
+	this.updateColormap(_colormap, true);
+	this.updateSVG();
+}
+
+ColorRamp.prototype.updateColormap = function(colormap, noUpdate) 
+{
+	this.colormap = colormap || new ColorMap(this.colors);
 
 	// render color ramp
 	var colorScale = document.createElement('canvas');
@@ -495,11 +507,14 @@ ColorRamp.prototype.updateColormap = function()
 			color: d3.lab(d3.rgb(c.r, c.g, c.b))
 		});
 	}
-	this.colorPicker.plotColormap(points);
 
 
 	// notify
+	if (!noUpdate) {
+		this.colorPicker.plotColormap(points);
+	}
 	this.fireUpdate();
+
 }
 
 ColorRamp.prototype.updateRamp = function() 

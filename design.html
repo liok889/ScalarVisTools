@@ -10,7 +10,7 @@
 	<script src="design/lib/three.js"></script>
 	<script src="design/lib/TrackballControls.js"></script>
 	<script src="design/lib/OrbitControls.js"></script>
-	
+
 	<script src="design/lib/d3.js"></script>
 	<script src="design/lib/d3-color.v1.min.js"></script>
 	<script src="design/lib/d3-interpolate.v1.min.js"></script>
@@ -77,9 +77,15 @@
 		}
 
 		.colormapCurve {
-			stroke: black; 
+			stroke: #01188e; 
 			stroke-width: 2px;
 			fill: none;
+		}
+
+		.bControlPoint {
+			stroke: black;
+			stroke-width: 1px;
+			fill: white; fill-opacity: 0.0;
 		}
 	</style>
 
@@ -113,7 +119,16 @@
 						<svg id="svgColorCanvas" width="275" height="275" style="position: absolute; left: 10px; border: solid 1px black; z-index: 100"></svg>
 						
 						<canvas id="channelCanvas" width="30" height="275" style="position: absolute; left: 300px; border: solid 0px black"></canvas>
+
 					</div>
+
+					<div>
+						<label for="luminanceLinear">linear</label>
+						<input type="radio" name="luminanceProfile" id="luminanceLinear" checked="checked">
+						<label for="luminanceDivergent">divergent</label>
+						<input type="radio" name="luminanceProfile" id="luminanceDivergent">					
+					</div>
+
 					
 					<div style="width: 315px; height: 300px">
 						<canvas id="threeDCanvas" width="275" height="275" style="border: solid 1px black"></canvas>
@@ -123,7 +138,7 @@
 			</div>
 
 			<div style="float: left">
-				<svg id="svgColorRamp" width="330" height="360" style="border: solid 1px black"></svg>
+				<svg id="svgColorRamp" width="330" height="500" style="border: solid 1px black"></svg>
 			</div>
 			<div style="float: left; margin-left: 5px">
 				<canvas id="fieldCanvas" width="513" height="513" style="border: solid 1px black"></canvas><br>
@@ -195,7 +210,15 @@
 			})
 			d3.select('#colorspaceJab').on('click', function() {
 				picker.changeColorSpace(COLORSPACE_CAM02);
+			});
+
+			d3.select('#luminanceLinear').on('click', function() {
+				picker.changeLuminanceProfile('linear');
 			})
+			d3.select('#luminanceDivergent').on('click', function() {
+				picker.changeLuminanceProfile('divergent');
+			})
+
 		}
 
 		// function to re-draw scalar field

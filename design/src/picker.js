@@ -16,6 +16,34 @@ var JAB_B_RANGE = [-45, 45];
 
 var CHANNEL_RAMP_OFFSET = 10;
 
+function interpolateLinear(c0, c1, t)
+{
+	return [
+		c0[0] + t*(c1[0]-c0[0]),
+		c0[1] + t*(c1[1]-c0[1]),
+		c0[2] + t*(c1[2]-c0[2])
+	];	
+}
+
+function interpolateBezier(controls, t) 
+{
+	if (controls.length == 2) 
+	{
+		return interpolateLinear(controls[0], controls[1], t);
+	}
+	else
+	{
+		var newControls = [];
+		for (var i=0; i<controls.length-1; i++) 
+		{
+			newControls.push(
+				interpolateLinear(controls[i], controls[i+1], t)
+			);
+		}
+		return interpolateBezier(newControls, t);
+	}
+}
+
 function isArray (value) {
 	return value && typeof value === 'object' && value.constructor === Array;
 }
@@ -46,20 +74,179 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	this.colorCurve = null;
 
 	// create a 'path' to visualize the map's curve in the color space
-	var g = svg.append('g');
-	this.colormapCurve = g.append('path').attr('class', 'colormapCurve');
+	this.controlGroup = svg.append('g');
+	this.colormapCurve = this.controlGroup.append('path').attr('class', 'colormapCurve');
 
 	this.bControls = [];
+	this.luminanceProfile = 'linear';
 }
 
-ColorPicker.prototype.addBControl = function(x, y, l) {
-	if (this.bControls.length < 6) {
-		this.bControls.push({x: x, y: y, l: l})
+ColorPicker.prototype.addBControl = function(color) 
+{	
+	var MAX_B_CONTROLS = 12;
+	if (this.colorSpace == COLORSPACE_CAM02) {
+		color = d3.jab(color);
+	}
+	if (this.bControls.length < MAX_B_CONTROLS) {
+		this.bControls.push(color);
+	}
+	this.updateBControl();
+}
+
+ColorPicker.prototype.changeLuminanceProfile = function(profile)
+{
+	this.luminanceProfile = profile;
+	this.instantiateColorMap();
+}
+
+ColorPicker.prototype.instantiateColorMap = function()
+{
+	var SAMPLES = 50;
+	var MIN_L = 10;
+	var MAX_L = 90;
+
+	if (this.bControls.length >= 2)
+	{
+		// convert control group to an Array format
+		var controls = [];
+		for (var i=0; i < this.bControls.length; i++) 
+		{
+			var c = this.bControls[i];
+			var cc = [this.colorSpace == COLORSPACE_LAB ? c.l : c.J, c.a, c.b];
+			controls.push(cc);
+		}
+
+		// interpolate the curve
+		this.colormapCoordinates = [];
+		var colorset = [];
+
+		for (var i=0; i<SAMPLES; i++) 
+		{
+			var t = i/(SAMPLES-1);
+			var c = interpolateBezier(controls, t);
+
+			// color map properties
+			if (this.luminanceProfile == 'linear') {
+				c[0] = MIN_L + t*(MAX_L-MIN_L);
+			}
+			else if (this.luminanceProfile == 'divergent')
+			{
+				if (t < 0.5) {
+					c[0] = MIN_L + 2*t*(MAX_L-MIN_L)
+				}
+				else if (t > 0.5)
+				{
+					c[0] = MIN_L + 2*(1-t)*(MAX_L-MIN_L);
+				}
+				else {
+					c[0] = MAX_L;
+				}
+			}
+			if (this.colorSpace == COLORSPACE_LAB) 
+			{
+				c = d3.lab(c[0], c[1], c[2]);
+			}
+			else if (this.colorSpace == COLORSPACE_CAM02)
+			{
+				c = d3.jab(c[0], c[1], c[2]);
+			}
+
+			// add to the color map
+			var cLab = d3.lab(c);
+			colorset.push({
+				value: t,
+				lab: [cLab.l, cLab.a, cLab.b]
+			});
+
+			// now take that color and convert it coordinates
+			var coord = this.coordFromColor(c);
+
+			// add to coordinates
+			this.colormapCoordinates.push(coord);
+		}
+		this.plotColormapCurve2D();
+		this.plotColormapCurve3D();
+
+		// instantiate a new color map
+		var theColormap = new ColorMap(colorset, COLORSPACE_LAB ? 'lab' : 'jab');
+
+		for (var i=0; i<this.callbacks.length; i++) {
+			var callback = this.callbacks[i];
+			if (callback.event == 'instantiateColormap') {
+				callback.callback(theColormap);
+			}
+		}
+		return theColormap;
+	}
+	else
+	{
+		return null;
 	}
 }
-ColorPicker.prototype.updateBControl = function() {
+
+ColorPicker.prototype.updateBControl = function() 
+{
+	var B_CONTROL_R = 4;
 	this.colormapCurve.attr('d', null);
+
+	// show the curves
+	var w = +this.mainCanvas.width, h = +this.mainCanvas.height;
+	var u = this.controlGroup.selectAll('circle.bControlPoint').data(this.bControls);
+	u.exit().remove();
+	u = u.enter().append('circle')
+		.attr('class', 'bControlPoint')
+		.attr('r', B_CONTROL_R).merge(u);
 	
+	// add circles
+	(function(u, picker) {
+		u.each(function(d, i) 
+		{
+			var colorSpace = picker.colorSpace;
+			var a_range = colorSpace==COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
+			var b_range = colorSpace==COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
+			var c = colorSpace==COLORSPACE_LAB ? d3.lab(d) : d3.jab(d);
+
+			var aScale = d3.scaleLinear().domain(a_range).range([0, w-1]);
+			var bScale = d3.scaleLinear().domain(b_range).range([h-1, 0]);
+
+			var x = aScale(c.a);
+			var y = bScale(c.b);
+			var L = colorSpace==COLORSPACE_LAB ? c.l : c.J;
+
+			d3.select(this)
+				.attr('cx', x).attr('cy', y);
+		})
+		.on('mousedown', function(d, i) 
+		{
+			d3.select(this).style('stroke-width', '2px');
+			picker.selectedBControl = i;
+			picker.selectedCircle = d3.select(this);
+			d3.select(document).on('mousemove.bControl', function() {
+				
+				var m = d3.mouse(picker.svg.node());
+				var c = picker.colorFromMouse(m);
+				if (picker.colorSpace == COLORSPACE_CAM02) {
+					c = d3.jab(c);
+				}
+				picker.bControls[ picker.selectedBControl ] = c;
+				picker.selectedCircle.attr('cx', m[0]).attr('cy', m[1]);
+				picker.updateBControl();
+			})
+			d3.select(document).on('mouseup.bControl', function() 
+			{
+				d3.select(document)
+					.on('mousemove.bControl', null)
+					.on('mouseup.bControl', null);
+				
+				picker.selectedCircle.style('stroke-width', null);
+				picker.selectedBControl = undefined;
+				picker.selectedCircle = undefined;
+			})
+			d3.event.stopPropagation();
+		})
+
+	})(u, this);
+	return this.instantiateColorMap();
 }
 
 ColorPicker.prototype.changeColorSpace = function(newSpace) {
@@ -217,7 +404,7 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 	}
 
 	//create a blue LineBasicMaterial
-	var material = new THREE.LineBasicMaterial( { color: 0x0000ff, linewidth: 4.0 } );
+	var material = new THREE.LineBasicMaterial( { color: 0x01188e, linewidth: 4.0 } );
 	var geometry = new THREE.Geometry();
 
 	// insert vertices
@@ -287,9 +474,25 @@ ColorPicker.prototype.armEvents = function() {
 			})
 			.on('mousedown', function() 
 			{
-				var c = picker.colorFromMouse(d3.mouse(this));
-				picker.pickColor(c);
-				picker.mouseDown = true;
+				if (d3.event.shiftKey)
+				{
+					// add a control ppoint
+					var c = picker.colorFromMouse(d3.mouse(this));
+					picker.addBControl(c);
+				
+				}
+				else
+				{
+					var c = picker.colorFromMouse(d3.mouse(this));
+					picker.pickColor(c);
+					picker.mouseDown = true;
+				}
+			})
+			.on('dblclick', function() {
+				if (d3.event.shiftKey) {
+					picker.bControls = [];
+					picker.updateBControl();
+				}
 			})
 			.on('mouseup', function() {
 				picker.mouseDown = false;
@@ -299,6 +502,11 @@ ColorPicker.prototype.armEvents = function() {
 
 ColorPicker.prototype.coordFromColor = function(color)
 {
+	if (isArray(color)) {
+		// assume this is a lab color
+		color = d3.lab(color[0], color[1], color[2])
+	}
+
 	var w = +this.mainCanvas.width, h = +this.mainCanvas.height;
 	var xScale = d3.scaleLinear(), yScale = d3.scaleLinear(), x, y, L, c;
 	switch (this.colorSpace)
@@ -361,7 +569,7 @@ ColorPicker.prototype.switchToColor = function(c)
 
 		var cLab = d3.lab(c);
 		if (!cLab.displayable()) {
-			console.log("\tNon-displayable");
+			//console.log("\tNon-displayable");
 		}
 		else
 		{
@@ -399,8 +607,8 @@ ColorPicker.prototype.markColor = function(c)
 	}
 
 	// draw a simple cross sign
-	var aS = d3.scaleLinear().domain(a_range).range([0, this.mainCanvas.width]);
-	var bS = d3.scaleLinear().domain(b_range).range([this.mainCanvas.height, 0]);
+	var aS = d3.scaleLinear().domain(a_range).range([0, +this.mainCanvas.width]);
+	var bS = d3.scaleLinear().domain(b_range).range([+this.mainCanvas.height, 0]);
 	var x = aS(c.a);
 	var y = bS(c.b);
 
@@ -479,7 +687,6 @@ ColorPicker.prototype.previewColor = function(c)
 					callback.callback(cLab);
 				}
 			}
-
 		}
 		else
 		{
