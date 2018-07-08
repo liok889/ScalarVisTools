@@ -79,16 +79,18 @@ function ColorRamp(_colors, _svg, _colorPicker)
 	this.diffPlot.append('path')
 		.attr('class', 'diffPlot');
 
-	// initialize
-	this.selectedControlPoint = null;
-	this.controlPoints = controlPoints;
-	this.updateRamp();
+	this.gButtons = g.append('g');
 
 	// keep track of history
 	this.history = [];
 
 	// create UI elements for the ramp (to add/remove colors)
 	this.addUI();
+
+	// initialize
+	this.selectedControlPoint = null;
+	this.controlPoints = controlPoints;
+	this.updateRamp();
 
 	// keep track of callbacks
 	this.callbacks = [];
@@ -188,6 +190,41 @@ ColorRamp.prototype.addUI = function()
 				}
 			}
 		});
+
+
+		// add buttons to select diff mode
+		ramp.gButtons.attr('transform', 'translate(-30,' + 2*(-PLOT_H-PLOT_OFFSET) + ')');
+		ramp.diff2000 = ramp.gButtons.append('g');
+		ramp.diff2000.append('rect')
+			.attr('x', 0).attr('y', 0).attr('class', 'smallButton smallButtonClicked')
+			.attr('width', '10').attr('height', '10');
+
+		ramp.diff2000.append('text').attr('x', -5).attr('y', 9).attr('class', 'smallText')
+			.attr('text-anchor', 'end').html('dE \'00');
+		ramp.diff2000.on('click', function() {
+			ramp.colormapDiffMode = 'de2000';
+			ramp.createDiffPlot();
+			ramp.gButtons.selectAll('rect.smallButton').attr('class', 'smallButton');
+			d3.select(this).select('rect').attr('class', 'smallButton smallButtonClicked')
+		});
+		ramp.colormapDiffMode = 'de2000'
+
+
+		ramp.diffCurve = ramp.gButtons.append('g');
+		ramp.diffCurve.append('rect')
+			.attr('x', 0).attr('y', 14).attr('class', 'smallButton')
+			.attr('width', '10').attr('height', '10');
+
+		ramp.diffCurve.append('text').attr('x', -5).attr('y', 9+14).attr('class', 'smallText')
+			.attr('text-anchor', 'end').html('dCurve');
+		ramp.diffCurve.on('click', function() {
+			ramp.colormapDiffMode = 'curve';
+			ramp.createDiffPlot();
+			ramp.gButtons.selectAll('rect.smallButton').attr('class', 'smallButton');
+			d3.select(this).select('rect').attr('class', 'smallButton smallButtonClicked')
+		});
+
+
 	})(add, remove, this, this.svg);
 }
 
@@ -344,19 +381,122 @@ ColorRamp.prototype.updateSVG = function()
 
 ColorRamp.prototype.createDiffPlot = function()
 {
-	var res = this.colormap.computeColorDiff();
-	var diffs = res.diffValues;
-	var maxD = res.maxColorDiff;
-	var points = [];
+	var SAMPLES = 50;
+
+	var lastColor = null;
+	var diffValues = [], diffVectors = [];
+	var maxDiff = -Number.MAX_VALUE;
+	var avgDiff = 0, N=0;
+	var colormap = this.colormap;
+
+	function normalize(a) {
+		var L = a[0]*a[0] + a[1]*a[1] + a[2]*a[2];
+		if (L > 0) {
+			L = 1.0 / Math.sqrt(L)
+			return [L*a[0], L*a[1], L*a[2]];
+		}
+		else
+		{
+			return a;
+		}
+	}
+	function dot(a, b) 
+	{
+		return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+	}
+	function angle(a, b) 
+	{
+		nA = normalize(a);
+		nB = normalize(b);
+
+		return dot(nA, nB);
+	}
+
+	for (var i=0, len=SAMPLES; i<len; i++) 
+	{
+		var v = i/(len-1);
+		var vv = colormap.mapValue(v);
+		var currColor = d3.lab( d3.rgb(vv.r, vv.g, vv.b) );
+
+		if (lastColor) 
+		{	
+			var d, diffV = [0,0,0];
+			switch (this.colormapDiffMode)
+			{
+
+			case 'de2000':
+				d = ciede2000(
+					currColor.l, currColor.a, currColor.b, 
+					lastColor.l, lastColor.a, lastColor.b
+				);
+				break;
+
+			case 'curve':
+				currColor = d3.jab(currColor);
+				diffV = [
+					currColor.J-lastColor.J,
+					currColor.a-lastColor.a,
+					currColor.b-lastColor.b,
+				];
+
+				d = Math.sqrt(
+					Math.pow(diffV[0], 2) +
+					Math.pow(diffV[1], 2) +
+					Math.pow(diffV[2], 2)
+				);
+				break;
+			}
+			diffValues.push(d);
+			diffVectors.push(diffV);
+
+			maxDiff = Math.max(d, maxDiff);
+			avgDiff += d;
+			N++;
+		}
+		else {
+			diffValues.push(0);
+			diffVectors.push([0,0,0]);
+		}
+		lastColor = currColor;
+		if (this.colormapDiffMode=='curve') {
+			lastColor = d3.jab(lastColor);
+		}
+	}
+	avgDiff /= N;
+
+	if (this.colormapDiffMode == 'curve') 
+	{
+
+		// do another pass
+		var secondOrder = [0];
+		maxDiff = 0.0;
+		avgDiff = 0.0;
+
+		for (var i=1, len=diffVectors.length; i<len-1; i++) 
+		{
+			//var d = Math.abs(diffValues[i]-diffValues[i+1]);
+			var d = angle(diffVectors[i], diffVectors[i+1]);
+			secondOrder.push(1-d);
+
+			maxDiff = Math.max(d, maxDiff);
+			avgDiff += d;
+		}
+		avgDiff /= diffVectors.length-1;
+		diffValues = secondOrder;
+	}
+
 
 	// round D to the next multiple of 10
-	var scaleMax = Math.ceil(maxD / 10) * 10;
+	var TICKS = this.colormapDiffMode == 'curve' ? 2 : 5
+	var scaleMax = Math.ceil(maxDiff / TICKS) * TICKS;
 
-	for (var i=0, len=diffs.length; i<len; i++) 
+	// plot
+	var points = [];
+	for (var i=0, len=diffValues.length; i<len; i++) 
 	{
 		points.push({
 			value: i/(len-1)*RAMP_W,
-			diff: PLOT_H * (1.0 - diffs[i] / scaleMax)
+			diff: PLOT_H * (1.0 - diffValues[i] / scaleMax)
 		});
 	}
 

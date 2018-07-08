@@ -91,6 +91,17 @@
 			fill: red;
 			stroke: none;
 		}
+		.smallText {
+			font-size: 10px;
+		}
+		.smallButton {
+			fill: #999999;
+			stroke: black;
+			stroke-width: 0.5px;
+		}
+		.smallButtonClicked {
+			fill: yellow;
+		}
 	</style>
 
 </head>
@@ -116,37 +127,35 @@
 				</div>
 
 				<div style="float: left">
-					<div style="width: 315px; height: 300px">
-						
-						<canvas id="colorCanvas" width="275" height="275" style="position: absolute; left: 10px; border: solid 1px black"></canvas>
+					<div style="width: 275px; height: 275px">
+						<canvas id="colorCanvas" width="250" height="250" style="position: absolute; left: 10px; border: solid 1px black"></canvas>
 
-						<svg id="svgColorCanvas" width="275" height="275" style="position: absolute; left: 10px; border: solid 1px black; z-index: 100"></svg>
+						<svg id="svgColorCanvas" width="250" height="250" style="position: absolute; left: 10px; border: solid 1px black; z-index: 100"></svg>
 						
-						<canvas id="channelCanvas" width="30" height="275" style="position: absolute; left: 300px; border: solid 0px black"></canvas>
-
+						<canvas id="channelCanvas" width="30" height="250" style="position: absolute; left: 265px; border: solid 0px black"></canvas>
 					</div>
 
 					<div>
 						<label for="luminanceLinear">linear</label>
 						<input type="radio" name="luminanceProfile" id="luminanceLinear" checked="checked">
 						<label for="luminanceDivergent">divergent</label>
-						<input type="radio" name="luminanceProfile" id="luminanceDivergent">					
+						<input type="radio" name="luminanceProfile" id="luminanceDivergent">
 					</div>
 
 					
-					<div style="width: 315px; height: 300px">
-						<canvas id="threeDCanvas" width="275" height="275" style="border: solid 1px black"></canvas>
+					<div style="width: 315px; height: 300px; margin-top: 10px">
+						<canvas id="threeDCanvas" width="250" height="250" style="border: solid 1px black"></canvas>
 					</div>
 
 				</div>
 			</div>
 
-			<div style="float: left">
-				<svg id="svgColorRamp" width="330" height="500" style="border: solid 1px black"></svg>
+			<div style="float: left; margin-top: 0px">
+				<svg id="svgColorRamp" width="330" height="500" style="border: solid 0px black"></svg>
 			</div>
 			<div style="float: left; margin-left: 5px">
-				<canvas id="fieldCanvas" width="513" height="513" style="border: solid 1px black"></canvas><br>
-				<canvas id="fieldDiffCanvas" width="513" height="513" style="border: solid 1px black"></canvas>
+				<canvas id="fieldCanvas" width="257" height="257" style="border: solid 1px black"></canvas><br>
+				<canvas id="fieldDiffCanvas" width="257" height="257" style="margin-top: 5px; border: solid 1px black"></canvas>
 
 
 			</div>
