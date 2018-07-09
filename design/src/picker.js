@@ -93,6 +93,7 @@ ColorPicker.prototype.L = function() {
 ColorPicker.prototype.setL = function(_L) {
 	this.channelPos = 1 - _L/100
 	this.drawChannelSelection();
+	this.renderPerceptual();
 }
 
 
@@ -250,9 +251,6 @@ ColorPicker.prototype.updateBControl = function()
 			d3.select(this).style('stroke-width', '3px');
 			picker.selectedBControl = i;
 			picker.selectedCircle = d3.select(this);
-			
-			// switch luminance
-			picker.setL( picker.bControls[i].L );
 
 			// mouse move
 			d3.select(document).on('mousemove.bControl', function() 
@@ -534,16 +532,9 @@ ColorPicker.prototype.armEvents = function() {
 					var m = d3.mouse(picker.channelCanvas);
 					var h = picker.channelCanvas.height
 					m[1] = Math.min(h, Math.max(0, m[1]));
+					
+					// set Luminance for color picker
 					picker.setL((1 - m[1] / h) * 100);
-
-					// update
-					switch (picker.colorSpace)
-					{
-					case COLORSPACE_CAM02:
-					case COLORSPACE_LAB:
-						picker.renderPerceptual();
-						break;
-					}
 				})
 				.on("mouseup.channelPicker", function() {
 					d3.select(document)
@@ -686,7 +677,6 @@ ColorPicker.prototype.switchToColor = function(c)
 		// change the color div to reflect selection
 		d3.select('#pickedColor')
 			.style('background-color', c.toString());
-		this.renderPerceptual();
 		this.markColor(color);
 	}
 }
