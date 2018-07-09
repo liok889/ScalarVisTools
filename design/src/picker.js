@@ -3,8 +3,12 @@
  * -------------------------------------
  */
 
+var MIN_LUMINANCE = 10;
+var MAX_LUMINANCE = 90;
+
 var COLORSPACE_LAB = 1;
 var COLORSPACE_CAM02 = 2;
+
 
 
 var A_RANGE=[-115, 115];
@@ -81,6 +85,14 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	this.luminanceProfile = 'linear';
 }
 
+ColorPicker.prototype.L = function() { 
+	return this.channelPos * 100;
+}
+
+ColorPicker.prototype.getColorSpace = function() {
+	return this.colorSpace;
+}
+
 ColorPicker.prototype.addBControl = function(color) 
 {	
 	var MAX_B_CONTROLS = 12;
@@ -93,17 +105,23 @@ ColorPicker.prototype.addBControl = function(color)
 	this.updateBControl();
 }
 
+ColorPicker.prototype.hasCurve = function() {
+	return this.bControls.length >= 2;
+}
+
 ColorPicker.prototype.changeLuminanceProfile = function(profile)
 {
 	this.luminanceProfile = profile;
-	this.instantiateColorMap();
+	if (this.bControls.length >= 2) {
+		this.instantiateColorMap();
+	}
 }
 
 ColorPicker.prototype.instantiateColorMap = function()
 {
 	var SAMPLES = 50;
-	var MIN_L = 10;
-	var MAX_L = 90;
+	var MAX_L = MAX_LUMINANCE;
+	var MIN_L = MIN_LUMINANCE;
 
 	if (this.bControls.length >= 2)
 	{
@@ -111,9 +129,14 @@ ColorPicker.prototype.instantiateColorMap = function()
 		var controls = [];
 		for (var i=0; i < this.bControls.length; i++) 
 		{
-			var c = this.bControls[i];
-			var cc = [this.colorSpace == COLORSPACE_LAB ? c.l : c.J, c.a, c.b];
-			controls.push(cc);
+			var control = this.bControls[i];
+
+			// translate to L, A, B
+			var L = control.L;
+			var AB = this.xy2ab([control.x, control.y]);
+			var A = AB[0], B = AB[1];
+
+			controls.push([L, A, B]);
 		}
 
 		// interpolate the curve
@@ -142,13 +165,15 @@ ColorPicker.prototype.instantiateColorMap = function()
 					c[0] = MAX_L;
 				}
 			}
-			if (this.colorSpace == COLORSPACE_LAB) 
+			switch (this.colorSpace)
 			{
+			case COLORSPACE_LAB:
 				c = d3.lab(c[0], c[1], c[2]);
-			}
-			else if (this.colorSpace == COLORSPACE_CAM02)
-			{
+				break;
+
+			case COLORSPACE_CAM02:
 				c = d3.jab(c[0], c[1], c[2]);
+				break;
 			}
 
 			// add to the color map
@@ -170,7 +195,8 @@ ColorPicker.prototype.instantiateColorMap = function()
 		// instantiate a new color map
 		var theColormap = new ColorMap(colorset, COLORSPACE_LAB ? 'lab' : 'jab');
 
-		for (var i=0; i<this.callbacks.length; i++) {
+		for (var i=0; i<this.callbacks.length; i++) 
+		{
 			var callback = this.callbacks[i];
 			if (callback.event == 'instantiateColormap') {
 				callback.callback(theColormap);
@@ -186,52 +212,55 @@ ColorPicker.prototype.instantiateColorMap = function()
 
 ColorPicker.prototype.updateBControl = function() 
 {
-	var B_CONTROL_R = 4;
+	var B_CONTROL_R = 5;
 	this.colormapCurve.attr('d', null);
 
 	// show the curves
-	var w = +this.mainCanvas.width, h = +this.mainCanvas.height;
-	var u = this.controlGroup.selectAll('circle.bControlPoint').data(this.bControls);
+	var w = +this.mainCanvas.width;
+	var h = +this.mainCanvas.height;
+	
+	var u = this.controlGroup.selectAll('g.bControlPoint').data(this.bControls);
 	u.exit().remove();
-	u = u.enter().append('circle')
+	u = u.enter().append('g')
 		.attr('class', 'bControlPoint')
-		.attr('r', B_CONTROL_R).merge(u);
+		.each(function() {
+			var g = d3.select(this)
+			g.append('circle')
+				.attr('r', B_CONTROL_R).attr('cx', 1).attr('cy', 1)
+				.style('stroke', 'white');
+			g.append('circle')
+				.attr('r', B_CONTROL_R).attr('cx', 0).attr('cy', 0)
+				.style('stroke', 'black');
+		})
+		.merge(u);
 	
 	// add circles
-	(function(u, picker) {
+	(function(u, picker) 
+	{
 		u.each(function(d, i) 
 		{
-			var colorSpace = picker.colorSpace;
-			var a_range = colorSpace==COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
-			var b_range = colorSpace==COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
-			var c = colorSpace==COLORSPACE_LAB ? d3.lab(d) : d3.jab(d);
-
-			var aScale = d3.scaleLinear().domain(a_range).range([0, w-1]);
-			var bScale = d3.scaleLinear().domain(b_range).range([h-1, 0]);
-
-			var x = aScale(c.a);
-			var y = bScale(c.b);
-			var L = colorSpace==COLORSPACE_LAB ? c.l : c.J;
-
 			d3.select(this)
-				.attr('cx', x).attr('cy', y);
+				.attr('transform', 'translate(' + d.x + ',' + d.y + ')');
 		})
 		.on('mousedown', function(d, i) 
 		{
-			d3.select(this).style('stroke-width', '2px');
+			d3.select(this).style('stroke-width', '3px');
 			picker.selectedBControl = i;
 			picker.selectedCircle = d3.select(this);
-			d3.select(document).on('mousemove.bControl', function() {
-				
+			
+			// mouse move
+			d3.select(document).on('mousemove.bControl', function() 
+			{
 				var m = d3.mouse(picker.svg.node());
-				var c = picker.colorFromMouse(m);
-				if (picker.colorSpace == COLORSPACE_CAM02) {
-					c = d3.jab(c);
-				}
-				picker.bControls[ picker.selectedBControl ] = c;
-				picker.selectedCircle.attr('cx', m[0]).attr('cy', m[1]);
+				var selected = picker.bControls[ picker.selectedBControl ];
+				selected.x = m[0];
+				selected.y = m[1];
+
+				// update (which also updates on screen)
 				picker.updateBControl();
-			})
+			});
+			
+			// mouse up
 			d3.select(document).on('mouseup.bControl', function() 
 			{
 				d3.select(document)
@@ -244,15 +273,53 @@ ColorPicker.prototype.updateBControl = function()
 			})
 			d3.event.stopPropagation();
 		})
+		.on('dblclick', function(d, i) 
+		{
+			// remove control point
+			picker.bControls.splice(i, 1);
+			picker.updateBControl();
+			d3.event.stopPropagation();
+		})
 
 	})(u, this);
 	return this.instantiateColorMap();
 }
 
-ColorPicker.prototype.changeColorSpace = function(newSpace) {
+ColorPicker.prototype.changeColorSpace = function(newSpace)
+{
 	this.colorSpace = newSpace;
 	this.renderChannel();
 	this.renderPerceptual();
+
+	// remap position of contorl points
+	var updateControls = false;
+	for (var i=0, len=this.bControls.length; i<len; i++) 
+	{
+		var c = this.bControls[i];
+		if (c.colorSpace != newSpace) 
+		{
+			// remap from XY to AB in original color space
+			var AB = this.xy2ab([c.x, c.y], c.colorSpace);
+			
+			// remap from AB in original to new color space
+			var color = c.colorSpace == COLORSPACE_CAM02 ? d3.jab(c.L, AB[0], AB[1]) : d3.lab(c.L, AB[0], AB[1]);
+			var newColor = newSpace == COLORSPACE_CAM02 ? d3.jab(color) : d3.lab(color);
+			var LL = newSpace == COLORSPACE_CAM02 ? newColor.J : newColor.l;
+
+			// remap from AB in new color space to new XY
+			var xy = this.ab2xy([newColor.a, newColor.b], newSpace);
+			c.x = xy[0];
+			c.y = xy[1];
+			c.L = LL;
+
+			c.colorSpace = newSpace;
+			updateControls = true;
+		}
+	}
+
+	if (updateControls) {
+		this.updateBControl();
+	}
 }
 
 ColorPicker.prototype.registerCallback = function(event, callback, id) 
@@ -495,12 +562,16 @@ ColorPicker.prototype.armEvents = function() {
 			})
 			.on('mousedown', function() 
 			{
+				var m = d3.mouse(this);
 				if (d3.event.shiftKey)
 				{
 					// add a control ppoint
-					var c = picker.colorFromMouse(d3.mouse(this));
-					picker.addBControl(c);
-				
+					//var c = picker.colorFromMouse(d3.mouse(this));
+					picker.addBControl({
+						x: m[0], y: m[1], 
+						L: picker.L(),
+						colorSpace: picker.getColorSpace()
+					});
 				}
 				else
 				{
@@ -777,8 +848,6 @@ ColorPicker.prototype.brushColor = function(color)
 		}
 
 	}
-
-
 }
 
 ColorPicker.prototype.renderPerceptual = function() 
@@ -812,9 +881,9 @@ ColorPicker.prototype.renderPerceptual = function()
 			// deal with off-gamut d3-cam02 issue
 			var offgamut = false;
 			if (this.colorSpace == COLORSPACE_CAM02 && L < 40) {
-				var limit = 20+(160-20)*(L/40);
+				var limit = h*(20/250)+h*((160-20)/250)*(L/40);
 				var offLimitC = [w/2-limit, w/2+limit];
-				var offLimitR = [h/2+20-limit, h/2+20+limit];
+				var offLimitR = [h/2+h*(20/250)-limit, h/2+h*(20/250)+limit];
 				if  (!(c >= offLimitC[0] && c <= offLimitC[1] &&
 					 r >= offLimitR[0] && r <= offLimitR[1]))
 				{
@@ -849,7 +918,71 @@ ColorPicker.prototype.renderPerceptual = function()
 	}
 
 	context.putImageData(image, 0, 0);
+}
 
+
+ColorPicker.prototype.xy2ab = function(xy, colorSpace) 
+{
+	if (!colorSpace) {
+		colorSpace = this.colorSpace;
+	}
+
+	var w = +this.mainCanvas.width;
+	var h = +this.mainCanvas.height;
+	var a_range, b_range;
+
+	switch (colorSpace) 
+	{
+	case COLORSPACE_LAB:
+		a_range = A_RANGE;
+		b_range = B_RANGE;
+		break;
+
+	case COLORSPACE_CAM02:
+		a_range = JAB_A_RANGE;
+		b_range = JAB_B_RANGE;
+		break;
+	}
+
+	// create scales
+	var aScale = d3.scaleLinear().range(a_range).domain([0, w-1]);
+	var bScale = d3.scaleLinear().range(b_range).domain([h-1, 0]);
+	return [
+		aScale(xy[0]),
+		bScale(xy[1])
+	];
+}
+
+ColorPicker.prototype.ab2xy = function(ab, colorSpace) 
+{
+	if (!colorSpace) {
+		colorSpace = this.colorSpace;
+	}
+
+	var w = +this.mainCanvas.width;
+	var h = +this.mainCanvas.height;
+	var a_range, b_range;
+
+	switch (colorSpace) 
+	{
+	case COLORSPACE_LAB:
+		a_range = A_RANGE;
+		b_range = B_RANGE;
+		break;
+
+	case COLORSPACE_CAM02:
+		a_range = JAB_A_RANGE;
+		b_range = JAB_B_RANGE;
+		break;
+	}
+
+	// create scales
+	var xScale = d3.scaleLinear().domain(a_range).range([0, w-1]);
+	var yScale = d3.scaleLinear().domain(b_range).range([h-1, 0]);
+	return [
+		xScale(ab[0]),
+		yScale(ab[1])
+	];
 }
 
 function getLab(c) {
@@ -892,4 +1025,3 @@ function doDispose(obj)
     }
     obj = undefined;
 }
-

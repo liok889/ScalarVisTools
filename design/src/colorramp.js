@@ -96,6 +96,84 @@ function ColorRamp(_colors, _svg, _colorPicker)
 	this.callbacks = [];
 }
 
+ColorRamp.prototype.changeLuminanceProfile = function(profile) 
+{
+	var MAX_L = MAX_LUMINANCE;
+	var MIN_L = MIN_LUMINANCE;
+	switch (profile)
+	{
+	case 'linear':
+		for (var i=0, len=this.colors.length; i<len; i++) 
+		{
+			var color = this.colors[i];
+
+			// look at the value of the color
+			var v = color.value;
+			var c = d3.lab(color.lab[0], color.lab[1], color.lab[2]);
+			var L = v*(MAX_L-MIN_L) + MIN_L;
+
+			// adjust luminacne accordingly
+			if (picker.getColorSpace()==COLORSPACE_CAM02) {
+				c = d3.jab(c);
+				c = d3.lab(d3.jab(L, c.a, c.b));
+			}
+			else
+			{
+				c = d3.lab(L, c.a, c.b);
+			}
+			color.lab = [c.l, c.a, c.b];
+		}
+		break;
+
+	case 'divergent':
+
+		// see if there's a 0.5 point
+		var hasMiddle = false;
+		for (var i=0, len=this.colors.length; i<len; i++) {
+			if (Math.abs(this.colors[i].v - 0.5) <= 0.01) {
+				hasMiddle = true;
+				break;
+			}
+		}
+		if (!hasMiddle) {
+			// insert a middle
+			this.insertColor(d3.lab(100, 0, 0), 0.5);
+		}
+
+		for (var i=0, len=this.colors.length; i<len; i++) 
+		{
+			var color = this.colors[i];
+
+			// look at the value of the color
+			var v = color.value;
+			var c = d3.lab(color.lab[0], color.lab[1], color.lab[2]);
+			var L;
+			if (v < 0.5) {
+				L = MIN_L + 2*v*(MAX_L-MIN_L)
+			}
+			else if (v > 0.5)
+			{
+				L = MIN_L + 2*(1-v)*(MAX_L-MIN_L);
+			}
+			else {
+				L = MAX_L;
+			}
+			if (picker.getColorSpace() == COLORSPACE_CAM02) {
+				c = d3.jab(c);
+				c = d3.lab(d3.jab(L, c.a, c.b));
+			}
+			else
+			{
+				c = d3.lab(L, c.a, c.b);				
+			}
+			color.lab = [c.l, c.a, c.b];
+		}
+
+		break;
+	}
+	this.updateRamp();
+}
+
 ColorRamp.prototype.registerCallback = function(callback) {
 	this.callbacks.push(callback)
 }
