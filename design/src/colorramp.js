@@ -381,7 +381,7 @@ ColorRamp.prototype.updateSVG = function()
 
 ColorRamp.prototype.createDiffPlot = function()
 {
-	var SAMPLES = 50;
+	var SAMPLES = 25;
 
 	var lastColor = null;
 	var diffValues = [], diffVectors = [];
@@ -476,7 +476,8 @@ ColorRamp.prototype.createDiffPlot = function()
 		{
 			//var d = Math.abs(diffValues[i]-diffValues[i+1]);
 			var d = angle(diffVectors[i], diffVectors[i+1]);
-			secondOrder.push(1-d);
+			d = d == 0 ? 0 : 1-d;
+			secondOrder.push(d);
 
 			maxDiff = Math.max(d, maxDiff);
 			avgDiff += d;
