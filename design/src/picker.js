@@ -3,14 +3,16 @@
  * -------------------------------------
  */
 
-var MIN_LUMINANCE = 10;
-var MAX_LUMINANCE = 90;
+var MAX_B_CONTROLS = 12;
 
+var MIN_LUMINANCE = 10;
+var MAX_LUMINANCE = 95;
+
+// color spaces
 var COLORSPACE_LAB = 1;
 var COLORSPACE_CAM02 = 2;
 
-
-
+// ranges for color spaces
 var A_RANGE=[-115, 115];
 var B_RANGE=[-115, 115];
 
@@ -88,6 +90,11 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 ColorPicker.prototype.L = function() { 
 	return this.channelPos * 100;
 }
+ColorPicker.prototype.setL = function(_L) {
+	this.channelPos = 1 - _L/100
+	this.drawChannelSelection();
+}
+
 
 ColorPicker.prototype.getColorSpace = function() {
 	return this.colorSpace;
@@ -95,10 +102,6 @@ ColorPicker.prototype.getColorSpace = function() {
 
 ColorPicker.prototype.addBControl = function(color) 
 {	
-	var MAX_B_CONTROLS = 12;
-	if (this.colorSpace == COLORSPACE_CAM02) {
-		color = d3.jab(color);
-	}
 	if (this.bControls.length < MAX_B_CONTROLS) {
 		this.bControls.push(color);
 	}
@@ -248,6 +251,9 @@ ColorPicker.prototype.updateBControl = function()
 			picker.selectedBControl = i;
 			picker.selectedCircle = d3.select(this);
 			
+			// switch luminance
+			picker.setL( picker.bControls[i].L );
+
 			// mouse move
 			d3.select(document).on('mousemove.bControl', function() 
 			{
@@ -275,10 +281,12 @@ ColorPicker.prototype.updateBControl = function()
 		})
 		.on('dblclick', function(d, i) 
 		{
-			// remove control point
-			picker.bControls.splice(i, 1);
-			picker.updateBControl();
-			d3.event.stopPropagation();
+			if (!event.shiftKey) {
+				// remove control point
+				picker.bControls.splice(i, 1);
+				picker.updateBControl();
+				d3.event.stopPropagation();
+			}
 		})
 
 	})(u, this);
@@ -526,8 +534,7 @@ ColorPicker.prototype.armEvents = function() {
 					var m = d3.mouse(picker.channelCanvas);
 					var h = picker.channelCanvas.height
 					m[1] = Math.min(h, Math.max(0, m[1]));
-					picker.channelPos = m[1] / h;
-					picker.drawChannelSelection();
+					picker.setL((1 - m[1] / h) * 100);
 
 					// update
 					switch (picker.colorSpace)
@@ -674,8 +681,7 @@ ColorPicker.prototype.switchToColor = function(c)
 	else
 	{
 		// adjust the channel position to match luminance of given color
-		this.channelPos = 1 - L / 100;
-		this.drawChannelSelection();	
+		this.setL(L);
 
 		// change the color div to reflect selection
 		d3.select('#pickedColor')
