@@ -114,7 +114,16 @@ ColorAnalysis.prototype.createPipelines = function()
 	this.speedPipeline = speedPipeline;
 
 	// create a list of pipelines currently loaded
-	this.pipelines = [diffPipeline, speedPipeline];
+	this.pipelines = {
+		vis: visPipeline,
+		diff: diffPipeline,
+		speed: speedPipeline
+	};
+}
+
+ColorAnalysis.prototype.getUniform = function(pipelineName, uniform)
+{
+
 }
 
 ColorAnalysis.prototype.loadShader = function(shaderPath, shaderName, callback)

@@ -50,6 +50,61 @@ function interpolateBezier(controls, t)
 	}
 }
 
+function interpolateLinearUniform(controls, t)
+{
+	// add up distances
+	var totalD = 0;
+	var distances = [];
+
+	for (var i=0; i<controls.length-1; i++) {
+		var p0 = controls[i];
+		var p1 = controls[i+1];
+		var d = Math.sqrt(
+			Math.pow(p0[0]-p1[0], 2) +
+			Math.pow(p0[1]-p1[1], 2) +
+			Math.pow(p0[2]-p1[2], 2)
+		);
+		distances.push(d);
+		totalD += d;
+	}
+
+	// normalize d by total distances
+	for (var i=0; i<distances.length; i++) {
+		distances[i] /= totalD;
+	}
+
+	// figure out we're we are in total distance
+	var running = 0;
+	var index = distances.length-1;
+	for (var i=0; i<distances.length; i++) 
+	{
+		var d = distances[i];
+		running += d;
+		if (t <= running) {
+			index = i;
+			break;
+		}
+	}
+
+	if (index >= 0)
+	{
+		var s = 1-((running - t) / distances[i]);
+		var c0 = controls[index];
+		var c1 = controls[index+1];
+
+		return [
+			s * (c1[0]-c0[0]) + c0[0],
+			s * (c1[1]-c0[1]) + c0[1],
+			s * (c1[2]-c0[2]) + c0[2],
+		];
+	}
+	else
+	{
+		console.log("error!")
+		return null;
+	}
+}
+
 function isArray (value) {
 	return value && typeof value === 'object' && value.constructor === Array;
 }
@@ -123,7 +178,7 @@ ColorPicker.prototype.changeLuminanceProfile = function(profile)
 
 ColorPicker.prototype.instantiateColorMap = function()
 {
-	var SAMPLES = 50;
+	var SAMPLES = 100;
 	var MAX_L = MAX_LUMINANCE;
 	var MIN_L = MIN_LUMINANCE;
 
@@ -150,7 +205,8 @@ ColorPicker.prototype.instantiateColorMap = function()
 		for (var i=0; i<SAMPLES; i++) 
 		{
 			var t = i/(SAMPLES-1);
-			var c = interpolateBezier(controls, t);
+			//var c = interpolateBezier(controls, t);
+			var c = interpolateLinearUniform(controls, t);
 
 			// color map properties
 			if (this.luminanceProfile == 'linear') {
