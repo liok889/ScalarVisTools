@@ -217,7 +217,6 @@ ColorMap.prototype.createGPUColormap = function(colorMap)
 ColorMap.prototype.dispose = function() {
 	if (this.gpuTexture !== undefined) 
 	{
-		console.log("dispose");
 		this.gpuTexture.dispose();
 		this.gpuTexture = undefined;
 	}

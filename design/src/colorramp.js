@@ -603,8 +603,8 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 	var lineGen = d3.line()
 		.x(function(d) { return RAMP_W * d.value;})
 		.y(function(d) { return PLOT_H * (1-d.lab[0]/100);});
-	lPath.attr('d', lineGen(this.colors));
-
+	var pathD = lineGen(this.colors);
+	lPath.attr('d', pathD);
 	if (skipControls) {
 		return;
 	}

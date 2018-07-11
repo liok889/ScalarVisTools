@@ -175,7 +175,7 @@ CatmulRom.prototype.interpolate = function(t)
 
 	if (index >= 0)
 	{
-		var s = 1-((running - t) / distances[i]);
+		var s = 1-((running - t) / distances[index]);
 		var c0 = curve[index];
 		var c1 = curve[index+1];
 
@@ -187,7 +187,6 @@ CatmulRom.prototype.interpolate = function(t)
 	}
 	else
 	{
-		console.log("error!")
 		return null;
 	}
 }

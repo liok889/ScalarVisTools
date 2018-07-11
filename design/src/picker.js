@@ -88,7 +88,7 @@ function interpolateLinearUniform(controls, t)
 
 	if (index >= 0)
 	{
-		var s = 1-((running - t) / distances[i]);
+		var s = 1-((running - t) / distances[index]);
 		var c0 = controls[index];
 		var c1 = controls[index+1];
 
@@ -182,7 +182,7 @@ ColorPicker.prototype.instantiateColorMap = function()
 	var MAX_L = MAX_LUMINANCE;
 	var MIN_L = MIN_LUMINANCE;
 
-	if (this.bControls.length >= 2)
+	if (this.bControls.length >= 3)
 	{
 		// convert control group to an Array format
 		var controls = [];
@@ -201,12 +201,17 @@ ColorPicker.prototype.instantiateColorMap = function()
 		// interpolate the curve
 		this.colormapCoordinates = [];
 		var colorset = [];
+		var catmulrom = new CatmulRom(controls, true);
 
 		for (var i=0; i<SAMPLES; i++) 
 		{
 			var t = i/(SAMPLES-1);
 			//var c = interpolateBezier(controls, t);
-			var c = interpolateLinearUniform(controls, t);
+			//var c = interpolateLinearUniform(controls, t);
+			var c = catmulrom.interpolate(t);
+			if (isNaN(c[0]) || isNaN(c[1]) || isNaN(c[2])) {
+				console.error('NaN in interpolation');
+			}
 
 			// color map properties
 			if (this.luminanceProfile == 'linear') {
@@ -225,26 +230,28 @@ ColorPicker.prototype.instantiateColorMap = function()
 					c[0] = MAX_L;
 				}
 			}
+
+			var color;
 			switch (this.colorSpace)
 			{
 			case COLORSPACE_LAB:
-				c = d3.lab(c[0], c[1], c[2]);
+				color = d3.lab(c[0], c[1], c[2]);
 				break;
 
 			case COLORSPACE_CAM02:
-				c = d3.jab(c[0], c[1], c[2]);
+				color = d3.jab(c[0], c[1], c[2]);
 				break;
 			}
 
 			// add to the color map
-			var cLab = d3.lab(c);
+			var cLab = d3.lab(color);
 			colorset.push({
 				value: t,
 				lab: [cLab.l, cLab.a, cLab.b]
 			});
 
 			// now take that color and convert it coordinates
-			var coord = this.coordFromColor(c);
+			var coord = this.coordFromColor(color);
 
 			// add to coordinates
 			this.colormapCoordinates.push(coord);
@@ -498,7 +505,13 @@ ColorPicker.prototype.plotColormapCurve2D = function()
 		.x(function(d) { return d.x * (w-1);})
 		.y(function(d) { return d.y * (w-1);});
 
-	this.colormapCurve.attr('d', lineGen(this.colormapCoordinates));
+
+	var pathD = lineGen(this.colormapCoordinates);
+	if (pathD.indexOf('NaN') != -1) {
+		console.log("ERROR!");
+	}
+
+	this.colormapCurve.attr('d', pathD);
 }
 
 ColorPicker.prototype.plotColormapCurve3D = function()
