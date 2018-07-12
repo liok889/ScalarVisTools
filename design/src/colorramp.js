@@ -720,7 +720,19 @@ ColorRamp.prototype.setColorMap = function(_colormap)
 
 ColorRamp.prototype.updateColormap = function(colormap, noUpdate) 
 {
-	this.colormap = colormap || new ColorMap(this.colors);
+	var interpType;
+	switch(picker.getColorSpace())
+	{
+	case COLORSPACE_CAM02:
+		interpType = 'jab';
+		break;
+	case COLORSPACE_LAB:
+		interpType = 'lab';
+		break;
+	default:
+		interpType = undefined;
+	}
+	this.colormap = colormap || new ColorMap(this.colors, interpType);
 
 	// render color ramp
 	var colorScale = document.createElement('canvas');

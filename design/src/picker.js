@@ -798,7 +798,7 @@ ColorPicker.prototype.pickColor = function(c, skipCallback)
 
 		var cLab = d3.lab(c);
 		if (!cLab.displayable()) {
-			console.log("\tNon-displayable");
+			//console.log("\tNon-displayable");
 		}
 		else
 		{

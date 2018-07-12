@@ -1,4 +1,59 @@
 
+var COLOR_INTERP_LAB = 1;
+var COLOR_INTERP_JAB = 2;
+var COLOR_INTERP_ELSE = 10;
+
+function isLabColor(c) 
+{
+	return c !== null && c !== undefined && !isNaN(c.l) && !isNaN(c.a) && !isNaN(c.b);
+}
+
+function isJabColor(c) {
+	return c !== null && c !== undefined && !isNaN(c.J) && !isNaN(c.a) && !isNaN(c.b);
+}
+
+function ColorInterpolator(c1, c2, interpType)
+{
+	if (isLabColor(c1) || isLabColor(c2) || interpType === 'lab') {
+		this.c1 = d3.lab(c1);
+		this.c2 = d3.lab(c2);
+		this.interpType = COLOR_INTERP_LAB;
+	}
+	else if (isJabColor(c1) || isJabColor(c2) || interpType==='jab') {
+		this.c1 = d3.jab(c1);
+		this.c2 = d3.jab(c2);
+		this.interpType = COLOR_INTERP_JAB;
+	}
+	else
+	{
+		this.interpType = COLOR_INTERP_ELSE
+	}
+}
+
+ColorInterpolator.prototype.interpolate = function(alpha)
+{
+	var c1=this.c1, c2=this.c2;
+	if (this.interpType == COLOR_INTERP_LAB) {
+		return d3.lab(
+			c1.l + alpha * (c2.l-c1.l),
+			c1.a + alpha * (c2.a-c1.a),
+			c1.b + alpha * (c2.b-c1.b)
+		);
+	}
+	else if (this.interpType == COLOR_INTERP_JAB) {
+		return d3.jab(
+			c1.J + alpha * (c2.J-c1.J),
+			c1.a + alpha * (c2.a-c1.a),
+			c1.b + alpha * (c2.b-c1.b)
+		);
+	}
+	else {
+		// add other interpolators as needed
+		return null;
+	}
+}
+
+
 function ColorMap(colorset, interpType)
 {
 	if (isFunction(colorset))
@@ -16,8 +71,10 @@ ColorMap.prototype.getColorSet = function() {
 
 ColorMap.prototype.setMap = function(colorMap, interpType)
 {
-	// force interpolation in the CIELAB color space?
-	// interpType = 'lab';
+	if (!interpType) {
+		// force interpolation in the CIELAB color space if non other specified
+		interpType = 'lab';
+	}
 	
 	this.colorMap = colorMap || this.colorMap;
 	this.colorInterpolator = [];
@@ -38,16 +95,16 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 				var lab1 = colorMap[i].lab;
 				var lab2 = colorMap[i+1].lab;
 
-				if (!isNaN(lab1.l) && !isNaN(lab1.a) && !isNaN(lab1.b)) {
+				if (isLabColor(lab1)) {
 					lab1 = [lab1.l, lab1.a, lab1.b];
 				}
-				if (!isNaN(lab2.l) && !isNaN(lab2.a) && !isNaN(lab2.b)) {
+				if (isLabColor(lab2)) {
 					lab2 = [lab2.l, lab2.a, lab2.b];
 				}
 
 				if (interpType == 'lab')
 				{
-					interpolator = d3.interpolateLab(
+					interpolator = new ColorInterpolator(
 						d3.lab(lab1[0], lab1[1], lab1[2]),
 						d3.lab(lab2[0], lab2[1], lab2[2])
 					);
@@ -55,7 +112,7 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 				else if (interpType == 'jab') {
 					var jab1 = d3.jab( d3.lab(lab1[0], lab1[1], lab1[2]) );
 					var jab2 = d3.jab( d3.lab(lab2[0], lab2[1], lab2[2]) );
-					interpolator = d3.interpolateJab(
+					interpolator = new ColorInterpolator(
 						jab1, jab2
 					);
 				}
@@ -76,6 +133,7 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 			}
 			else
 			{
+				// values defined in RGB
 				var rgb1 = colorMap[i].rgb;
 				var rgb2 = colorMap[i+1].rgb;
 
@@ -100,7 +158,9 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 						d3.rgb(rgb1[0], rgb1[1], rgb1[2]),
 						d3.rgb(rgb2[0], rgb2[1], rgb2[2])
 					);
-				}	
+				}
+				
+				//console.log("Error in creating ColorMap: unspecified 'lab' control points.");
 			}
 
 			this.colorInterpolator.push(
@@ -447,8 +507,26 @@ ColorMap.prototype.mapValue = function(v)
 			if (range[0] <= v && range[1] >= v)
 			{
 				var n = (v - range[0]) * interpolator._len
-				var c = interpolator.interpolator(n);
-				return d3.rgb(c);
+				var interp = interpolator.interpolator;
+				var c;
+
+				if (ColorInterpolator.prototype.isPrototypeOf(interp)) 
+				{
+					c = interp.interpolate(n);
+					if (c.displayable()) {
+						return d3.rgb(c);
+					}
+					else
+					{
+						// return black
+						return d3.rgb(0,0,0);
+					}
+				} 
+				else 
+				{
+					c = interp(n)
+					return c;
+				}
 			}
 		}
 		return null;
