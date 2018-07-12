@@ -122,10 +122,11 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	// location of current selection on the channel
 	// this should be a normalized number between 0 and 1
 	this.channelPos = 0.5;
+	this.makeUI();
 	this.renderChannel();
-	this.armEvents();
 	this.renderPerceptual();
 
+	// currently selected color
 	this.currentColor = null;
 
 	// callbacks, initially empty 
@@ -138,6 +139,7 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	this.controlGroup = svg.append('g');
 	this.colormapCurve = this.controlGroup.append('path').attr('class', 'colormapCurve');
 
+	// control points to specify a color ramp within the picker
 	this.bControls = [];
 	this.luminanceProfile = 'linear';
 }
@@ -206,9 +208,14 @@ ColorPicker.prototype.instantiateColorMap = function()
 		for (var i=0; i<SAMPLES; i++) 
 		{
 			var t = i/(SAMPLES-1);
+
 			//var c = interpolateBezier(controls, t);
 			//var c = interpolateLinearUniform(controls, t);
-			var c = catmulrom.interpolate(t);
+			
+			var c = this.interpolationType == 'linear' ? 
+				interpolateLinearUniform(controls, t) :
+				catmulrom.interpolate(t);
+
 			if (isNaN(c[0]) || isNaN(c[1]) || isNaN(c[2])) {
 				console.error('NaN in interpolation');
 			}
@@ -590,7 +597,7 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 
 }
 
-ColorPicker.prototype.armEvents = function() {
+ColorPicker.prototype.makeUI = function() {
 
 	(function(picker) {
 		d3.select(picker.channelCanvas).on("mousedown", function() {
@@ -610,7 +617,6 @@ ColorPicker.prototype.armEvents = function() {
 						.on("mousemove.channelPicker", null)
 						.on("mouseup.channelPicker", null);
 				})
-
 		})
 
 		picker.svg
@@ -633,7 +639,6 @@ ColorPicker.prototype.armEvents = function() {
 				if (d3.event.shiftKey)
 				{
 					// add a control ppoint
-					//var c = picker.colorFromMouse(d3.mouse(this));
 					picker.addBControl({
 						x: m[0], y: m[1], 
 						L: picker.L(),
@@ -656,6 +661,19 @@ ColorPicker.prototype.armEvents = function() {
 			.on('mouseup', function() {
 				picker.mouseDown = false;
 			});
+
+		var g = picker.svg.append('g')
+		g.attr('transform', 'translate(35,5)');
+		picker.interpolationSelector = new SmallRadio(g, [
+			{text: 'spline', choice: 'spline'},
+			{text: 'linear', choice: 'linear'}
+		], function(choice) {
+			picker.interpolationType = choice;
+			picker.instantiateColorMap();
+		})
+
+		// defaults to spline interpolation
+		picker.interpolationType = 'spline';
 	})(this);
 }
 
