@@ -489,7 +489,7 @@ ColorMap.prototype.scaleColorDiff = function(s)
 	}
 }
 
-ColorMap.prototype.mapValue = function(v)
+ColorMap.prototype.mapValue = function(v, dontMapAnyway)
 {
 	if (this.colormapFunc)
 	{
@@ -519,7 +519,13 @@ ColorMap.prototype.mapValue = function(v)
 					else
 					{
 						// return black
-						return d3.rgb(0,0,0);
+						if (dontMapAnyway) {
+							return null;
+						}
+						else
+						{
+							return d3.rgb(0,0,0);
+						}
 					}
 				} 
 				else 
@@ -565,13 +571,26 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 		y = 0;
 	}
 
+	var dontMapAnyway = h > 4;
 	for (var i=0; i<steps; i++, x += dX, y += dY) 
 	{
 		var v = (minmax[1]-minmax[0]) * ( (invert ? steps-1-i : i )/(steps-1)) + minmax[0];
-		var c = this.mapValue(v);
+		var c = this.mapValue(v, dontMapAnyway);
 
-		context.fillStyle = c.toString();
+		context.fillStyle = c !== null ? c.toString() : '#000000';
 		context.fillRect(x, y, ww, hh);
+
+		if (c === null) 
+		{
+			// strike through with a red line
+			context.strokeStyle="#FFFF00";
+			context.lineWidth=2;
+
+			context.beginPath();
+			context.moveTo(x,h/2);
+			context.lineTo(x+ww,h/2);
+			context.stroke();
+		}
 	}
 
 	return internalCanvas;
