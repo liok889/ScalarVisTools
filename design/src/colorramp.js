@@ -269,39 +269,19 @@ ColorRamp.prototype.addUI = function()
 			}
 		});
 
-
-		// add buttons to select diff mode
-		ramp.gButtons.attr('transform', 'translate(-30,' + 2*(-PLOT_H-PLOT_OFFSET) + ')');
-		ramp.diff2000 = ramp.gButtons.append('g');
-		ramp.diff2000.append('rect')
-			.attr('x', 0).attr('y', 0).attr('class', 'smallButton smallButtonClicked')
-			.attr('width', '10').attr('height', '10');
-
-		ramp.diff2000.append('text').attr('x', -5).attr('y', 9).attr('class', 'smallText')
-			.attr('text-anchor', 'end').html('dE \'00');
-		ramp.diff2000.on('click', function() {
-			ramp.colormapDiffMode = 'de2000';
+		// create radio buttons to chooise mode of selection plot
+		var g = ramp.g.append('g')
+		g.attr('transform', 'translate(-30,' + 2*(-PLOT_H-PLOT_OFFSET) + ')');
+		ramp.plotSelection = new SmallRadio(g, [ 
+			{ choice: 'de2000', text: 'dE \'00', },
+			{ choice: 'curve' , text: 'dCurve'   }
+		], function(choice) {
+			ramp.colormapDiffMode = choice;
 			ramp.createDiffPlot();
-			ramp.gButtons.selectAll('rect.smallButton').attr('class', 'smallButton');
-			d3.select(this).select('rect').attr('class', 'smallButton smallButtonClicked')
-		});
-		ramp.colormapDiffMode = 'de2000'
-
-
-		ramp.diffCurve = ramp.gButtons.append('g');
-		ramp.diffCurve.append('rect')
-			.attr('x', 0).attr('y', 14).attr('class', 'smallButton')
-			.attr('width', '10').attr('height', '10');
-
-		ramp.diffCurve.append('text').attr('x', -5).attr('y', 9+14).attr('class', 'smallText')
-			.attr('text-anchor', 'end').html('dCurve');
-		ramp.diffCurve.on('click', function() {
-			ramp.colormapDiffMode = 'curve';
-			ramp.createDiffPlot();
-			ramp.gButtons.selectAll('rect.smallButton').attr('class', 'smallButton');
-			d3.select(this).select('rect').attr('class', 'smallButton smallButtonClicked')
 		});
 
+		// defaults to plotting CIE 2000 dE
+		ramp.colormapDiffMode = 'de2000';
 
 	})(add, remove, this, this.svg);
 }

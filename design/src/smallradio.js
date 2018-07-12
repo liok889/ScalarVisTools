@@ -7,14 +7,13 @@ function SmallRadio(g, choices, _callback)
 
 	// create groups for buttons
 	this.buttons = this.g.selectAll('g').data(choices);
-	this.buttons = this.buttons.enter().append('g').enter()
-		.append('g')
+	this.buttons = this.buttons.enter().append('g')
 		.attr('transform', function(d, i) {
 			return 'translate(' + 0 + ',' + (i*14) + ')';
 		})	
 		.merge(this.buttons);
 
-	(function(g, buttons, radio) {
+	(function(all, buttons, radio) {
 		buttons.each(function(d, i) 
 		{
 			var thisG = d3.select(this);
@@ -24,13 +23,13 @@ function SmallRadio(g, choices, _callback)
 
 			thisG.append('text')
 				.attr('x', -5).attr('y', 9).attr('class', 'smallText')
-				.attr('text-anchor', 'end').html(d.choice);
+				.attr('text-anchor', 'end').html(d.text);
 
-			thisG.on('click', function(d) 
+			thisG.on('click', function(_d) 
 			{
-				g.selectAll('rect.smallButton').attr('class', 'smallButton');
+				all.selectAll('rect.smallButton').attr('class', 'smallButton');
 				d3.select(this).select('rect').attr('class', 'smallButton smallButtonClicked');
-				radio.fireCallback(d.choice)
+				radio.fireCallback(_d.choice);
 			});
 		});
 	})(this.g, this.buttons, this);
@@ -40,11 +39,12 @@ function SmallRadio(g, choices, _callback)
 	}
 }
 
-SmallRadio.prototype.makeActive = function(_choice) {
-	this.buttons.each(function(d, i) 
+SmallRadio.prototype.makeActive = function(_choice) 
+{
+	this.buttons.each(function(d) 
 	{
 		d3.select(this).select('rect')
-			.attr('class', 'smallButton ' + (d.choice==_choice ? ' smallButtonClicked' : ''));
+			.attr('class', 'smallButton' + (d.choice===_choice ? ' smallButtonClicked' : ''));
 	});
 }
 
