@@ -430,57 +430,6 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 		maxColorDiff: this.maxColorDiff
 	};
 }
-/*
-ColorMap.prototype.computeColorDiffAroundValue = function(value)
-{
-	var SAMPLES = 1;		// each direction
-	var THRESHOLD = 0.025;	// in data space
-
-	var samplesTaken = 0;
-	var maxDiff = -Number.MAX_VALUE;
-	var cummDiff = 0;
-
-	// loop through two directions
-	for (var d=0; d<2; d++) {
-		var direction = (d == 0 ? 1 : -1);
-		var v1 = value; 
-		var v2 = value + direction * (THRESHOLD / SAMPLES);
-
-		var c1 = this.mapValue(v1);
-		c1 = d3.lab( d3.rgb(c1.r, c1.g, c1.b) );
-
-		for (var i=0; i<SAMPLES && v1>=0 && v1<=1.0 && v2>=0 && v2<=1.0; i++) 
-		{
-			var c2 = this.mapValue(v2);
-			c2 = d3.lab( d3.rgb(c2.r, c2.g, c2.b) );
-
-			// compute color difference
-			var colorDiff = cie2000Diff(c1, c2);
-			cummDiff += colorDiff;
-			maxDiff = Math.max(maxDiff, colorDiff);
-
-			c1 = c2;
-			v1 = v2;
-			v2 += direction * (THRESHOLD / SAMPLES);
-
-			samplesTaken++;
-		}
-	}
-
-	if (samplesTaken == 0) {
-		console.error("Couldn't take any color differential samples.");
-		return null;
-	}
-	else
-	{
-		return {
-			avgColorDiff: cummDiff / samplesTaken,
-			maxColorDiff: maxDiff
-		};
-	}
-}
-*/
-
 
 ColorMap.prototype.scaleColorDiff = function(s) 
 {
