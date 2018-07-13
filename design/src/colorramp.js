@@ -13,6 +13,11 @@ var PLOT_H = 40;
 var PLOT_OFFSET = 5;
 var CONTROL_R = 4;
 
+// number of samples to take in the color ramp 
+// when computing difference
+var DIFF_SAMPLES = 20;
+
+// allow more leeway in tuning lightning
 var PERMISSIVE_L_TUNING = false;
 
 function ColorRamp(_colors, _svg, _colorPicker)
@@ -46,8 +51,10 @@ function ColorRamp(_colors, _svg, _colorPicker)
 			.on('mousemove', function() 
 			{
 				var m = d3.mouse(this);
-				var color = ramp.colormap.mapValue(m[0]/RAMP_W);
-				ramp.colorPicker.brushColor(color);
+				var color = ramp.colormap.mapValue(m[0]/RAMP_W, true);
+				if (color) {
+					ramp.colorPicker.brushColor(color);
+				}
 			})
 			.on('mouseout', function() {
 				ramp.colorPicker.brushColor(null);
@@ -439,7 +446,7 @@ ColorRamp.prototype.updateSVG = function()
 
 ColorRamp.prototype.createDiffPlot = function()
 {
-	var SAMPLES = 25;
+	var SAMPLES = DIFF_SAMPLES;
 
 	var lastColor = null;
 	var diffValues = [], diffVectors = [];

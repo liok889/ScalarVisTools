@@ -13,8 +13,8 @@ var COLORSPACE_LAB = 1;
 var COLORSPACE_CAM02 = 2;
 
 // ranges for color spaces
-var A_RANGE=[-115, 115];
-var B_RANGE=[-115, 115];
+var A_RANGE=[-112, 112];
+var B_RANGE=[-112, 112];
 
 var JAB_A_RANGE = [-45, 45];
 var JAB_B_RANGE = [-45, 45];
@@ -48,6 +48,31 @@ function interpolateBezier(controls, t)
 		}
 		return interpolateBezier(newControls, t);
 	}
+}
+
+function interpolateLinearNonUniform(controls, t)
+{
+	var k = t * (controls.length-1);
+	var k0 = Math.floor(k);
+	var k1 = Math.ceil(k);
+	if (k0 == k1) {
+		if (k0==0) { 
+			k1 = 1;
+		}
+		else if (k0==controls.length-1) { 
+			k0 = k1-1;
+		}
+	}
+
+	// compute a 't' between k0 and k1
+	var running = k0/(controls.length-1);
+	var l = 1/(controls.length-1);
+	var s = (t-running)/l;
+
+	// interpolate between k0 and k1
+	c0 = controls[k0];
+	c1 = controls[k1];
+	return interpolateLinear(c0, c1, s);
 }
 
 function interpolateLinearUniform(controls, t)
@@ -208,14 +233,24 @@ ColorPicker.prototype.instantiateColorMap = function()
 		for (var i=0; i<SAMPLES; i++) 
 		{
 			var t = i/(SAMPLES-1);
+			var c;
+		
+			switch (this.interpolationType)
+			{
+			case 'linear':
+				c = interpolateLinearUniform(controls, t);
+				break;
 
-			//var c = interpolateBezier(controls, t);
-			//var c = interpolateLinearUniform(controls, t);
-			
-			var c = this.interpolationType == 'linear' ? 
-				interpolateLinearUniform(controls, t) :
-				catmulrom.interpolate(t);
+			case 'spline':
+				c = catmulrom.interpolate(t);
+				break;
 
+			case 'nonuniformLinear':
+				c = interpolateLinearNonUniform(controls, t);
+				break;
+			}
+
+			// make sure we have a valid color
 			if (isNaN(c[0]) || isNaN(c[1]) || isNaN(c[2])) {
 				console.error('NaN in interpolation');
 			}
@@ -381,6 +416,10 @@ ColorPicker.prototype.changeColorSpace = function(newSpace)
 			var color = c.colorSpace == COLORSPACE_CAM02 ? d3.jab(c.L, AB[0], AB[1]) : d3.lab(c.L, AB[0], AB[1]);
 			var newColor = newSpace == COLORSPACE_CAM02 ? d3.jab(color) : d3.lab(color);
 			var LL = newSpace == COLORSPACE_CAM02 ? newColor.J : newColor.l;
+
+			if (isNaN(newColor.a) || isNaN(newColor.b)) {
+				console.error("Error in convering color")
+			}
 
 			// remap from AB in new color space to new XY
 			var xy = this.ab2xy([newColor.a, newColor.b], newSpace);
@@ -641,7 +680,7 @@ ColorPicker.prototype.makeUI = function() {
 					// add a control ppoint
 					picker.addBControl({
 						x: m[0], y: m[1], 
-						L: picker.L(),
+						L: 50,//picker.L(),
 						colorSpace: picker.getColorSpace()
 					});
 				}
@@ -663,10 +702,11 @@ ColorPicker.prototype.makeUI = function() {
 			});
 
 		var g = picker.svg.append('g')
-		g.attr('transform', 'translate(35,5)');
+		g.attr('transform', 'translate(50,5)');
 		picker.interpolationSelector = new SmallRadio(g, [
 			{text: 'spline', choice: 'spline'},
-			{text: 'linear', choice: 'linear'}
+			{text: 'linear', choice: 'linear'},
+			{text: '! uniform', choice: 'nonuniformLinear'}
 		], function(choice) {
 			picker.interpolationType = choice;
 			picker.instantiateColorMap();

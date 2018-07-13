@@ -430,7 +430,7 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 		maxColorDiff: this.maxColorDiff
 	};
 }
-
+/*
 ColorMap.prototype.computeColorDiffAroundValue = function(value)
 {
 	var SAMPLES = 1;		// each direction
@@ -479,6 +479,8 @@ ColorMap.prototype.computeColorDiffAroundValue = function(value)
 		};
 	}
 }
+*/
+
 
 ColorMap.prototype.scaleColorDiff = function(s) 
 {
