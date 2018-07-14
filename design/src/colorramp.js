@@ -707,6 +707,9 @@ ColorRamp.prototype.setColorMap = function(_colormap)
 
 ColorRamp.prototype.updateColormap = function(colormap, noUpdate) 
 {
+	// transfer the color points to the picker
+	//picker.setControlPoints(this.colors);
+
 	var interpType;
 	switch(picker.getColorSpace())
 	{
@@ -753,8 +756,9 @@ ColorRamp.prototype.updateColormap = function(colormap, noUpdate)
 
 ColorRamp.prototype.updateRamp = function() 
 {
-	this.updateColormap();
-	this.updateSVG();
+	picker.setControlPoints(this.colors);
+	//this.updateColormap();
+	//this.updateSVG();
 }
 
 ColorRamp.prototype.removeColor = function(index) {

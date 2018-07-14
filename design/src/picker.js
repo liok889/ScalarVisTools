@@ -170,9 +170,10 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 }
 
 ColorPicker.prototype.L = function() { 
-	return this.channelPos * 100;
+	return (1-this.channelPos) * 100;
 }
-ColorPicker.prototype.setL = function(_L) {
+ColorPicker.prototype.setL = function(_L) 
+{
 	this.channelPos = 1 - _L/100
 	this.drawChannelSelection();
 	this.renderPerceptual();
@@ -209,7 +210,7 @@ ColorPicker.prototype.instantiateColorMap = function()
 	var MAX_L = MAX_LUMINANCE;
 	var MIN_L = MIN_LUMINANCE;
 
-	if (this.bControls.length >= 3)
+	if (this.bControls.length >= 2)
 	{
 		// convert control group to an Array format
 		var controls = [];
@@ -317,6 +318,42 @@ ColorPicker.prototype.instantiateColorMap = function()
 	{
 		return null;
 	}
+}
+
+ColorPicker.prototype.setControlPoints = function(colors)
+{
+	var controls = [];
+	for (var i=0; i<colors.length; i++) 
+	{
+		var c = colors[i];
+		var lab = d3.lab(c.lab[0], c.lab[1], c.lab[2]);
+		var xy, L;
+		switch (this.colorSpace) {
+
+		case COLORSPACE_LAB:
+			xy = this.ab2xy([lab.a, lab.b], COLORSPACE_LAB);
+			L = lab.l;
+			break;
+		case COLORSPACE_CAM02:
+			var jab = d3.jab(lab);
+			xy = this.ab2xy([jab.a, jab.b], COLORSPACE_CAM02);
+			L = jab.J;
+			break;
+		}
+
+
+		controls.push({
+			x: xy[0],
+			y: xy[1],
+			L: L,
+			colorSpace: this.colorSpace,
+			value: (c.value !== null) && (c.value !== undefined) ? c.value : undefined
+		});
+	}
+	this.bControls = controls;
+	this.updateBControl();
+
+
 }
 
 ColorPicker.prototype.updateBControl = function() 
@@ -680,7 +717,7 @@ ColorPicker.prototype.makeUI = function() {
 					// add a control ppoint
 					picker.addBControl({
 						x: m[0], y: m[1], 
-						L: 50,//picker.L(),
+						L: picker.L(),
 						colorSpace: picker.getColorSpace()
 					});
 				}

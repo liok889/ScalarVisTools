@@ -85,12 +85,12 @@ function CatmulRom4(p0, p1, p2, p3, _t)
 function vpad(a, b, c)
 {
 	var v1 = (vsub(b, a));
-	var v2 = (vsub(c, b));
+	var v2 = c ? (vsub(c, b)) : [0, 0, 0];
 	var d1 = vlen(v1);
 	var d2 = vlen(v2);
 
 	var v = vadd( normalize(v1), normalize(v2) );
-	return vmult( (d1+d2)/2, normalize(v) );
+	return vmult( c ? (d1+d2)/2 : 1, normalize(v) );
 }
 
 // uniformly sampled CatmulRom curve
@@ -103,7 +103,7 @@ function CatmulRom(controls, pad)
 		var p0 = vsub(controls[0], v0);
 
 
-		var v1 = vpad(controls[l-3], controls[l-2], controls[l-1]);
+		var v1 = vpad(controls[l-1], controls[l-2]);
 		var p1 = vadd(controls[l-1], v1);
 
 		var newControls = ([p0]).concat(controls);
