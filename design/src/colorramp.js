@@ -241,8 +241,8 @@ ColorRamp.prototype.addUI = function()
 			ramp.pickColor(c);
 		});
 
-		ramp.colorPicker.registerCallback('instantiateColormap', function(colormap) {
-			ramp.setColorMap(colormap);
+		ramp.colorPicker.registerCallback('instantiateColormap', function(colormap, controlPoints) {
+			ramp.setColorMap(colormap, controlPoints);
 		})
 
 		// ramp image double click adds a new colors
@@ -586,11 +586,39 @@ ColorRamp.prototype.createDiffPlot = function()
 
 ColorRamp.prototype.createLPlot = function(skipControls) 
 {
+	// sample the color map
+	var SAMPLES = 30, luminanceSamples = [];;
+	
+	for (var i=0; i<SAMPLES; i++) 
+	{
+		var t = i/(SAMPLES-1);
+		var rgb = this.colormap.mapValue(t), L=0;
+		if (rgb)
+		{
+			switch (picker.getColorSpace())
+			{
+			case COLORSPACE_CAM02:
+				L = d3.jab(rgb).J;
+				break;
+			case COLORSPACE_LAB:
+				L = d3.lab(rgb).l;
+				break;
+			}
+		}
+		else
+		{
+			L = 0;
+		}
+		luminanceSamples.push({value: t, L: L});
+
+	}
+
 	var lPath = this.lPlot.select('path');
 	var lineGen = d3.line()
-		.x(function(d) { return RAMP_W * d.value;})
-		.y(function(d) { return PLOT_H * (1-d.lab[0]/100);});
-	var pathD = lineGen(this.colors);
+		.x(function(d) { return RAMP_W * d.value; })
+		.y(function(d) { return PLOT_H * (1-d.L/100); });
+
+	var pathD = lineGen(luminanceSamples);
 	lPath.attr('d', pathD);
 	if (skipControls) {
 		return;
@@ -700,7 +728,7 @@ ColorRamp.prototype.setColorMap = function(_colormap, controlPoints)
 		this.colormap.dispose();
 		this.colormap = null;
 	}
-	this.colors = _colormap.getColorSet();
+	this.colors = controlPoints; //_colormap.getColorSet();
 	this.updateColormap(_colormap, true);
 	this.updateSVG();
 }

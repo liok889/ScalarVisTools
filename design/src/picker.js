@@ -95,16 +95,38 @@ ColorPicker.prototype.changeLuminanceProfile = function(profile)
 	}
 }
 
-function resampleValues(contorls)
+ColorPicker.prototype.getLuminanceGivenProfile = function(t)
 {
+	var MAX_L = MAX_LUMINANCE;
+	var MIN_L = MIN_LUMINANCE;
 
+
+	// color map properties
+	if (this.luminanceProfile == 'linear') {
+		return MIN_L + t*(MAX_L-MIN_L);
+	}
+	else if (this.luminanceProfile == 'divergent')
+	{
+		if (t < 0.5) {
+			return MIN_L + 2*t*(MAX_L-MIN_L)
+		}
+		else if (t > 0.5)
+		{
+			return MIN_L + 2*(1-t)*(MAX_L-MIN_L);
+		}
+		else {
+			return MAX_L;
+		}
+	}
+	else
+	{
+		return null;
+	}
 }
 
 ColorPicker.prototype.instantiateColorMap = function()
 {
 	var SAMPLES = 100;
-	var MAX_L = MAX_LUMINANCE;
-	var MIN_L = MIN_LUMINANCE;
 
 	if (this.bControls.length >= 2)
 	{
@@ -123,7 +145,7 @@ ColorPicker.prototype.instantiateColorMap = function()
 
 			controls.push(
 			{
-				lab: colorLab,
+				lab: [colorLab.l, colorLab.a, colorLab.b],
 				value: control.value
 			});
 			colors.push(color)
@@ -156,24 +178,9 @@ ColorPicker.prototype.instantiateColorMap = function()
 				console.error('NaN in interpolation');
 			}
 
-			// color map properties
-			if (this.luminanceProfile == 'linear') {
-				c[0] = MIN_L + t*(MAX_L-MIN_L);
-			}
-			else if (this.luminanceProfile == 'divergent')
-			{
-				if (t < 0.5) {
-					c[0] = MIN_L + 2*t*(MAX_L-MIN_L)
-				}
-				else if (t > 0.5)
-				{
-					c[0] = MIN_L + 2*(1-t)*(MAX_L-MIN_L);
-				}
-				else {
-					c[0] = MAX_L;
-				}
-			}
-
+			// adjust control point luminance according to profile
+			c[0] = this.getLuminanceGivenProfile(t);
+			
 			var color;
 			switch (this.colorSpace)
 			{
@@ -204,6 +211,23 @@ ColorPicker.prototype.instantiateColorMap = function()
 
 		// instantiate a new color map
 		var theColormap = new ColorMap(colorset, COLORSPACE_LAB ? 'lab' : 'jab');
+
+		// re-distribute the value in original control points based on interpolation
+		for (var i=0; i < controls.length; i++) 
+		{
+			var t = interpolation.getTFromIndex(i);
+			controls[i].value = t;
+
+			// re-adjust the color based on the interpolation
+			var newColor = interpolation.interpolate(t);
+			newColor[0] = this.getLuminanceGivenProfile(t);
+
+			var newColorLab = d3.lab(this.getColorFromAB(newColor));
+			controls[i].lab = [
+				newColorLab.l, newColorLab.a, newColorLab.b
+			];
+
+		}
 
 		for (var i=0; i<this.callbacks.length; i++) 
 		{
@@ -246,7 +270,7 @@ ColorPicker.prototype.setControlPoints = function(colors)
 			y: xy[1],
 			L: L,
 			colorSpace: this.colorSpace,
-			value: (c.value !== null) && (c.value !== undefined) ? c.value : undefined
+			//value: (c.value !== null) && (c.value !== undefined) ? c.value : undefined
 		});
 	}
 	this.bControls = controls;

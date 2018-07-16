@@ -112,7 +112,7 @@ function CatmulRom(controls, pad)
 		controls = newControls;
 	}
 
-	var out = [], tIndex = [];
+	var out = [];
 	for (var i=1; i<controls.length-2; i++) 
 	{
 
@@ -128,9 +128,7 @@ function CatmulRom(controls, pad)
 				t
 			);
 			out.push(p);
-			if (t==1) {
-				tIndex.push(out.length-1);
-			}
+
 		}
 	}
 	this.controls = controls;
@@ -154,21 +152,12 @@ function CatmulRom(controls, pad)
 	}
 
 	// normalize d by total distances
-	var running = 0;
 	for (var i=0; i<distances.length; i++) 
 	{
 		distances[i] /= totalD;
-		running += distances[i];
-
-		// search for match against tIndex
-		for (var j=0; j<tIndex.length; j++) {
-			if (tIndex[j]==i) {
-				tIndex[j] = running;
-			}
-		}
+		
 	}
 	this.distances = distances;
-	this.tIndex = tIndex;
 
 }
 
@@ -187,7 +176,7 @@ CatmulRom.prototype.getTFromIndex = function(index)
 	if (index == 0) {
 		return 0;
 	}
-	else if (index == this.controls.length-2-1) {
+	else if (index >= this.controls.length-2-1) {
 		return 1;
 	}
 	else {

@@ -39,7 +39,8 @@ function LinearInterpolation(controls, type)
 	var totalD = 0;
 	var distances = [];
 
-	for (var i=0; i<controls.length-1; i++) {
+	for (var i=0; i<controls.length-1; i++) 
+	{
 		var p0 = controls[i];
 		var p1 = controls[i+1];
 		var d = Math.sqrt(
@@ -135,5 +136,27 @@ LinearInterpolation.prototype.interpolateNonUniform = function(t)
 	c0 = controls[k0];
 	c1 = controls[k1];
 	return interpolateLinear(c0, c1, s);
+}
+
+LinearInterpolation.prototype.getTFromIndex = function(index)
+{
+	switch (this.interpolationType)
+	{
+	case LINEAR_NON_UNIFORM:
+		return index/(this.controls.length-1);
+		break;
+
+	case LINEAR_UNIFORM:
+		if (index == 0) {
+			return 0;
+		}
+		else if (index >= this.controls.length-1) {
+			return 1;
+		}
+		else {
+			return this.distances[index-1];
+		}
+		break;
+	}
 }
 
