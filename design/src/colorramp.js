@@ -693,7 +693,7 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 	})(lControls, this);
 }
 
-ColorRamp.prototype.setColorMap = function(_colormap)
+ColorRamp.prototype.setColorMap = function(_colormap, controlPoints)
 {
 	// remove existing color map
 	if (this.colormap) {

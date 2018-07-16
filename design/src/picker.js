@@ -341,7 +341,6 @@ ColorPicker.prototype.setControlPoints = function(colors)
 			break;
 		}
 
-
 		controls.push({
 			x: xy[0],
 			y: xy[1],
