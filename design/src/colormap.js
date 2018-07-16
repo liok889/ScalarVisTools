@@ -360,10 +360,7 @@ ColorMap.prototype.visualize = function(svg)
 			x: COLOR_LIGHTNESS_W * cLab.l/100, 
 			y: COLOR_LIGHTNESS_H - COLOR_LIGHTNESS_H * i/(len-1) 
 		});
-
-
 	}
-
 	
 	for (var i=0, len=this.colorDiffs.length; i<len; i++) {
 		var d = this.colorDiffs[i];

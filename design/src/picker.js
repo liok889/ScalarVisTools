@@ -226,8 +226,9 @@ ColorPicker.prototype.instantiateColorMap = function()
 			controls[i].lab = [
 				newColorLab.l, newColorLab.a, newColorLab.b
 			];
-
 		}
+		// sort controls
+		controls.sort(function(a, b) { return a.value-b.value});
 
 		for (var i=0; i<this.callbacks.length; i++) 
 		{

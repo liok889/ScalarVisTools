@@ -161,7 +161,8 @@ function CatmulRom(controls, pad)
 
 }
 
-CatmulRom.prototype.sumDistanceTo = function(index) {
+CatmulRom.prototype.sumDistanceTo = function(index) 
+{
 	var running = 0;
 	var distances = this.distances;
 

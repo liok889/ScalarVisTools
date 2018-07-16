@@ -30,6 +30,16 @@ function interpolateBezier(controls, t)
 	}
 }
 
+function sumThrough(array, index)
+{
+	var running = 0;
+
+	for (var i=0, len=Math.min(index, array.length-1); i<=len; i++) {
+		running += array[i];
+	}
+	return running;
+}
+
 var LINEAR_UNIFORM = 1;
 var LINEAR_NON_UNIFORM = 2;
 
@@ -154,7 +164,7 @@ LinearInterpolation.prototype.getTFromIndex = function(index)
 			return 1;
 		}
 		else {
-			return this.distances[index-1];
+			return sumThrough(this.distances, index-1);
 		}
 		break;
 	}
