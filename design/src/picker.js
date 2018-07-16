@@ -19,116 +19,7 @@ var B_RANGE=[-112, 112];
 var JAB_A_RANGE = [-45, 45];
 var JAB_B_RANGE = [-45, 45];
 
-
 var CHANNEL_RAMP_OFFSET = 10;
-
-function interpolateLinear(c0, c1, t)
-{
-	return [
-		c0[0] + t*(c1[0]-c0[0]),
-		c0[1] + t*(c1[1]-c0[1]),
-		c0[2] + t*(c1[2]-c0[2])
-	];	
-}
-
-function interpolateBezier(controls, t) 
-{
-	if (controls.length == 2) 
-	{
-		return interpolateLinear(controls[0], controls[1], t);
-	}
-	else
-	{
-		var newControls = [];
-		for (var i=0; i<controls.length-1; i++) 
-		{
-			newControls.push(
-				interpolateLinear(controls[i], controls[i+1], t)
-			);
-		}
-		return interpolateBezier(newControls, t);
-	}
-}
-
-function interpolateLinearNonUniform(controls, t)
-{
-	var k = t * (controls.length-1);
-	var k0 = Math.floor(k);
-	var k1 = Math.ceil(k);
-	if (k0 == k1) {
-		if (k0==0) { 
-			k1 = 1;
-		}
-		else if (k0==controls.length-1) { 
-			k0 = k1-1;
-		}
-	}
-
-	// compute a 't' between k0 and k1
-	var running = k0/(controls.length-1);
-	var l = 1/(controls.length-1);
-	var s = (t-running)/l;
-
-	// interpolate between k0 and k1
-	c0 = controls[k0];
-	c1 = controls[k1];
-	return interpolateLinear(c0, c1, s);
-}
-
-function interpolateLinearUniform(controls, t)
-{
-	// add up distances
-	var totalD = 0;
-	var distances = [];
-
-	for (var i=0; i<controls.length-1; i++) {
-		var p0 = controls[i];
-		var p1 = controls[i+1];
-		var d = Math.sqrt(
-			Math.pow(p0[0]-p1[0], 2) +
-			Math.pow(p0[1]-p1[1], 2) +
-			Math.pow(p0[2]-p1[2], 2)
-		);
-		distances.push(d);
-		totalD += d;
-	}
-
-	// normalize d by total distances
-	for (var i=0; i<distances.length; i++) {
-		distances[i] /= totalD;
-	}
-
-	// figure out we're we are in total distance
-	var running = 0;
-	var index = distances.length-1;
-	for (var i=0; i<distances.length; i++) 
-	{
-		var d = distances[i];
-		running += d;
-		if (t <= running) {
-			index = i;
-			break;
-		}
-	}
-
-	if (index >= 0)
-	{
-		var s = 1-((running - t) / distances[index]);
-		var c0 = controls[index];
-		var c1 = controls[index+1];
-
-		return [
-			s * (c1[0]-c0[0]) + c0[0],
-			s * (c1[1]-c0[1]) + c0[1],
-			s * (c1[2]-c0[2]) + c0[2],
-		];
-	}
-	else
-	{
-		console.log("error!")
-		return null;
-	}
-}
 
 function isArray (value) {
 	return value && typeof value === 'object' && value.constructor === Array;
@@ -204,6 +95,11 @@ ColorPicker.prototype.changeLuminanceProfile = function(profile)
 	}
 }
 
+function resampleValues(contorls)
+{
+
+}
+
 ColorPicker.prototype.instantiateColorMap = function()
 {
 	var SAMPLES = 100;
@@ -213,7 +109,7 @@ ColorPicker.prototype.instantiateColorMap = function()
 	if (this.bControls.length >= 2)
 	{
 		// convert control group to an Array format
-		var controls = [];
+		var controls = [], colors = [];
 		for (var i=0; i < this.bControls.length; i++) 
 		{
 			var control = this.bControls[i];
@@ -222,35 +118,39 @@ ColorPicker.prototype.instantiateColorMap = function()
 			var L = control.L;
 			var AB = this.xy2ab([control.x, control.y]);
 			var A = AB[0], B = AB[1];
+			var color = [L, A, B];
+			var colorLab = d3.lab(this.getColorFromAB(color));
 
-			controls.push([L, A, B]);
+			controls.push(
+			{
+				lab: colorLab,
+				value: control.value
+			});
+			colors.push(color)
 		}
 
 		// interpolate the curve
 		this.colormapCoordinates = [];
 		var colorset = [];
-		var catmulrom = new CatmulRom(controls, true);
+		var interpolation = null;
+
+		switch (this.interpolationType) {
+		case 'spline':
+			interpolation = new CatmulRom(colors, true);
+			break;
+		case 'linear':
+			interpolation = new LinearInterpolation(colors, LINEAR_UNIFORM);
+			break;
+		case 'nonuniformLinear':
+			interpolation = new LinearInterpolation(colors, LINEAR_NON_UNIFORM);
+			break;		
+		}
 
 		for (var i=0; i<SAMPLES; i++) 
 		{
 			var t = i/(SAMPLES-1);
-			var c;
-		
-			switch (this.interpolationType)
-			{
-			case 'linear':
-				c = interpolateLinearUniform(controls, t);
-				break;
-
-			case 'spline':
-				c = catmulrom.interpolate(t);
-				break;
-
-			case 'nonuniformLinear':
-				c = interpolateLinearNonUniform(controls, t);
-				break;
-			}
-
+			var c = interpolation.interpolate(t);
+			
 			// make sure we have a valid color
 			if (isNaN(c[0]) || isNaN(c[1]) || isNaN(c[2])) {
 				console.error('NaN in interpolation');
@@ -309,7 +209,7 @@ ColorPicker.prototype.instantiateColorMap = function()
 		{
 			var callback = this.callbacks[i];
 			if (callback.event == 'instantiateColormap') {
-				callback.callback(theColormap);
+				callback.callback(theColormap, controls);
 			}
 		}
 		return theColormap;
@@ -1144,7 +1044,23 @@ ColorPicker.prototype.ab2xy = function(ab, colorSpace)
 	];
 }
 
-function getLab(c) {
+// expects an array of L, A, B. Returns a color D3 color object
+// based in the current color space
+ColorPicker.prototype.getColorFromAB = function(c) 
+{
+	switch (this.colorSpace)
+	{
+	case COLORSPACE_LAB:
+		return d3.lab(c[0], c[1], c[2]);
+		break;
+	case COLORSPACE_CAM02:
+		return d3.jab(c[0], c[1], c[2]);
+		break;
+	}
+}
+
+function getLab(c) 
+{
 	if (!isNaN(c.l) && !isNaN(c.a) && !isNaN(c.b)) {
 		return c;
 	}

@@ -2,6 +2,9 @@
 // based on:
 // https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
 
+var SAMPLES_PER_CURVE_SEGMENT = 25;
+
+
 function vmult(scalar, v) {
 	return [
 		scalar * v[0],
@@ -43,8 +46,6 @@ function normalize(a)
 function vlen(a) {
 	return Math.sqrt(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
 }
-
-
 
 function CatmulRom4(p0, p1, p2, p3, _t)
 {
@@ -111,14 +112,13 @@ function CatmulRom(controls, pad)
 		controls = newControls;
 	}
 
-	var SAMPLES_PER_SEGMENT = 25;
-	var out = [];
+	var out = [], tIndex = [];
 	for (var i=1; i<controls.length-2; i++) 
 	{
 
-		for (var j=0; j<SAMPLES_PER_SEGMENT; j++)
+		for (var j=0; j<SAMPLES_PER_CURVE_SEGMENT; j++)
 		{
-			var t = j/(SAMPLES_PER_SEGMENT-1);
+			var t = j/(SAMPLES_PER_CURVE_SEGMENT-1);
 			var p = CatmulRom4
 			( 
 				controls[i-1],
@@ -128,15 +128,20 @@ function CatmulRom(controls, pad)
 				t
 			);
 			out.push(p);
+			if (t==1) {
+				tIndex.push(out.length-1);
+			}
 		}
 	}
+	this.controls = controls;
 	this.curve = out;
 
 	// add up distances
 	var totalD = 0;
 	var distances = [];
 
-	for (var i=0; i<out.length-1; i++) {
+	for (var i=0; i<out.length-1; i++) 
+	{
 		var p0 = out[i];
 		var p1 = out[i+1];
 		var d = Math.sqrt(
@@ -149,10 +154,45 @@ function CatmulRom(controls, pad)
 	}
 
 	// normalize d by total distances
-	for (var i=0; i<distances.length; i++) {
+	var running = 0;
+	for (var i=0; i<distances.length; i++) 
+	{
 		distances[i] /= totalD;
+		running += distances[i];
+
+		// search for match against tIndex
+		for (var j=0; j<tIndex.length; j++) {
+			if (tIndex[j]==i) {
+				tIndex[j] = running;
+			}
+		}
 	}
 	this.distances = distances;
+	this.tIndex = tIndex;
+
+}
+
+CatmulRom.prototype.sumDistanceTo = function(index) {
+	var running = 0;
+	var distances = this.distances;
+
+	for (var i=0, len=Math.min(index, distances.length-1); i<len; i++) {
+		running += distances[i];
+	}
+	return running;
+}
+
+CatmulRom.prototype.getTFromIndex = function(index)
+{
+	if (index == 0) {
+		return 0;
+	}
+	else if (index == this.controls.length-2-1) {
+		return 1;
+	}
+	else {
+		return this.sumDistanceTo(index * SAMPLES_PER_CURVE_SEGMENT -1);
+	}
 }
 
 CatmulRom.prototype.interpolate = function(t)  
