@@ -156,7 +156,8 @@
 			</div>
 
 			<div style="float: left; margin-top: 0px">
-				<svg id="svgColorRamp" width="330" height="500" style="border: solid 0px black"></svg>
+				<svg id="svgColorRamp" width="330" height="500" style="border: solid 0px black"></svg><br>
+				<button onclick="exportColormap()">export colormap</button><a id="downloadAnchorElem" style="display:none"></a>
 			</div>
 			<div style="float: left; margin-left: 5px">
 				<canvas id="fieldCanvas" width="257" height="257" style="border: solid 1px black"></canvas><br>
@@ -205,6 +206,38 @@
 			});
 			picker.luminanceProfile = profile;
 			//picker.changeLuminanceProfile(profile);
+		}
+
+		function exportColormap() 
+		{
+			// create a json object
+			var out = { colors: [] };
+			var colormap = ramp.getColorMap();
+			var colors = colormap.getColorSet();
+			
+			out.interpolation = colormap.interpType;
+			
+			// how many samples?
+			var SAMPLES = 100;
+			for (var i=0; i<SAMPLES; i++) 
+			{
+				var v = i/(SAMPLES-1);
+				var c = colormap.mapValue(v, true);
+				if (!c) {
+					console.error("Can not export colormap: undefined interpolation");
+					return;
+				}
+				else
+				{
+					out.colors.push({ t: v, rgb: [c.r, c.g, c.b]});
+				}
+
+			}
+			var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(out));
+			var dlAnchorElem = document.getElementById('downloadAnchorElem');
+			dlAnchorElem.setAttribute("href",     dataStr     );
+			dlAnchorElem.setAttribute("download", "scene.json");
+			dlAnchorElem.click();
 		}
 
 		function refreshNoise() {
