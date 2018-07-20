@@ -659,6 +659,11 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 				ramp.colorPicker.switchToColor( d3.lab(c[0], c[1], c[2]) );
 
 				ramp.lControl = { index: i, control: d, circle: d3.select(this), lastL: c[0] };
+
+				// change interpolation type and luminance profile to 'manual'
+				ramp.colorPicker.setInterpolationType('nonuniformLinear');
+				setLuminanceProfile('manual');
+
 				d3.select(document)
 					.on('mousemove.lControl', function() 
 					{
@@ -668,6 +673,7 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 
 						var c = ramp.lControl.control.lab;
 						var newL = 100*(1-m[1]);
+						//console.log("newL: " + newL);
 
 						// see if new L leads to a displayble color
 						var redraw = false;
@@ -692,6 +698,8 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 						}
 
 						// change horizontal position
+						// don't allow this since we don't handle that with interpolation right now
+						/*
 						if (ramp.lControl.index > 0 && ramp.lControl.index < ramp.colors.length-1) {
 							// allow horizontal movement
 							var minV = ramp.colors[0].value+.03;
@@ -701,6 +709,7 @@ ColorRamp.prototype.createLPlot = function(skipControls)
 							ramp.lControl.circle.attr('cx', newV * RAMP_W);
 							redraw = true;
 						}
+						*/
 
 						if (redraw) {
 							ramp.updateRamp();
@@ -728,16 +737,18 @@ ColorRamp.prototype.setColorMap = function(_colormap, controlPoints)
 		this.colormap.dispose();
 		this.colormap = null;
 	}
-	this.colors = controlPoints; //_colormap.getColorSet();
+	if (!this.lControl) 
+	{
+		// essentally update controlPoints only if user is not manipulating
+		// the ramp
+		this.colors = controlPoints;
+	}
 	this.updateColormap(_colormap, true);
 	this.updateSVG();
 }
 
 ColorRamp.prototype.updateColormap = function(colormap, noUpdate) 
 {
-	// transfer the color points to the picker
-	//picker.setControlPoints(this.colors);
-
 	var interpType;
 	switch(picker.getColorSpace())
 	{
@@ -773,20 +784,21 @@ ColorRamp.prototype.updateColormap = function(colormap, noUpdate)
 		});
 	}
 
-
 	// notify
 	if (!noUpdate) {
 		this.colorPicker.plotColormap(points);
 	}
 	this.fireUpdate();
-
 }
 
 ColorRamp.prototype.updateRamp = function() 
 {
 	picker.setControlPoints(this.colors);
+	
+	// don't update colormap from here; picker will call us back
 	//this.updateColormap();
-	//this.updateSVG();
+
+	this.updateSVG();
 }
 
 ColorRamp.prototype.removeColor = function(index) {

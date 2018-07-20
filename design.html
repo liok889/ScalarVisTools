@@ -11,7 +11,7 @@
 	<script src="design/lib/TrackballControls.js"></script>
 	<script src="design/lib/OrbitControls.js"></script>
 
-	<script src="design/lib/d3.js"></script>
+	<script src="design/lib/d3.js"></script>q
 	<script src="design/lib/d3-color.v1.min.js"></script>
 	<script src="design/lib/d3-interpolate.v1.min.js"></script>
 	<script src="design/lib/d3-cam02.js"></script>
@@ -138,11 +138,13 @@
 						<canvas id="channelCanvas" width="30" height="300" style="position: absolute; left: 310px; border: solid 0px black"></canvas>
 					</div>
 
-					<div>
+					<div id="lumunanceProfileRadio">
 						<label for="luminanceLinear">linear</label>
-						<input type="radio" name="luminanceProfile" id="luminanceLinear" checked="checked">
+						<input type="radio" name="luminanceProfile" id="luminanceLinear" value="linear" checked="checked">
 						<label for="luminanceDivergent">divergent</label>
-						<input type="radio" name="luminanceProfile" id="luminanceDivergent">
+						<input type="radio" name="luminanceProfile" id="luminanceDivergent" value="divergent">
+						<label for="luminanceManual">manual</label>
+						<input type="radio" name="luminanceProfile" id="luminanceManual" value="manual">
 					</div>
 
 					
@@ -162,7 +164,7 @@
 
 
 			</div>
-			<div style="margin-left: 5px; float: left; width: 120px; height:100px; border: solid 0px black">
+			<div style="margin-left: 5px; float: left; width: 120px; height:100px; border: solid 0px black" >
 				spatial frequency<div id="sliderScale" style="width: 80px; height: 5px; font-size: 10px"></div>
 				<br>
 
@@ -180,7 +182,31 @@
 		var NOISE_TERRAIN = 2;
 		var noiseType = NOISE_SIMPLEX;
 		var terrain = null;
-		
+
+		var L_PROFILES = [
+			{p: 'manual', selector: 'luminanceManual'},
+			{p: 'divergent', selector: 'luminanceDivergent'},
+			{p: 'linear', selector: 'luminanceLinear'},
+		];
+
+		function setLuminanceProfile(profile)
+		{
+			var inputs = d3.select('#lumunanceProfileRadio').selectAll('input');
+
+			inputs.each(function(d) {
+				d3.select(this).attr('checked', null);
+				var id = d3.select(this).attr('id');
+				for (var i=0; i<L_PROFILES.length; i++) 
+				{
+					if (profile == L_PROFILES[i].p && id== L_PROFILES[i].selector) {
+						d3.select(this).attr('checked', 'checked');
+					}
+				}
+			});
+			picker.luminanceProfile = profile;
+			//picker.changeLuminanceProfile(profile);
+		}
+
 		function refreshNoise() {
 			switch (noiseType)
 			{
@@ -210,6 +236,8 @@
 		// see where to switch the luminance profile at: clicker picker or ramp designer
 		function changeLuminanceProfile(profile) 
 		{
+			picker.changeLuminanceProfile(profile);
+			/*
 			if (picker.hasCurve()) {
 				picker.changeLuminanceProfile(profile);
 			}
@@ -217,6 +245,7 @@
 			{
 				ramp.changeLuminanceProfile(profile);
 			}
+			*/
 		}
 
 		// create UI elements
@@ -245,6 +274,10 @@
 			})
 			d3.select('#luminanceDivergent').on('click', function() {
 				changeLuminanceProfile('divergent');
+			})
+
+			d3.select('#luminanceManual').on('click', function() {
+				changeLuminanceProfile('manual');
 			})
 
 		}

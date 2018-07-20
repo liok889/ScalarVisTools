@@ -179,7 +179,14 @@ ColorPicker.prototype.instantiateColorMap = function()
 			}
 
 			// adjust control point luminance according to profile
-			c[0] = this.getLuminanceGivenProfile(t);
+			var luminanceProfiled = this.getLuminanceGivenProfile(t)
+			if (luminanceProfiled !== null) {
+				c[0] = luminanceProfiled;
+			}
+			else
+			{
+				//console.log("non luminanceProfile")
+			}
 			
 			var color;
 			switch (this.colorSpace)
@@ -220,7 +227,10 @@ ColorPicker.prototype.instantiateColorMap = function()
 
 			// re-adjust the color based on the interpolation
 			var newColor = interpolation.interpolate(t);
-			newColor[0] = this.getLuminanceGivenProfile(t);
+			var luminanceProfiled = this.getLuminanceGivenProfile(t)
+			if (luminanceProfiled !== null) {
+				newColor[0] = luminanceProfiled;
+			}
 
 			var newColorLab = d3.lab(this.getColorFromAB(newColor));
 			controls[i].lab = [
@@ -243,6 +253,12 @@ ColorPicker.prototype.instantiateColorMap = function()
 	{
 		return null;
 	}
+}
+
+ColorPicker.prototype.setInterpolationType = function(interpType)
+{
+	this.interpolationType = interpType;
+	this.interpolationSelector.makeActive(interpType);
 }
 
 ColorPicker.prototype.setControlPoints = function(colors)
@@ -271,19 +287,18 @@ ColorPicker.prototype.setControlPoints = function(colors)
 			y: xy[1],
 			L: L,
 			colorSpace: this.colorSpace,
-			//value: (c.value !== null) && (c.value !== undefined) ? c.value : undefined
+			value: c.value,
 		});
 	}
 	this.bControls = controls;
 	this.updateBControl();
-
-
 }
 
 ColorPicker.prototype.updateBControl = function() 
 {
 	var B_CONTROL_R = 5;
 	this.colormapCurve.attr('d', null);
+	//console.log("bCongtrols[1]: " + this.bControls[1].L);
 
 	// show the curves
 	var w = +this.mainCanvas.width;
