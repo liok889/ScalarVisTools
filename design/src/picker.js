@@ -5,8 +5,8 @@
 
 var MAX_B_CONTROLS = 12;
 
-var MIN_LUMINANCE = 10;
-var MAX_LUMINANCE = 95;
+var MIN_LUMINANCE = 15;
+var MAX_LUMINANCE = 90;
 
 // color spaces
 var COLORSPACE_LAB = 1;
@@ -487,15 +487,35 @@ ColorPicker.prototype.drawChannelSelection = function()
 	var width = this.channelCanvas.width;
 
 	context.fillStyle="#222222";
+	context.strokeStyle="";
 	context.putImageData(this.channelImage, 0, 0);
 
 	var y = (height-1) * this.channelPos;
 
+	
 	var path=new Path2D();
 	path.moveTo(width - CHANNEL_RAMP_OFFSET, y);
 	path.lineTo(width-1, y-6);
 	path.lineTo(width-1, y+6);
 	context.fill(path);
+	
+
+	// draw two markers to show MIN/MAX_LUMINANCE
+	//context.fillStyle="";
+	context.strokeStyle="#ffff00";
+	context.beginPath();
+	context.moveTo(0, (height-1) * (1-MAX_LUMINANCE/100));
+	context.lineTo(width-CHANNEL_RAMP_OFFSET, (height-1) * (1-MAX_LUMINANCE/100));
+
+	context.stroke();
+
+	context.strokeStyle="#ffff00";
+	context.beginPath();
+	context.moveTo(0, (height-1) * (1-MIN_LUMINANCE/100));
+	context.lineTo(width-CHANNEL_RAMP_OFFSET, (height-1) * (1-MIN_LUMINANCE/100));
+
+	context.stroke();
+
 }
 
 ColorPicker.prototype.plotColormap = function(colorPoints)
@@ -615,17 +635,59 @@ ColorPicker.prototype.plotColormapCurve3D = function()
 ColorPicker.prototype.makeUI = function() {
 
 	(function(picker) {
-		d3.select(picker.channelCanvas).on("mousedown", function() {
+		d3.select(picker.channelCanvas).on("mousedown", function() 
+		{
+			// test if we're manipulating MIN/MAX_Luminance
+			var m = d3.mouse(this);
+			var y = m[1];
+			var MAX_Y = +this.height * (1-MAX_LUMINANCE/100);
+			var MIN_Y = +this.height * (1-MIN_LUMINANCE/100);
+			
+			var withinMax = Math.abs(y-MAX_Y) < 5;
+			var withinMin = Math.abs(y-MIN_Y) < 5;
+
+			if ( withinMax ) {
+				picker.pick = 'max';
+			}
+			else if ( withinMin ) {
+				picker.pick = 'min';
+			}
+			else {
+				picker.pick = undefined;
+			}
+
 			d3.select(document)
 
 				.on("mousemove.channelPicker", function() 
 				{
 					var m = d3.mouse(picker.channelCanvas);
-					var h = picker.channelCanvas.height
-					m[1] = Math.min(h, Math.max(0, m[1]));
-					
-					// set Luminance for color picker
-					picker.setL((1 - m[1] / h) * 100);
+					var h = +picker.channelCanvas.height;
+
+					if (picker.pick == 'max')
+					{
+						m[1] = Math.max(0, m[1]);
+						m[1] = Math.min(m[1], h*(1-MIN_LUMINANCE/100)-5);
+						MAX_LUMINANCE = (1-m[1]/h)*100;
+						picker.drawChannelSelection();
+						picker.instantiateColorMap();
+
+					}
+					else if (picker.pick == 'min')
+					{
+						m[1] = Math.min(h, m[1]);
+						m[1] = Math.max(m[1], h*(1-MAX_LUMINANCE/100)+5)
+						MIN_LUMINANCE = (1-m[1]/h)*100;
+						picker.drawChannelSelection();
+						picker.instantiateColorMap();
+					}
+					else
+					{
+
+						m[1] = Math.min(h, Math.max(0, m[1]));
+						
+						// set Luminance for color picker
+						picker.setL((1 - m[1] / h) * 100);
+					}
 				})
 				.on("mouseup.channelPicker", function() {
 					d3.select(document)
