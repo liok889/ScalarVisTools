@@ -131,9 +131,9 @@
 
 				<div style="float: left">
 					<div style="width: 300px; height: 310px">
-						<canvas id="colorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 1px black"></canvas>
+						<canvas id="colorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 0px black"></canvas>
 
-						<svg id="svgColorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 1px black; z-index: 100"></svg>
+						<svg id="svgColorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 0px black; z-index: 100"></svg>
 						
 						<canvas id="channelCanvas" width="30" height="300" style="position: absolute; left: 312px; border: solid 0px black"></canvas>
 					</div>
@@ -224,7 +224,7 @@
 				var v = i/(SAMPLES-1);
 				var c = colormap.mapValue(v, true);
 				if (!c) {
-					console.error("Can not export colormap: undefined interpolation");
+					alert("Can not export colormap because of colors outside RGB gamut.");
 					return;
 				}
 				else
@@ -233,7 +233,7 @@
 				}
 
 			}
-			var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(out));
+			var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(out, null, 4));
 			var dlAnchorElem = document.getElementById('downloadAnchorElem');
 			dlAnchorElem.setAttribute("href",     dataStr     );
 			dlAnchorElem.setAttribute("download", "scene.json");
