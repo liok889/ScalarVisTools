@@ -327,11 +327,11 @@
 			{
 				if (colorPipeline.ready()) {
 					// compute color difference
-					colorPipeline.run("speed");
-					colorPipeline.copyToCanvas(d3.select("#fieldDiffCanvas").node());
+					colorPipeline.run('speed');
+					colorPipeline.copyToCanvas(d3.select('#fieldDiffCanvas').node());
 
 					// visualize the field
-					colorPipeline.run("vis");
+					colorPipeline.run('vis');
 				}
 			} 
 		}
@@ -391,6 +391,14 @@
 		ramp.registerCallback('brushRamp', function(t) {
 			visualizeContour(t);
 		})
+
+		// register callback for luminance change
+		picker.registerCallback('changeLuminance', function(L) {
+			var cam02Uniforms = colorPipeline.getUniforms('cam02slice', 0);
+			cam02Uniforms.J.value = L;
+			//colorPipeline.run('cam02slice');
+		})
+
 
 		// create noise
 		seedNoise();

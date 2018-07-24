@@ -69,6 +69,9 @@ ColorPicker.prototype.setL = function(_L)
 	this.drawChannelSelection();
 	this.renderPerceptual();
 }
+ColorPicker.prototype.getL = function() {
+	return 100 * (1-this.channelPos);
+}
 
 
 ColorPicker.prototype.getColorSpace = function() {
@@ -686,7 +689,16 @@ ColorPicker.prototype.makeUI = function() {
 						m[1] = Math.min(h, Math.max(0, m[1]));
 						
 						// set Luminance for color picker
-						picker.setL((1 - m[1] / h) * 100);
+						var L = (1 - m[1] / h) * 100;
+						picker.setL(L);
+
+						// callbacks
+						for (var i=0, len=picker.callbacks.length; i<len; i++) {
+							var c = picker.callbacks[i];
+							if (c.event == 'changeLuminance') {
+								c.callback(L);
+							}
+						}
 					}
 				})
 				.on("mouseup.channelPicker", function() {

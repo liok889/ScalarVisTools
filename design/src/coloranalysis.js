@@ -26,6 +26,7 @@ ColorAnalysis = function(field, glCanvas, _readyCallback)
 			.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
 			.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
 			.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
+			.defer( gLoadShader, object, 'design/src/shaders/cam022rgb.frag', 'cam02slice')
 			.defer( loadExternalColorPresets )
 
 			.awaitAll(function(error, results) 
@@ -117,11 +118,20 @@ ColorAnalysis.prototype.createPipelines = function()
 	});
 	this.speedPipeline = speedPipeline;
 
+	var cam02slice = new GLPipeline(this.glCanvas);
+	cam02slice.addStage({
+		uniforms: { J: {value: 50.0} },
+		fragment: this.shaders['cam02slice'],
+		vertex: this.shaders['vertex']
+	});
+
 	// create a list of pipelines currently loaded
 	this.pipelines = {
 		vis: visPipeline,
 		diff: diffPipeline,
-		speed: speedPipeline
+		speed: speedPipeline,
+		cam02slice: cam02slice
+
 	};
 }
 
@@ -181,26 +191,15 @@ ColorAnalysis.prototype.run = function(analysis)
 		field.setColorMap();
 	}
 
-	var pipeline = null;
-	switch (analysis)
-	{
-	case 'diff':
-		pipeline = this.diffPipeline;
-		break;
-
-	case 'speed':
-		pipeline = this.speedPipeline;
-		break;
-
-	case 'vis':
-		pipeline = this.visPipeline;
-		break;
-	}
+	var pipeline = this.pipelines[analysis];
 
 	// initialize stage0 to take scalarField as inTexture
 	var stage0 = pipeline.getStage(0);
 	var uniforms = stage0.getUniforms();
-	uniforms[stage0.inTexture].value = this.field.gpuTexture;
+	if (stage0.inTexture)
+	{
+		uniforms[stage0.inTexture].value = this.field.gpuTexture;
+	}
 
 	for (var i=0; i<pipeline.getStageCount(); i++) 
 	{
