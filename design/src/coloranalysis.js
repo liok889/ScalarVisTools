@@ -26,6 +26,7 @@ ColorAnalysis = function(field, glCanvas, _readyCallback)
 			.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
 			.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
 			.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
+			.defer( loadExternalColorPresets )
 
 			.awaitAll(function(error, results) 
 			{

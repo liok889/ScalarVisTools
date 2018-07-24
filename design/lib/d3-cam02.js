@@ -1,3 +1,5 @@
+var G_CIECAM02_VC = null;
+
 // https://github.com/connorgr/d3-cam02 Version 0.1.5. Copyright 2017 Connor Gramazio.
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('d3-color')) :
@@ -165,6 +167,7 @@ var CIECAM02_VC = (function() {
     return (2.0 * lpa + mpa + 0.05 * spa - 0.305) * vc.nbb;
   })();
 
+  G_CIECAM02_VC = vc;
   return vc;
 })(); // end CIECAM02_VC
 

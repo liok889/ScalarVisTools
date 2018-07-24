@@ -7,7 +7,7 @@ void main()
 {
 	vec4 data = texture2D(scalarField, oTexCoord);
 	vec2 colormapCoord = vec2(data.x, 0.5);
-	if (contour >= 0.0 && abs(data.x-contour) < .007)
+	if (contour >= 0.0 && abs(data.x-contour) < .0035)
 	{
 		gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
 	}

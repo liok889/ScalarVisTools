@@ -799,14 +799,14 @@ var COLOR_PRESETS = {
 
 		rainbowhcl: function(t) {
 			return d3.rgb(d3.hcl(t * 360, 1, .5));
-		}
-		// 
+		},
+		
+		viridisLike: { URL: '/colormaps/viridis-like.json'}
 };
+
 function isFunction(obj) {
 	return !!(obj && obj.constructor && obj.call && obj.apply);
 }
-
-
 
 var loaded_colormaps = {};
 function getColorPreset(preset, m0, m1)
@@ -836,7 +836,8 @@ function getColorPreset(preset, m0, m1)
 	else
 	{
 		var colorset;
-		if (!isFunction(colorScheme))
+		
+		if (isArray(colorScheme))
 		{
 			colorset = [];
 			for (var i=0, cLen = colorScheme.length; i<cLen; i++) {
@@ -854,13 +855,23 @@ function getColorPreset(preset, m0, m1)
 				});
 			}
 		}
-		else
+		else if (typeof(colorScheme) === 'object' && colorScheme.colorset)
+		{
+			colorset = colorScheme.colorset;
+			if (colorScheme.interpolation) {
+				specialInterpolation = colorScheme.interpolation
+			}
+		}
+		else if (typeof(colorScheme) === 'string') {
+
+		}
+		else if (!isFunction(colorScheme))
 		{
 			colorset = colorScheme;
 		}
 
 		var preloaded = loaded_colormaps[preset];
-		if (preloaded/* && preloaded.m0 == m0 && preloaded.m1 == m1*/) {
+		if (preloaded) {
 			return preloaded.colormap;
 		}
 		else
@@ -874,6 +885,54 @@ function getColorPreset(preset, m0, m1)
 			return newMap;
 		}
 	}
+}
+
+function loadExternalColorPresets(callback) 
+{
+	function loadExternalColorMap(presetName, path, _callback)
+	{
+		d3.text(path).then(function(text, error) 
+		{
+			if (error) {
+				_callback(error);
+				throw error;
+			} 
+			else
+			{
+				var colorScheme = JSON.parse(text);
+				var newColorMap = new ColorMap(colorScheme.colorset, colorScheme.interpolation);
+				COLOR_PRESETS[presetName] = colorScheme;
+				loaded_colormaps[presetName] = {
+					colormap: newColorMap,
+					m0: 0,
+					m1: 1
+				};
+				_callback();
+			}
+		});
+	}
+
+	// load URL and parse it as JSON
+	var q = d3.queue();
+	for (var presetName in COLOR_PRESETS) 
+	{
+		if (COLOR_PRESETS.hasOwnProperty(presetName)) 
+		{
+			preset = COLOR_PRESETS[presetName];
+			if (typeof(preset) === 'object' && preset.URL && typeof(preset.URL) === 'string')
+			{
+				q.defer( loadExternalColorMap, presetName, preset.URL )
+			}
+		}
+	}
+	q.awaitAll(function(error) {
+		if (error) { 
+			throw error;
+		}
+		if (callback) {
+			callback();
+		}
+	});
 }
 
 function drawColorPresets(svg, callback)

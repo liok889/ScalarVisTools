@@ -30,7 +30,7 @@ void main()
 			diff += abs(c00-c);
 		}
 	}
-	diff /= pow( float(KHS*2+1), 2.0 ) / 4.0;
+	diff /= pow( float(KHS*2+1), 2.0 ) * 4.0;
 
 	//diff /= 10.0;
 	if (outputColor) {
