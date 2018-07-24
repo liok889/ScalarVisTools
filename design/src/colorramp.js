@@ -15,7 +15,7 @@ var CONTROL_R = 4;
 
 // number of samples to take in the color ramp 
 // when computing difference
-var DIFF_SAMPLES = 20;
+var DIFF_SAMPLES = 30;
 
 // allow more leeway in tuning lightning
 var PERMISSIVE_L_TUNING = false;
@@ -51,13 +51,28 @@ function ColorRamp(_colors, _svg, _colorPicker)
 			.on('mousemove', function() 
 			{
 				var m = d3.mouse(this);
-				var color = ramp.colormap.mapValue(m[0]/RAMP_W, true);
+				var t = m[0]/RAMP_W;
+				var color = ramp.colormap.mapValue(t, true);
 				if (color) {
 					ramp.colorPicker.brushColor(color);
+				}
+
+				// callbacks
+				for (var i=0, len=ramp.callbacks.length; i<len; i++) {
+					var c = ramp.callbacks[i];
+					if (c.type == 'brushRamp') {
+						c.callback(t, color);
+					}
 				}
 			})
 			.on('mouseout', function() {
 				ramp.colorPicker.brushColor(null);
+				for (var i=0, len=ramp.callbacks.length; i<len; i++) {
+					var c = ramp.callbacks[i];
+					if (c.type == 'brushRamp') {
+						c.callback(-1);
+					}
+				}
 			})
 	})(this)
 
@@ -181,16 +196,23 @@ ColorRamp.prototype.changeLuminanceProfile = function(profile)
 	this.updateRamp();
 }
 
-ColorRamp.prototype.registerCallback = function(callback) {
-	this.callbacks.push(callback)
+ColorRamp.prototype.registerCallback = function(_type, callback) {
+	this.callbacks.push({
+		type: _type,
+		callback: callback
+	});
 }
 
 ColorRamp.prototype.fireUpdate = function() 
 {
 	if (this.callbacks) 
 	{
-		for (var i=0; i<this.callbacks.length; i++) {
-			this.callbacks[i](this);
+		for (var i=0; i<this.callbacks.length; i++) 
+		{
+			var c = this.callbacks[i];
+			if (c.type == 'update')	 {
+				c.callback(this);
+			}
 		}
 	}
 }
@@ -281,6 +303,7 @@ ColorRamp.prototype.addUI = function()
 		g.attr('transform', 'translate(-30,' + 2*(-PLOT_H-PLOT_OFFSET) + ')');
 		ramp.plotSelection = new SmallRadio(g, [ 
 			{ choice: 'de2000', text: 'dE \'00', },
+			{ choice: 'dejab',  text: 'dE Jab'},
 			{ choice: 'curve' , text: 'dCurve'   }
 		], function(choice) {
 			ramp.colormapDiffMode = choice;
@@ -493,6 +516,16 @@ ColorRamp.prototype.createDiffPlot = function()
 				d = ciede2000(
 					currColor.l, currColor.a, currColor.b, 
 					lastColor.l, lastColor.a, lastColor.b
+				);
+				break;
+
+			case 'dejab':
+				var x = d3.jab(currColor); 
+				var y = d3.jab(lastColor);
+				d = Math.sqrt(
+					Math.pow(x.J-y.J, 2) +
+					Math.pow(x.a-y.a, 2) +
+					Math.pow(x.b-y.b, 2)
 				);
 				break;
 

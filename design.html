@@ -338,8 +338,26 @@
 		
 		// color analysis pipeline
 		var colorPipeline = null;
-		function initColorAnalysis() {
-			colorPipeline = new ColorAnalysis(field, d3.select("#fieldCanvas").node());
+		function initColorAnalysis(callback) 
+		{
+			colorPipeline = new ColorAnalysis(
+				field, 
+				d3.select("#fieldCanvas").node(),
+				callback
+			);
+		}
+
+		function visualizeContour(t) 
+		{
+			var visUniforms = colorPipeline.getUniforms('vis', 0);
+			if (t >=0 && t <= 1) {
+				visUniforms.contour.value = t;
+			}
+			else
+			{
+				visUniforms.contour.value = -1;
+			}
+			colorPipeline.run('vis');
 		}
 
 	</script>
@@ -367,22 +385,28 @@
 
 		// create color ramp
 		var ramp = new ColorRamp(null, d3.select("#svgColorRamp"), picker);
-		ramp.registerCallback(function() {
+		ramp.registerCallback('update', function() {
 			visualizeScalarField(field);
 		});
-
+		ramp.registerCallback('brushRamp', function(t) {
+			visualizeContour(t);
+		})
 
 		// create noise
 		seedNoise();
 		makeNoise(field);
 
-		// initialize color analysis pipeline
-		initColorAnalysis();
-
-		// visualize the initial field
-		visualizeScalarField(field);
-
+		// create user interface
 		createUI();
+
+
+		// initialize color analysis pipeline
+		initColorAnalysis(function() 
+		{
+			// visualize the initial scalar field upon loading color analysis pipeline
+			visualizeScalarField(field);		
+		});
+
 
 	</script>
 

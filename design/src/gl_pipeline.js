@@ -27,6 +27,7 @@ function getRenderer(nameOrCanvas)
 function PipelineStage(stage)
 {
 	this.inTexture = stage.inTexture;
+	this.uniforms = stage.uniforms;
 
 	// load shader
 	this.shader = new THREE.ShaderMaterial(

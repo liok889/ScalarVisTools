@@ -8,7 +8,7 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 	object.loadShader(shaderPath, shaderName, callback);
 }
 
-ColorAnalysis = function(field, glCanvas)
+ColorAnalysis = function(field, glCanvas, _readyCallback)
 {
 	this.glCanvas = glCanvas;
 	this.field = field;
@@ -19,7 +19,7 @@ ColorAnalysis = function(field, glCanvas)
 	this.copyList = [];
 
 	// load shaders
-	(function(object) {
+	(function(object, readyCallback) {
 		var q = d3.queue();
 		q
 			.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
@@ -36,9 +36,12 @@ ColorAnalysis = function(field, glCanvas)
 				{
 					object.createPipelines();
 					object.isReady = true;
+					if (readyCallback) {
+						readyCallback();
+					}
 				}
 			});
-	})(this)
+	})(this, _readyCallback)
 }
 
 ColorAnalysis.prototype.ready = function() {
@@ -121,9 +124,26 @@ ColorAnalysis.prototype.createPipelines = function()
 	};
 }
 
-ColorAnalysis.prototype.getUniform = function(pipelineName, uniform)
+ColorAnalysis.prototype.getUniforms = function(pipelineName, stageIndex, uniformName)
 {
-
+	var pipeline = this.pipelines[pipelineName];
+	if (!pipeline) 
+	{
+		console.error("Can not find pipeline: " + pipelineName);
+		return;
+	}
+	else
+	{
+		var stage = pipeline.getStage(stageIndex);
+		var uniforms = stage.getUniforms();
+		if (uniformName) {
+			return uniforms[uniformName];
+		}
+		else
+		{
+			return uniforms;
+		}
+	}
 }
 
 ColorAnalysis.prototype.loadShader = function(shaderPath, shaderName, callback)
@@ -228,7 +248,7 @@ ColorAnalysis.prototype.copyToCanvas = function(copyTarget)
 		}
 	}
 
-	// copy them to the 'DiffCanvas'
+	// copy them to the taget canvas
 	var ctx = copyTarget.getContext('2d');
 	var imgData = ctx.getImageData(0, 0, w, h);
 	imgData.data.set(flipPixels);

@@ -2,7 +2,7 @@
 // based on:
 // https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
 
-var SAMPLES_PER_CURVE_SEGMENT = 25;
+var SAMPLES_PER_CURVE_SEGMENT = 40;
 
 
 function vmult(scalar, v) {
