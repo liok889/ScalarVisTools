@@ -5,7 +5,20 @@
 
 function gLoadShader(object, shaderPath, shaderName, callback)
 {
-	object.loadShader(shaderPath, shaderName, callback);
+	(function(_path, _name, _object, _callback) 
+	{
+		d3.text(_path).then(function(text, error) 
+		{
+			if (error) {
+				if (_callback) _callback(error); else throw error;
+			} else
+			{
+				_object.shaders[_name] = text;
+				if (_callback) _callback(null);
+
+			}
+		})
+	})(shaderPath, shaderName, object, callback);
 }
 
 ColorAnalysis = function(field, glCanvas, _readyCallback)
@@ -131,7 +144,6 @@ ColorAnalysis.prototype.createPipelines = function()
 		diff: diffPipeline,
 		speed: speedPipeline,
 		cam02slice: cam02slice
-
 	};
 }
 
@@ -155,24 +167,6 @@ ColorAnalysis.prototype.getUniforms = function(pipelineName, stageIndex, uniform
 			return uniforms;
 		}
 	}
-}
-
-ColorAnalysis.prototype.loadShader = function(shaderPath, shaderName, callback)
-{
-	(function(_path, _name, object, _callback) 
-	{
-		d3.text(_path).then(function(text, error) 
-		{
-			if (error) {
-				if (_callback) _callback(error); else throw error;
-			} else
-			{
-				object.shaders[_name] = text;
-				if (_callback) _callback(null);
-
-			}
-		})
-	})(shaderPath, shaderName, this, callback);
 }
 
 ColorAnalysis.prototype.run = function(analysis)
@@ -219,40 +213,12 @@ ColorAnalysis.prototype.run = function(analysis)
 	for (var i=0; i<this.copyList.length; i++) 
 	{
 		var copyTarget = this.copyList[i];
-		this.copyToCanvas(copyTarget);
+		glCanvasToCanvas(this.glCanvas, copyTarget);
 	}
 }
 
-ColorAnalysis.prototype.copyToCanvas = function(copyTarget) 
-{
-	// read the color diff
-	var gl = this.glCanvas.getContext('webgl');
-	var w = gl.drawingBufferWidth;
-	var h = gl.drawingBufferHeight;
-
-	var pixels = new Uint8Array(w * h * 4);
-	gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-	// flip pixels
-	var flipPixels = new Uint8Array(w * h * 4);
-	var I=0;
-	for (var r=h-1; r>=0; r--) 
-	{
-		var rI = r * w * 4;
-		for (var c=0; c<w; c++, I+=4, rI += 4) 
-		{
-			flipPixels[I] = pixels[rI];
-			flipPixels[I+1] = pixels[rI+1];
-			flipPixels[I+2] = pixels[rI+2];
-			flipPixels[I+3] = pixels[rI+3];
-		}
-	}
-
-	// copy them to the taget canvas
-	var ctx = copyTarget.getContext('2d');
-	var imgData = ctx.getImageData(0, 0, w, h);
-	imgData.data.set(flipPixels);
-	ctx.putImageData(imgData, 0, 0);
+ColorAnalysis.prototype.copyToCanvas = function(copyTarget, dontFlip) {
+	glCanvasToCanvas(this.glCanvas, copyTarget, dontFlip);
 }
 
 ColorAnalysis.prototype.addCopyCanvas = function(canvas) 

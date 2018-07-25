@@ -8,7 +8,7 @@ var RENDERERS = {};
 function getRenderer(nameOrCanvas) 
 {
 	var name = typeof nameOrCanvas === "string" ? nameOrCanvas : nameOrCanvas.id;
-	var canvas = document.getElementById(name);
+	var canvas = document.getElementById(name) || nameOrCanvas;
 
 	if (RENDERERS[name]) {
 		return RENDERERS[name];
@@ -162,3 +162,44 @@ GLPipeline.prototype.getStage = function(index) {
 	return this.stages[index];
 }
 
+// copy the results of GL render from source to copyTarget canvas
+// (which can be non-GL)
+function glCanvasToCanvas(source, copyTarget, dontFlip) 
+{
+	// read the color diff
+	var gl = source.getContext('webgl');
+	var w = gl.drawingBufferWidth;
+	var h = gl.drawingBufferHeight;
+
+	var pixels = new Uint8Array(w * h * 4);
+	gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+	// flip pixels
+
+	var flipPixels;
+	if (dontFlip) {
+		flipPixels = pixels;
+	}
+	else
+	{
+		flipPixels = new Uint8Array(w * h * 4);
+		var I=0;
+		for (var r=h-1; r>=0; r--) 
+		{
+			var rI = r * w * 4;
+			for (var c=0; c<w; c++, I+=4, rI += 4) 
+			{
+				flipPixels[I] = pixels[rI];
+				flipPixels[I+1] = pixels[rI+1];
+				flipPixels[I+2] = pixels[rI+2];
+				flipPixels[I+3] = pixels[rI+3];
+			}
+		}
+	}
+
+	// copy them to the taget canvas
+	var ctx = copyTarget.getContext('2d');
+	var imgData = ctx.getImageData(0, 0, w, h);
+	imgData.data.set(flipPixels);
+	ctx.putImageData(imgData, 0, 0);
+}

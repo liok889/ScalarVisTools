@@ -1,3 +1,9 @@
+//#ifdef GL_FRAGMENT_PRECISION_HIGH
+   precision highp float;
+//#else
+//   precision mediump float;
+//#endif
+
 // A shader to plot a Jab color space slice in RGB
 // experts lightness (J value) as a uniform
 // Code primarily taken from Connor Gramazio's d3-cam02 library
@@ -63,8 +69,8 @@ vec3 xyz2cat02(vec3 xyz)
 {
   const mat3 XYZ_2_CAT02 = mat3(
    0.7328,  0.4296, -0.1624,
-   -0.7036, 1.6975, -0.0061,
-   0.0030,  0.0136, -0.9834
+   -0.7036, 1.6975, 0.0061,
+   0.0030,  0.0136, 0.9834
   );
   return xyz * XYZ_2_CAT02;
 }
@@ -96,15 +102,16 @@ vec3 Aab2Cat02LMS(vec3 Aab, float nbb)
     0.32787, -0.15681, -4.49038
   );
 
-  vec3 xab = Aab / vec3(nbb, 1.0, 1.0) + vec3(0.305, 0.0, 0.0);
+  vec3 xab = Aab * vec3(1.0/nbb, 1.0, 1.0) + vec3(0.305, 0.0, 0.0);
   return xab * XAB_2_LMS;
 }
 
 
-vec3 inverseNonlinearAdaptation(vec3 coneResponse, float fl) {
-  return vec3(100.0 / fl) *
-          pow(( vec3(27.13) * abs(coneResponse - vec3(0.1) )) /
-                      ( vec3(400.0) - abs(coneResponse - vec3(0.1) )),
+vec3 inverseNonlinearAdaptation(vec3 coneResponse, float fl) 
+{
+  return (100.0 / fl) *
+          pow((27.13 * abs(coneResponse - 0.1)) /
+                      (400.0 - abs(coneResponse - 0.1)),
                    vec3(1.0 / 0.42));
 }
 
@@ -224,22 +231,56 @@ bool displayable(vec3 rgb)
   return all( lessThanEqual(rgb, vec3(1.0)) ) && all( greaterThanEqual(rgb, vec3(0.0)) ); 
 }
 
+uniform vec3 background;
+uniform float width;
+uniform float height;
+
+bool cropOutOfGamut() 
+{
+  if (J >= 40.0) {
+    return false;
+  }
+  else
+  {
+    float limit = height*(20.0/250.0)+height*((160.0-20.0)/250.0)*(J/40.0);
+    vec2 offLimitC = vec2(width/2.0-limit, width/2.0+limit);
+    vec2 offLimitR = vec2(height/2.0+height*(20.0/250.0)-limit, height/2.0+height*(20.0/250.0)+limit);
+    vec2 p = vec2(oTexCoord.x, 1.0-oTexCoord.y) * vec2(width, height);
+
+    if  (!(p[0] >= offLimitC[0] && p[0] <= offLimitC[1] &&
+    p[1] >= offLimitR[0] && p[1] <= offLimitR[1]))
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
 void main() 
 {
-  /*
-  float JPrime = ((1.0 + 100.0*UCS_c1) * J) / (1.0 + UCS_c1 * J);
-  JPrime = JPrime / UCS_k_l;
-  */
-
-  vec2 ab = mix(vec2(-45.0), vec2(45.0), vec2(oTexCoord.x, 1.0-oTexCoord.y));
-  vec3 rgb = jab2rgb(vec3(J, ab));
-
-  if (displayable(rgb)) 
-  {
-    gl_FragColor = vec4(rgb, 1.0);
+  
+  if (cropOutOfGamut()) {
+    gl_FragColor = vec4(background, 1.0);
   }
-  else {
-    gl_FragColor = vec4(.5, .5, .5, 1.0);
+  else
+  {
+    float JPrime = ((1.0 + 100.0*UCS_c1) * J) / (1.0 + UCS_c1 * J);
+    JPrime = JPrime / UCS_k_l;
+    
+
+    vec2 ab = mix(vec2(-45.0), vec2(45.0), vec2(oTexCoord.x, oTexCoord.y));
+    vec3 rgb = jab2rgb(vec3(J, ab));
+
+    
+    if (displayable(rgb)) 
+    {
+      gl_FragColor = vec4(rgb, 1.0);
+    }
+    else {
+      gl_FragColor = vec4(background, 1.0);
+    }
   }
 }
 

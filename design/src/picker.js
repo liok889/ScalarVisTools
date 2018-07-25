@@ -3,6 +3,9 @@
  * -------------------------------------
  */
 
+var BACKGROUND = [200, 200, 200];
+
+
 var MAX_B_CONTROLS = 12;
 
 var MIN_LUMINANCE = 15;
@@ -20,6 +23,8 @@ var JAB_A_RANGE = [-45, 45];
 var JAB_B_RANGE = [-45, 45];
 
 var CHANNEL_RAMP_OFFSET = 10;
+
+var jabRenderGL = true;
 
 function isArray (value) {
 	return value && typeof value === 'object' && value.constructor === Array;
@@ -58,6 +63,47 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	// control points to specify a color ramp within the picker
 	this.bControls = [];
 	this.luminanceProfile = 'linear';
+
+	
+	if (jabRenderGL) 
+	{	
+		this.glCanvas = document.createElement('canvas');
+		this.glCanvas.width = +mainCanvas.width;
+		this.glCanvas.height = +mainCanvas.height;
+		this.glCanvas.id = 'canvasPickerGL';
+
+		// object to store shaders
+		this.shaders = {};
+		var q = d3.queue();
+		q
+			.defer( gLoadShader, this, 'design/src/shaders/vertex.vert', 'vertex' )
+			.defer( gLoadShader, this, 'design/src/shaders/cam022rgb.frag', 'cam02slice');
+
+		(function(picker, _q) {
+			_q.awaitAll(function(error) 
+			{
+				if (error) {
+					throw error;
+				}
+				else {
+					var bg = BACKGROUND;
+
+					picker.jabPipeline = new GLPipeline(picker.glCanvas);
+					picker.jabPipeline.addStage({
+						uniforms: {
+							J: {value: 50.0},
+							background: {value: [bg[0]/255, bg[1]/255, bg[2]/255]},
+							width: {value: +picker.glCanvas.width},
+							height: {value: +picker.glCanvas.height}
+						},
+						fragment: picker.shaders['cam02slice'],
+						vertex: picker.shaders['vertex']
+					});
+				}
+			});
+		})(this, q);
+	}
+	
 }
 
 ColorPicker.prototype.L = function() { 
@@ -1030,7 +1076,6 @@ ColorPicker.prototype.renderPerceptual = function()
 	var a = this.colorSpace == COLORSPACE_LAB ? A_RANGE : JAB_A_RANGE;
 	var b = this.colorSpace == COLORSPACE_LAB ? B_RANGE : JAB_B_RANGE;
 
-	var BACKGROUND = [200, 200, 200];
 
 	var canvas = this.mainCanvas;
 	var w = +this.mainCanvas.width;
@@ -1043,54 +1088,65 @@ ColorPicker.prototype.renderPerceptual = function()
 	var yScale = d3.scaleLinear().domain([h-1, 0]).range(b);
 	var L = 100 - this.channelPos * 100;
 
-	var I=0, displayables = 0, imageData = image.data;
-	for (var r=0; r<h; r++) 
+	if (this.colorSpace == COLORSPACE_CAM02 && jabRenderGL)
 	{
-		var B = yScale(r);
-		for (var c=0; c<w; c++, I+=4) 
+		var uniforms = this.jabPipeline.getStage(0).getUniforms();
+		uniforms.J.value = L;
+		this.jabPipeline.run();
+		glCanvasToCanvas(this.glCanvas, this.mainCanvas, true);
+	}
+	else
+	{
+		var I=0, displayables = 0, imageData = image.data;
+		for (var r=0; r<h; r++) 
 		{
-			var A = xScale(c);
-			
-			// deal with off-gamut d3-cam02 issue
-			var offgamut = false;
-			if (this.colorSpace == COLORSPACE_CAM02 && L < 40) {
-				var limit = h*(20/250)+h*((160-20)/250)*(L/40);
-				var offLimitC = [w/2-limit, w/2+limit];
-				var offLimitR = [h/2+h*(20/250)-limit, h/2+h*(20/250)+limit];
-				if  (!(c >= offLimitC[0] && c <= offLimitC[1] &&
-					 r >= offLimitR[0] && r <= offLimitR[1]))
+			var B = yScale(r);
+			for (var c=0; c<w; c++, I+=4) 
+			{
+				var A = xScale(c);
+				
+				// deal with off-gamut d3-cam02 issue
+				var offgamut = false;
+				if (this.colorSpace == COLORSPACE_CAM02 && L < 40) {
+					var limit = h*(20/250)+h*((160-20)/250)*(L/40);
+					var offLimitC = [w/2-limit, w/2+limit];
+					var offLimitR = [h/2+h*(20/250)-limit, h/2+h*(20/250)+limit];
+					if  (!(c >= offLimitC[0] && c <= offLimitC[1] &&
+						 r >= offLimitR[0] && r <= offLimitR[1]))
+					{
+						imageData[I]	= BACKGROUND[0];
+						imageData[I+1] 	= BACKGROUND[1];
+						imageData[I+2]	= BACKGROUND[2];
+						imageData[I+3]	= 255;	
+						offgamut = true;
+						continue;
+					}
+				}
+
+				var cLAB = this.colorSpace == COLORSPACE_LAB ? d3.lab(L, A, B) : d3.jab(L, A, B);
+				if (cLAB.displayable()) 
+				{
+					var cRGB = d3.rgb(cLAB);
+
+					imageData[I]	= cRGB.r;
+					imageData[I+1] 	= cRGB.g;
+					imageData[I+2]	= cRGB.b;
+					imageData[I+3]	= 255;
+					//displayables++;
+				}
+				else if (!offgamut)
 				{
 					imageData[I]	= BACKGROUND[0];
 					imageData[I+1] 	= BACKGROUND[1];
 					imageData[I+2]	= BACKGROUND[2];
 					imageData[I+3]	= 255;	
-					offgamut = true;
-					continue;
 				}
 			}
-
-			var cLAB = this.colorSpace == COLORSPACE_LAB ? d3.lab(L, A, B) : d3.jab(L, A, B);
-			if (cLAB.displayable()) 
-			{
-				var cRGB = d3.rgb(cLAB);
-
-				imageData[I]	= cRGB.r;
-				imageData[I+1] 	= cRGB.g;
-				imageData[I+2]	= cRGB.b;
-				imageData[I+3]	= 255;
-				//displayables++;
-			}
-			else if (!offgamut)
-			{
-				imageData[I]	= BACKGROUND[0];
-				imageData[I+1] 	= BACKGROUND[1];
-				imageData[I+2]	= BACKGROUND[2];
-				imageData[I+3]	= 255;	
-			}
 		}
+		context.putImageData(image, 0, 0);
+
 	}
 
-	context.putImageData(image, 0, 0);
 }
 
 
