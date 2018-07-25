@@ -24,7 +24,7 @@ var JAB_B_RANGE = [-45, 45];
 
 var CHANNEL_RAMP_OFFSET = 10;
 
-var jabRenderGL = true;
+var PICKER_RENDER_GL = true;
 
 function isArray (value) {
 	return value && typeof value === 'object' && value.constructor === Array;
@@ -44,8 +44,6 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	// this should be a normalized number between 0 and 1
 	this.channelPos = 0.5;
 	this.makeUI();
-	this.renderChannel();
-	this.renderPerceptual();
 
 	// currently selected color
 	this.currentColor = null;
@@ -65,7 +63,7 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 	this.luminanceProfile = 'linear';
 
 	
-	if (jabRenderGL) 
+	if (PICKER_RENDER_GL) 
 	{	
 		this.glCanvas = document.createElement('canvas');
 		this.glCanvas.width = +mainCanvas.width;
@@ -77,6 +75,7 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 		var q = d3.queue();
 		q
 			.defer( gLoadShader, this, 'design/src/shaders/vertex.vert', 'vertex' )
+			.defer( gLoadShader, this, 'design/src/shaders/lab2rgb.frag', 'labslice')
 			.defer( gLoadShader, this, 'design/src/shaders/cam022rgb.frag', 'cam02slice');
 
 		(function(picker, _q) {
@@ -91,7 +90,7 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 					picker.jabPipeline = new GLPipeline(picker.glCanvas);
 					picker.jabPipeline.addStage({
 						uniforms: {
-							J: {value: 50.0},
+							J: {value: picker.getL()},
 							background: {value: [bg[0]/255, bg[1]/255, bg[2]/255]},
 							width: {value: +picker.glCanvas.width},
 							height: {value: +picker.glCanvas.height}
@@ -99,11 +98,27 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 						fragment: picker.shaders['cam02slice'],
 						vertex: picker.shaders['vertex']
 					});
+
+					picker.labPipeline = new GLPipeline(picker.glCanvas);
+					picker.labPipeline.addStage({
+						uniforms: {
+							L: {value: picker.getL()},
+							background: {value: [bg[0]/255, bg[1]/255, bg[2]/255]},
+						},
+						fragment: picker.shaders['labslice'],
+						vertex: picker.shaders['vertex']
+					});
+
+					// render initial view
+					picker.renderChannel();
+					picker.renderPerceptual();
 				}
 			});
 		})(this, q);
 	}
 	
+
+
 }
 
 ColorPicker.prototype.L = function() { 
@@ -1088,11 +1103,18 @@ ColorPicker.prototype.renderPerceptual = function()
 	var yScale = d3.scaleLinear().domain([h-1, 0]).range(b);
 	var L = 100 - this.channelPos * 100;
 
-	if (this.colorSpace == COLORSPACE_CAM02 && jabRenderGL)
+	if (this.colorSpace == COLORSPACE_CAM02 && PICKER_RENDER_GL)
 	{
 		var uniforms = this.jabPipeline.getStage(0).getUniforms();
 		uniforms.J.value = L;
 		this.jabPipeline.run();
+		glCanvasToCanvas(this.glCanvas, this.mainCanvas, true);
+	}
+	else if (this.colorSpace == COLORSPACE_LAB && PICKER_RENDER_GL)
+	{
+		var uniforms = this.labPipeline.getStage(0).getUniforms();
+		uniforms.L.value = L;
+		this.labPipeline.run();
 		glCanvasToCanvas(this.glCanvas, this.mainCanvas, true);
 	}
 	else

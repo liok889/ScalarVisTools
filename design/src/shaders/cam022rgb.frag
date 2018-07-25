@@ -1,25 +1,29 @@
+// A shader to plot a Jab color space slice in RGB
+// experts lightness (J value) as a uniform
+// Code primarily taken from Connor Gramazio's d3-cam02 library
+// ============================================================
+
 #ifdef GL_FRAGMENT_PRECISION_HIGH
    precision highp float;
 #else
    precision mediump float;
 #endif
 
-// A shader to plot a Jab color space slice in RGB
-// experts lightness (J value) as a uniform
-// Code primarily taken from Connor Gramazio's d3-cam02 library
 // texture coordinates
 varying vec2 oTexCoord;
+
+// lightness
 uniform float J;
 
-/*
-var altCam02Coef = {
-  lcd: {k_l: 0.77, c1: 0.007, c2:0.0053},
-  scd: {k_l: 1.24, c1: 0.007, c2:0.0363},
-  ucs: {k_l: 1.00, c1: 0.007, c2:0.0228}
-};
-*/
+// background color
+uniform vec3 background;
 
-// constants taken from D3-cam02
+// dimensions of the slice
+uniform float width;
+uniform float height;
+
+
+// constants taken from d3-cam02
 const float UCS_c1 = 0.007;
 const float UCS_c2 = 0.0228;
 const float UCS_k_l = 1.0;
@@ -78,7 +82,7 @@ vec3 xyz2cat02(vec3 xyz)
 vec3 cat022xyz(vec3 lms) {
   const mat3 LMS_2_XYZ = mat3(
     1.096124, -0.278869, 0.182745,
-    0.454369, 0.473533,  0.072098,
+    0.454369,  0.473533,  0.072098,
     -0.009628, -0.005698, 1.015326  
   );
   return lms * LMS_2_XYZ;
@@ -231,9 +235,6 @@ bool displayable(vec3 rgb)
   return all( lessThanEqual(rgb, vec3(1.0)) ) && all( greaterThanEqual(rgb, vec3(0.0)) ); 
 }
 
-uniform vec3 background;
-uniform float width;
-uniform float height;
 
 bool cropOutOfGamut() 
 {
