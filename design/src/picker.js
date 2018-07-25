@@ -116,8 +116,6 @@ function ColorPicker(svg, mainCanvas, channelCanvas, threeDCanvas)
 			});
 		})(this, q);
 	}
-	
-
 
 }
 
@@ -921,7 +919,7 @@ ColorPicker.prototype.switchToColor = function(c)
 
 ColorPicker.prototype.markColor = function(c) 
 {
-	
+	/*
 	var a_range, b_range;
 	switch (this.colorSpace)
 	{
@@ -954,6 +952,7 @@ ColorPicker.prototype.markColor = function(c)
 	ctx.moveTo(x, y-5);
 	ctx.lineTo(x, y+5);
 	ctx.stroke();
+	*/
 		
 }
 
