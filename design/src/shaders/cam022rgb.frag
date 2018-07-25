@@ -1,8 +1,8 @@
-//#ifdef GL_FRAGMENT_PRECISION_HIGH
+#ifdef GL_FRAGMENT_PRECISION_HIGH
    precision highp float;
-//#else
-//   precision mediump float;
-//#endif
+#else
+   precision mediump float;
+#endif
 
 // A shader to plot a Jab color space slice in RGB
 // experts lightness (J value) as a uniform
@@ -121,7 +121,7 @@ vec3 pre2rgb(vec3 x)
   vec3 high  = x * 12.92;
   vec3 low = 1.055 * pow(x, vec3(1.0 / 2.4)) - vec3(0.055);
   
-  // models:  return (x) <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1.0 / 2.4) - 0.055);
+  // models:  return x <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055);
   return mix(low, high, vec3(less));
 }
 
@@ -237,14 +237,22 @@ uniform float height;
 
 bool cropOutOfGamut() 
 {
+  
   if (J >= 40.0) {
     return false;
   }
   else
   {
-    float limit = height*(20.0/250.0)+height*((160.0-20.0)/250.0)*(J/40.0);
-    vec2 offLimitC = vec2(width/2.0-limit, width/2.0+limit);
-    vec2 offLimitR = vec2(height/2.0+height*(20.0/250.0)-limit, height/2.0+height*(20.0/250.0)+limit);
+    // golden ratio
+    const float G1 = 20.0 / 250.0;
+    const float G2 = (160.0 - 20.0) / 250.0;
+    float GH = height * G1;
+
+
+    float limit = GH + height * G2 * (J/40.0);
+    vec2 vlimit = vec2(-limit, limit);
+    vec2 offLimitC = vec2(width/2.0) + vlimit;
+    vec2 offLimitR = vec2(height/2.0 + GH) + vlimit;
     vec2 p = vec2(oTexCoord.x, 1.0-oTexCoord.y) * vec2(width, height);
 
     if  (!(p[0] >= offLimitC[0] && p[0] <= offLimitC[1] &&
