@@ -19,7 +19,7 @@ var DIFF_SAMPLES = 50;
 
 // size of local speed window and number of samples
 var LOCAL_SPEED_W = .1;
-var LOCAL_SPEED_S = 20;
+var LOCAL_SPEED_S = 20*2;
 
 // allow more leeway in tuning lightning
 var PERMISSIVE_L_TUNING = false;
@@ -476,6 +476,42 @@ ColorRamp.prototype.computeLocalDirection = function() {
 
 }
 
+ColorRamp.prototype.computeDivergence = function(t)
+{
+	// size of window (in t coordinates) to compute
+	// local speed within
+	var WINDOW = LOCAL_SPEED_W;
+	var SAMPLES = LOCAL_SPEED_S/2;
+
+	var STEP = WINDOW/SAMPLES;
+
+	var d = 0.0, count = 0;
+	for (var i=0; i<SAMPLES; i++) 
+	{
+		var t1 = t-i*STEP;
+		var t2 = t+i*STEP;
+		if (t1 < 0 || t2 > 1) {
+			break;
+		}
+		else
+		{
+			var rgb1 = this.colormap.mapValue(t1);
+			var c1 = d3.jab(rgb1);
+
+			var rgb2 = this.colormap.mapValue(t2);
+			var c2 = d3.jab(rgb2); 
+
+			d += Math.sqrt(
+				Math.pow(c1.J-c2.J, 2) +
+				Math.pow(c1.a-c2.a, 2) +
+				Math.pow(c1.b-c2.b, 2) 
+			);
+			count++;
+		}
+	}
+	return count == 0 ? 0.0 : d/count;
+}
+
 ColorRamp.prototype.computeLocalSpeed = function(t)
 {
 	// size of window (in t coordinates) to compute
@@ -584,7 +620,7 @@ ColorRamp.prototype.createDiffPlot = function()
 				break;
 
 			case 'localspeed':
-				d = this.computeLocalSpeed(v);
+				d = this.computeDivergence(v); //this.computeLocalSpeed(v);
 				break;
 
 			case 'curve':
