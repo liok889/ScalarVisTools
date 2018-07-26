@@ -13,9 +13,13 @@ var PLOT_H = 40;
 var PLOT_OFFSET = 5;
 var CONTROL_R = 4;
 
-// number of samples to take in the color ramp 
+// number of samples to take in the computinglor ramp 
 // when computing difference
-var DIFF_SAMPLES = 30;
+var DIFF_SAMPLES = 50;
+
+// size of local speed window and number of samples
+var LOCAL_SPEED_W = .1;
+var LOCAL_SPEED_S = 20;
 
 // allow more leeway in tuning lightning
 var PERMISSIVE_L_TUNING = false;
@@ -304,6 +308,7 @@ ColorRamp.prototype.addUI = function()
 		ramp.plotSelection = new SmallRadio(g, [ 
 			{ choice: 'de2000', text: 'dE \'00', },
 			{ choice: 'dejab',  text: 'dE Jab'},
+			{ choice: 'localspeed',  text: 'speed'},
 			{ choice: 'curve' , text: 'dCurve'   }
 		], function(choice) {
 			ramp.colormapDiffMode = choice;
@@ -467,6 +472,55 @@ ColorRamp.prototype.updateSVG = function()
 	this.createDiffPlot();
 }
 
+ColorRamp.prototype.computeLocalDirection = function() {
+
+}
+
+ColorRamp.prototype.computeLocalSpeed = function(t)
+{
+	// size of window (in t coordinates) to compute
+	// local speed within
+	var WINDOW = LOCAL_SPEED_W;
+	var SAMPLES = LOCAL_SPEED_S;
+
+	var STEP = WINDOW/SAMPLES;
+	var d = 0.0;
+
+	var rgb0 = this.colormap.mapValue(t);
+	var c0 = d3.jab(rgb0);
+
+	for (var pass=0; pass<2; pass++) 
+	{
+		var dir = pass == 0 ? -1 : +1;
+		var cur = t;
+		var endReached = false;
+		for (var i=0; i<SAMPLES/2 && !endReached; i++) 
+		{
+			var next = cur + dir * STEP;
+			var next = Math.min(1, Math.max(0, next));
+			if (next == cur) {
+				// can't move anymore
+				break;
+			}
+			else if ( Math.abs(next-cur) < STEP-0.0001 ) {
+				endReached = true;
+			}
+
+			var rgb = this.colormap.mapValue(next);
+			var c1 = d3.jab(rgb);
+
+			d += Math.sqrt(
+				Math.pow(c1.J-c0.J, 2) +
+				Math.pow(c1.a-c0.a, 2) +
+				Math.pow(c1.b-c0.b, 2) 
+			) // / Math.abs(next-t);
+
+			cur = next;
+		}
+	}
+	return d;
+}
+
 ColorRamp.prototype.createDiffPlot = function()
 {
 	var SAMPLES = DIFF_SAMPLES;
@@ -527,6 +581,10 @@ ColorRamp.prototype.createDiffPlot = function()
 					Math.pow(x.a-y.a, 2) +
 					Math.pow(x.b-y.b, 2)
 				);
+				break;
+
+			case 'localspeed':
+				d = this.computeLocalSpeed(v);
 				break;
 
 			case 'curve':
