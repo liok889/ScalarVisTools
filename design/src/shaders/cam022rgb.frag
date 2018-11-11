@@ -1,6 +1,7 @@
 // A shader to plot a Jab color space slice in RGB
-// experts lightness (J value) as a uniform
+// expects lightness (J value) as a uniform
 // Code primarily taken from Connor Gramazio's d3-cam02 library
+// https://github.com/connorgr/d3-cam02
 // ============================================================
 
 #ifdef GL_FRAGMENT_PRECISION_HIGH
