@@ -571,12 +571,18 @@ ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)
 	
 	if (!this.renderer)
 	{
-		this.renderer = new THREE.WebGLRenderer({ 
-			canvas: canvas 
-		});
-		this.renderer.setClearColor(0x000000, 1)
+		if (typeof getRenderer == 'undefined' || typeof getRenderer == 'null' )
+		{
+			this.renderer = new THREE.WebGLRenderer({
+				canvas: canvas
+			});
+			this.renderer.setClearColor(0x000000, 1)
+		}
+		else
+		{
+			this.renderer = getRenderer(canvas);
+		}
 	}
-
 	this.renderer.render(this.quadScene, this.orthoCamera);
 }
 
@@ -637,10 +643,17 @@ ScalarField.prototype.generateColorDiffGL = function(canvas)
 	
 	if (!this.renderer)
 	{
-		this.renderer = new THREE.WebGLRenderer({ 
-			canvas: canvas 
-		});
-		this.renderer.setClearColor(0x000000, 1)
+		if (typeof getRenderer == 'undefined' || typeof getRenderer == 'null' )
+		{
+			this.renderer = new THREE.WebGLRenderer({ 
+				canvas: canvas 
+			});
+			this.renderer.setClearColor(0x000000, 1)
+		}
+		else
+		{
+			this.renderer = getRenderer(canvas);
+		}
 	}
 
 	this.renderer.render(this.quadSceneDiff, this.diffOrthoCamera);
