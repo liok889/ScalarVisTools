@@ -1,6 +1,6 @@
 var noiseOffset = [0, 0];
 var noiseZoom = 1;
-var noiseSimplex = true;
+var noiseSimplex = false;
 var inversion = false;
 
 var exponentWeight = 2.2;
@@ -12,6 +12,19 @@ var noiseFunc = function(x, y)
 {
 	var theNoise = noiseSimplex ? noise.simplex2 : noise.perlin2;
 	return (inversion ? -1 : 1) * theNoise(x, y)
+}
+
+function setNoiseOffset(x, y) {
+	noiseOffset[0] = x;
+	noiseOffset[1] = y;
+}
+
+function setExponentWeight(e) {
+	exponentWeight = e;
+}
+
+function getExponentWeight() {
+	return exponentWeight;
 }
 
 function noiseGenerate(x, y, w, h)
@@ -29,7 +42,7 @@ function noiseGenerate(x, y, w, h)
 
 function makeNoise(scalarField, _noiseScale, _exponentWeight)
 {
-	console.log("noiseScale: " + noiseScale);
+	//console.log("noiseScale: " + noiseScale);
 
 	var data = scalarField.view;
 	var w = scalarField.w;

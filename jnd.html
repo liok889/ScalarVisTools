@@ -70,6 +70,14 @@
 				<div class="uiDiv" id="sliderDiffValue"></div>
 			</div>
 
+			<div class="uiParentDiv">
+
+				<div class="uiDiv">Exponent</div>
+				<div class="uiDiv sliderDiv" id="sliderExponent"></div>
+				<div class="uiDiv" id="sliderExponentValue"></div>
+			</div>
+
+
 		</div>
 
 		<div style="border: solid 1px red; width: 250px; float: left">
@@ -95,9 +103,12 @@
 		{
 			var magnitude = +$('#sliderMagnitude').slider('value');
 			var diff = $('#sliderDiff').slider('value');
+			var expWeight = $('#sliderExponent').slider('value');
+			setExponentWeight(expWeight);
 
 			d3.select("#sliderMagnitudeValue").html(magnitude);
 			d3.select("#sliderDiffValue").html(diff);
+			d3.select("#sliderExponentValue").html(getExponentWeight());
 
 			stimulus.randomStimulus(magnitude, diff);
 
@@ -110,7 +121,10 @@
 		function createUI() {
 			$('#sliderMagnitude').slider({ step: 0.01, min: 0.01, max: 10, value: stimMagnitude, change: refreshStimulus });
 
-			$('#sliderDiff').slider({ step: 0.01, min: 0.01, max: 2, value: stimMagnitude, change: refreshStimulus });
+			$('#sliderDiff').slider({ step: 0.05, min: 1.5, max: 12, value: stimMagnitude, change: refreshStimulus });
+
+			$('#sliderExponent').slider({ step: 0.05, min: .1, max: 10, value: getExponentWeight(), change: refreshStimulus });
+
 		}
 
 		function initExperiment()
@@ -138,6 +152,7 @@
 			var q = d3.queue()
 				.defer( createVisLeft )
 				.defer( createVisRight )
+				.defer( loadExternalColorPresets )
 				.awaitAll(function(error, results)
 				{
 					if (error) { 
@@ -150,11 +165,10 @@
 						visRight.createVisPipeline();
 
 						// initialize colormaps
-						colormapLeft = 	getColorPreset('coolwarm', null, null, true);
-						colormapRight = getColorPreset('coolwarm', null, null, true);
+						colormapLeft = 	getColorPreset('spectral', null, null, true);
+						colormapRight = getColorPreset('spectral', null, null, true);
 						stimulus.getFirst().setColorMap(colormapLeft);
 						stimulus.getSecond().setColorMap(colormapRight);
-
 
 						// continue loading
 						createUI();
