@@ -21,7 +21,7 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 	})(shaderPath, shaderName, object, callback);
 }
 
-ColorAnalysis = function(field, glCanvas, _readyCallback)
+ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 {
 	this.glCanvas = glCanvas;
 	this.field = field;
@@ -32,38 +32,76 @@ ColorAnalysis = function(field, glCanvas, _readyCallback)
 	this.copyList = [];
 
 	// load shaders
-	(function(object, readyCallback) {
+	(function(object, readyCallback, shaderList) {
 		var q = d3.queue();
-		q
-			.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
-			.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
-			.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
-			.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
-			.defer( gLoadShader, object, 'design/src/shaders/cam022rgb.frag', 'cam02slice')
-			.defer( loadExternalColorPresets )
-
-			.awaitAll(function(error, results) 
+		if (shaderList)
+		{
+			for (var i=0; i<shaderList.length; i++) 
 			{
-				if (error) { 
-					throw error;
+				var shaderPath = shaderList[i].path;
+				var shaderName = shaderList[i].name;
+
+				q.defer( gLoadShader, object, shaderPath, shaderName )
+			}
+		}
+		else
+		{
+			q
+				.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
+				.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
+				.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
+				.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
+				.defer( gLoadShader, object, 'design/src/shaders/cam022rgb.frag', 'cam02slice')
+				.defer( loadExternalColorPresets )
+		}
+		
+		q.awaitAll(function(error, results) 
+		{
+			if (error) { 
+				throw error;
+			}
+			else if (!shaderList) 
+			{
+				object.createDefaultPipelines();
+				object.isReady = true;
+				if (readyCallback) {
+					readyCallback();
 				}
-				else 
-				{
-					object.createPipelines();
-					object.isReady = true;
-					if (readyCallback) {
-						readyCallback();
-					}
+			}
+			else
+			{
+				object.isReady = true;
+				if (readyCallback) {
+					readyCallback();
 				}
-			});
-	})(this, _readyCallback)
+			}
+		});
+	})(this, _readyCallback, _shaderList)
 }
 
 ColorAnalysis.prototype.ready = function() {
 	return this.isReady === true;
 }
 
-ColorAnalysis.prototype.createPipelines = function() 
+ColorAnalysis.prototype.createVisPipeline = function() 
+{
+	var visPipeline = new GLPipeline(this.glCanvas);
+	visPipeline.addStage({
+		uniforms: {
+			scalarField: {},
+			colormap: {},
+			contour: {value: -1.0}
+		},
+		inTexture: 'scalarField',
+		fragment: this.shaders['vis'],
+		vertex: this.shaders['vertex']
+	});
+	this.visPipeline = visPipeline;
+	if (!this.pipelines) this.pipelines = {};
+	this.pipelines['vis'] = visPipeline;
+}
+
+ColorAnalysis.prototype.createDefaultPipelines = function() 
 {
 	// create a color scale from extendedBlackBody to be used 
 	// to visualzie cie2000de or speed
@@ -176,13 +214,13 @@ ColorAnalysis.prototype.run = function(analysis)
 	}
 
 	// deal with GPU texture
-	if (!field.gpuTexture) {
-		field.createGPUTexture();
+	if (!this.field.gpuTexture) {
+		this.field.createGPUTexture();
 	}
 
 	// deal with color map
-	if (!field.gpuColormapTexture) {
-		field.setColorMap();
+	if (!this.field.gpuColormapTexture) {
+		this.field.setColorMap();
 	}
 
 	var pipeline = this.pipelines[analysis];
@@ -203,7 +241,7 @@ ColorAnalysis.prototype.run = function(analysis)
 		// does this stage require a colormap?
 		if (u.colormap) {
 			// if so, give it the current colormap associated with the scalar field
-			u.colormap.value = field.gpuColormapTexture;
+			u.colormap.value = this.field.gpuColormapTexture;
 		}
 	}
 

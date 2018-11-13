@@ -265,9 +265,9 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 				var aaa  = view[r    *sW+c-1];
 				var ddd  = view[r    *sW+c+1];
 				var www  = view[(r-1)*sW+c  ];
-				var xxx = view[(r+1)*sW+c  ];
+				var xxx  = view[(r+1)*sW+c  ];
 				var eee  = view[(r-1)*sW+c+1];
-				var ccc = view[(r+1)*sW+c+1];				
+				var ccc  = view[(r+1)*sW+c+1];				
 				var qqq  = view[(r-1)*sW+c-1];
 				var zzz  = view[(r+1)*sW+c-1];
 

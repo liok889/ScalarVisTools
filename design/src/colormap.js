@@ -809,7 +809,7 @@ function isFunction(obj) {
 }
 
 var loaded_colormaps = {};
-function getColorPreset(preset, m0, m1)
+function getColorPreset(preset, m0, m1, brandNew)
 {
 	if (m0 === undefined || m0 === null || m1 === undefined || m1 === null) {
 		m0 = 0;
@@ -837,7 +837,7 @@ function getColorPreset(preset, m0, m1)
 	{
 		var colorset;
 		
-		if (isArray(colorScheme))
+		if (Array.isArray(colorScheme))
 		{
 			colorset = [];
 			for (var i=0, cLen = colorScheme.length; i<cLen; i++) {
@@ -871,7 +871,7 @@ function getColorPreset(preset, m0, m1)
 		}
 
 		var preloaded = loaded_colormaps[preset];
-		if (preloaded) {
+		if (preloaded && !brandNew) {
 			return preloaded.colormap;
 		}
 		else

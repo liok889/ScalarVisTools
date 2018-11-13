@@ -41,7 +41,7 @@ function makeNoise(scalarField, _noiseScale, _exponentWeight)
 	}
 
 	if (_exponentWeight && !isNaN(_exponentWeight)) {
-		noiseScale = _exponentWeight;
+		exponentWeight = _exponentWeight;
 	}
 
 	noiseOffset[0] /= noiseScale / noiseZoom;
