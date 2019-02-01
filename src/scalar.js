@@ -19,6 +19,32 @@ function ScalarField(width, height)
 	this.contour = -1;
 }
 
+ScalarField.prototype.setMask = function(theMask) 
+{
+	this.mask = theMask;
+}
+
+ScalarField.prototype.getMaskedW = function() {
+	if (this.mask) {
+		return Math.min(this.w, this.mask[0]);
+	}
+	else
+	{
+		return this.w;
+	}
+}
+ScalarField.prototype.getMaskedH = function() 
+{
+	if (this.mask) {
+		return Math.min(this.h, this.mask[1]);
+	}
+	else
+	{
+		return this.h;
+	}
+}
+
+
 ScalarField.prototype.duplicate = function() 
 {
 	var field = this.view;
@@ -213,10 +239,14 @@ ScalarField.prototype.getMinMax = function()
 		var m1 = Number.MIN_VALUE;
 		var view = this.view;
 
-		for (var i=0, len=this.w*this.h; i<len; i++) {
-			var v = view[i];
-			m0 = Math.min(m0, v);
-			m1 = Math.max(m1, v);
+		for (var r=0, rLen = this.getMaskedH(); r<rLen; r++)
+		{
+			var R = r * this.w;
+			for (var c=0, cLen=this.getMaskedW(); c<cLen; c++) {
+				var v = view[R + c];
+				m0 = Math.min(m0, v);
+				m1 = Math.max(m1, v);
+			}
 		}
 
 		this.minmax = [m0, m1]
@@ -714,18 +744,24 @@ ScalarField.prototype.fft = function()
 	this.mH = mH;
 }
 
-ScalarField.prototype.calcAmplitudeFrequency = function()
+ScalarField.prototype.calcAmplitudeFrequency = function(_bins)
 {
-	var BINS = 30;
+	var BINS = _bins || 30;
 	var histogram = [], curve = [];
 	for (var b=0; b<BINS; b++) {
 		histogram.push(0);
 	}
 
 	var view = this.view;
-	for (var i=0, len=this.view.length; i<len; i++) {
-		var b = Math.min(BINS-1, Math.floor(view[i] * BINS));
-		histogram[b]++;
+	for (var r=0, rLen=this.getMaskedH(); r<rLen; r++)
+	{
+		var R = this.w * r;
+
+		for (var c=0, cLen=this.getMaskedW(); c<cLen; c++) 
+		{
+			var b = Math.min(BINS-1, Math.floor(view[R+c] * BINS));
+			histogram[b]++;
+		}
 	}
 
 	for (var i=0, len=histogram.length; i<len; i++) {

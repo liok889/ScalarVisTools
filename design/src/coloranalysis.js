@@ -124,8 +124,8 @@ ColorAnalysis.prototype.createDefaultPipelines = function()
 	var diffPipeline = new GLPipeline(this.glCanvas);
 	diffPipeline.addStage({
 		uniforms: {
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			scalarField: {},
 			colormap: {},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
@@ -142,8 +142,8 @@ ColorAnalysis.prototype.createDefaultPipelines = function()
 	// add first stage to perform a cie2000 color-diff
 	speedPipeline.addStage({
 		uniforms: {
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			scalarField: {},
 			colormap: {},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
@@ -158,8 +158,8 @@ ColorAnalysis.prototype.createDefaultPipelines = function()
 	speedPipeline.addStage({
 		uniforms: {
 			colorDiff: {},
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
 			outputColor: {value: false}
 		},

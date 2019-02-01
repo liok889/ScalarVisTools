@@ -6,11 +6,14 @@
 	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
 	<script src="jnd/lib/d3.min.js"></script>
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+
 	<script src="jnd/lib/three.min.js"></script>
 
 	<script src="src/scalar.js"></script>
 	<script src="src/perlin.js"></script>
 	<script src="src/noisegen.js"></script>
+	<script src="src/terrain.js"></script>
 
 	<script src="design/src/colormap.js"></script>
 	<script src="design/src/gl_pipeline.js"></script>
@@ -44,6 +47,11 @@
 			width: 80px;
 			height: 5px;
 			font-size: 10px;
+		}
+		.distRect {
+			fill: #cccccc;
+			stroke: #333333;
+			stroke-width: 1px;
 		}
 
 		#stimLeft {}
@@ -80,17 +88,26 @@
 
 		</div>
 
-		<div style="border: solid 1px red; width: 250px; float: left">
-			<canvas id="stimLeft" width="250" height="250"></canvas>
+		<div style="border: solid 1px red; width: 257px; float: left">
+			<canvas id="stimLeft" width="256" height="256"></canvas>
+			<br>
+			<svg id="svgLeft" width="256" height="350" style="border: dashed 1px black"></svg>
 		</div>
-		<div style="border: solid 1px blue; width: 250px; float: right">
-			<canvas id="stimRight" width="250" height="250"></canvas>
+		<div style="border: solid 1px blue; width: 257px; float: right">
+			<canvas id="stimRight" width="256" height="256"></canvas>
+			<br>
+			<svg id="svgRight" width="256" height="350" style="border: dashed 1px black"></svg>
+
 		</div>
 	</div>
 
 	<script type="text/javascript">
-		var STIM_W = 250;
-		var STIM_H = 250;
+		var STIM_W = 256;
+		var STIM_H = 256;
+		var HIST_W = 150;
+		var HIST_H = 150;
+		var HIST_OFFSET = 50;
+
 
 		var stimMagnitude = 1;
 		var stimDiff = 0.7;
@@ -99,8 +116,45 @@
 		var visLeft, visRight;
 		var colormapLeft, colormapRight;
 
+		function visualizeDist(svg, dist, theMax)
+		{
+			if (!theMax) {
+				theMax = d3.max(dist);
+			}
+			var yScale = d3.scaleLinear()
+				.domain([0, theMax])
+				.range([HIST_H, 0]);
+
+			var g = svg.append('g');
+
+			var update = g.selectAll('rect.distRect').data(dist);
+			update = update.enter().append('rect')
+				.attr('class', 'distRect')
+				.merge(update);
+			update
+				.attr('x', function(d, i) { return (HIST_W / dist.length) * i; })
+				.attr('y', function(d, i) { return (yScale(d)); })
+				.attr('width', function() { return HIST_W / dist.length; })
+				.attr('height', function(d) {
+					return HIST_H - yScale(d);
+				});
+
+			// plot the scale
+			var gScale = g.append('g');
+			var axis = d3.axisLeft(yScale);
+
+			gScale.call(axis);
+
+			g.attr('transform', 'translate(' + HIST_OFFSET + ',30)').attr('class', 'distribution');
+			return g;
+		}
+
+
+
 		function refreshStimulus()
 		{
+			var timeStart = Date.now();
+
 			var magnitude = +$('#sliderMagnitude').slider('value');
 			var diff = $('#sliderDiff').slider('value');
 			var expWeight = $('#sliderExponent').slider('value');
@@ -114,14 +168,39 @@
 
 			// visualize the 2AFC images
 			visLeft.run('vis');
-			visRight.run('vis');	
+			visRight.run('vis');
+
+			// visualize the distributions
+			d3.select('#svgLeft').selectAll('g.distribution').remove();
+			d3.select('#svgRight').selectAll('g.distribution').remove();
+			
+			var dist1 = stimulus.getFirstDist();
+			var dist2 = stimulus.getSecondDist();
+			var maxValue = Math.max(d3.max(dist1), d3.max(dist2));
+			
+			// visualize distributions
+			visualizeDist(d3.select("#svgLeft"), dist1, maxValue);
+			visualizeDist(d3.select("#svgRight"), dist2, maxValue);
+			
+			// run a KS test and plot a qq plot
+			var ksTest = KS_test(stimulus.stim1.view, stimulus.stim2.view);
+			
+			d3.select("#svgLeft").select("g.qqplot").remove();
+			var gPlot = d3.select('#svgLeft').append('g')
+				.attr('class', 'qqplot')
+				.attr('transform', 'translate(' + HIST_OFFSET + ',' + (40 + HIST_H + 10) + ')');
+
+			plotQQ(gPlot, HIST_W, 120, ksTest.field1, ksTest.field2, ksTest.valueAtMax)
+
+
+			printTimeDiff(timeStart, Date.now(), "time")
 		}
 
 
 		function createUI() {
 			$('#sliderMagnitude').slider({ step: 0.01, min: 0.01, max: 10, value: stimMagnitude, change: refreshStimulus });
 
-			$('#sliderDiff').slider({ step: 0.05, min: 1.5, max: 12, value: stimMagnitude, change: refreshStimulus });
+			$('#sliderDiff').slider({ step: 0.05, min: 0.0, max: 12, value: stimMagnitude, change: refreshStimulus });
 
 			$('#sliderExponent').slider({ step: 0.05, min: .1, max: 10, value: getExponentWeight(), change: refreshStimulus });
 
@@ -179,6 +258,35 @@
  	
 		}
 
+		var TEAMS = [
+			{
+				key: "ARI",
+				values: [
+					{key: "W", values: 49},
+					{key: "L", values: 30},
+					{key: "T", values: 1}
+
+				]
+			},
+			{
+				key: "ATL",
+				values: [
+					{key: "W", values: 39},
+					{key: "L", values: 41}
+				]
+			}
+		];
+
+		for (var i=0; i < TEAMS.length; i++) {
+			var team = TEAMS[i];
+			team.map = d3.map(team.values, function(d) { return d.key; })
+		}
+
+		// example use: TEAMS[1].map.get("W")
+
+		var TeamMap = d3.map(TEAMS, function(d) { return d.key; });
+		// example use: TeamMap.get("ATL").map.get("W")
+		
 		//createUI();
 		initExperiment();
 	</script>
