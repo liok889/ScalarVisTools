@@ -1,6 +1,6 @@
 
-var TRIALS0 = 5;
-var TRIALS = 30;
+var TRIALS0 = 10;
+var TRIALS = 20;
 
 var TOLERANCE = .07;
 var HIST_BIN = 10;
@@ -65,7 +65,7 @@ function TAFC(width, height)
 	this.stim2.setMask([width, height]);
 }
 
-TAFC.prototype.randomStimulus = function(targetScale, diff)
+TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 {
 	var timeStart = Date.now();
 	function sign(x) { if (x >= 0) return 1; else return -1; }
@@ -93,9 +93,9 @@ TAFC.prototype.randomStimulus = function(targetScale, diff)
 			seedNoise();
 			setNoiseOffset(Math.random() * 10000, Math.random() * 10000);
 
-			var K_RANGE = [.1,.3];
+			var K_RANGE = [.1,.1];
 			var k = Math.random() * (K_RANGE[1]-K_RANGE[0]) + K_RANGE[1];
-			genericNoiseFunction(this.stim2, targetScale+diff*k)
+			genericNoiseFunction(this.stim2, targetScale+diff*k);
 
 			// compute difference between the two stimuli
 			g2 = calcAvgGradient(this.stim2);
@@ -106,9 +106,23 @@ TAFC.prototype.randomStimulus = function(targetScale, diff)
 			maxDiff = Math.max(actualDiff, maxDiff);
 
 			var delta = actualDiff-diff
-			if (Math.abs(delta) <= tolerance && sign(actualDiff) == sign(diff))
+			if (Math.abs(delta) <= tolerance)
 			{
 				done = true;
+				if (sign(actualDiff) != sign(diff)) 
+				{
+					// flip
+					var temp = this.stim1;
+					this.stim1 = this.stim2;
+					this.stim2 = temp;
+				}
+			}
+
+			if (done && ksThreshold !== undefined && ksThreshold != 0.0) {
+				var ksRes = KS_test(this.stim1.view, this.stim2.view);
+				if (ksRes.maxD > ksThreshold) {
+					done = false;
+				}
 			}
 		}
 	}
@@ -125,13 +139,23 @@ TAFC.prototype.randomStimulus = function(targetScale, diff)
 	if (done) 
 	{
 		console.log('** base: ' + g1.toFixed(2) + ', actualDiff: ' + actualDiff.toFixed(3) + ", req: " + diff.toFixed(3) + ", converged: " + iterations);
-		return true;
+		return {
+			actualDiff: actualDiff,
+			requestedDiff: diff,
+			iterations: iterations,
+			success: true
+		};
 	
 	}
 	else
 	{
-		console.error("could not converge. min Diff rached: " + minDiff);
-		return false;
+		console.warn("could not converge. min Diff rached: " + minDiff);
+		return {
+			requestedDiff: diff,
+			minDiff: diff,
+			iterations: iterations,
+			success: false
+		};
 	}
 }
 
@@ -265,8 +289,8 @@ function plotQQ(svg, w, h, field1, field2, index)
 			.attr('y1', 0).attr('y2', H)
 			.attr('x1', index*W).attr('x2', index*W);
 	}
-
 }
+
 
 function chiSqured(d1, d2, stimSize)
 {
