@@ -3,9 +3,9 @@ var noiseZoom = 1;
 var noiseSimplex = false;
 var inversion = false;
 
-var exponentWeight = 2.2;
+var exponentWeight = 2.0;
 var noiseScale = 4;
-var noiseWeights = [1, 0.75, 0.3, 0.1/2, 0.05/5];
+var noiseWeights = [1, 0.75, 0.3/2, 0.1/3, 0.05/5];
 var noiseOctaves = [1, 2, 4, 8, 16];
 
 var noiseFunc = function(x, y) 
@@ -35,8 +35,8 @@ function noiseGenerate(x, y, w, h)
 		noiseWeights[0] * (.5 + .5 * noiseFunc(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
 		noiseWeights[1] * (.5 + .5 * noiseFunc(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
 		noiseWeights[2] * (.5 + .5 * noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny));
-		noiseWeights[3] * (.5 + .5 * noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
-		noiseWeights[4] * (.5 + .5 * noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
+		//noiseWeights[3] * (.5 + .5 * noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
+		//noiseWeights[4] * (.5 + .5 * noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
 	return Math.pow(e, exponentWeight);					
 }
 
@@ -68,11 +68,11 @@ function makeNoise(scalarField, _noiseScale, _exponentWeight)
 			var nx = noiseScale*((x + noiseOffset[0])/(w-1) - 0.5);
 			var ny = noiseScale*((y + noiseOffset[1])/(h-1) - 0.5);
 			var e = 
-				noiseWeights[0] * (.5 + .5*noiseFunc(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
-				noiseWeights[1] * (.5 + .5*noiseFunc(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
-				noiseWeights[2] * (.5 + .5*noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny)) +
-				noiseWeights[3] * (.5 + .5*noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
-				noiseWeights[4] * (.5 + .5*noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
+				noiseWeights[0] * (.5 + .5*noise.simplex2(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
+				noiseWeights[1] * (.5 + .5*noise.simplex2(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
+				noiseWeights[2] * (.5 + .5*noise.simplex2(noiseOctaves[2] * nx, noiseOctaves[2] * ny));
+				//noiseWeights[3] * (.5 + .5*noise.simplex2(noiseOctaves[3] * nx, noiseOctaves[3] * ny));
+				//noiseWeights[4] * (.5 + .5*noise.simplex2(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
 				data[I++] = Math.pow(e, exponentWeight);
 		}
 	}

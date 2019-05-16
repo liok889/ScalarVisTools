@@ -1,6 +1,6 @@
 
-var TRIALS0 = 10;
-var TRIALS = 20;
+var TRIALS0 = 15;
+var TRIALS = 15;
 
 var TOLERANCE = .07;
 var HIST_BIN = 10;
@@ -11,6 +11,11 @@ var NOISE_TYPE_SIMPLEX = 2;
 var NOISE_TYPE_TERRAIN = 3;
 var NOISE_TYPE_SIGMOID = 4;
 var NOISE_TYPE_DISPLACEMENT = 5;
+
+var LOW_GRADIENT = 1.0;
+var MED_GRADIENT = 2.5;
+var HI_GRADIENT = 5.0;
+var DIFF = [0.35, 15.0];
 
 var noiseType = NOISE_TYPE_SIMPLEX;
 
@@ -58,8 +63,8 @@ function TAFC(width, height)
 	this.width = width;
 	this.height = height;
 
-	this.stim1 = new ScalarField(width+1, height+1);
-	this.stim2 = new ScalarField(width+1, height+1);
+	this.stim1 = new ScalarField(width, height);
+	this.stim2 = new ScalarField(width, height);
 
 	this.stim1.setMask([width, height]);
 	this.stim2.setMask([width, height]);
@@ -106,20 +111,30 @@ TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 			maxDiff = Math.max(actualDiff, maxDiff);
 
 			var delta = actualDiff-diff
-			if (Math.abs(delta) <= tolerance)
+			if (Math.abs(delta) <= tolerance && sign(actualDiff) == sign(diff))
 			{
 				done = true;
 				if (sign(actualDiff) != sign(diff)) 
 				{
 					// flip
+					console.log("flip!!!!!");
 					var temp = this.stim1;
 					this.stim1 = this.stim2;
 					this.stim2 = temp;
+
+					temp = g1;
+					g1 = g2;
+					g2 = temp;
 				}
 			}
 
-			if (done && ksThreshold !== undefined && ksThreshold != 0.0) {
-				var ksRes = KS_test(this.stim1.view, this.stim2.view);
+			if (done && ksThreshold !== undefined && ksThreshold != 0.0) 
+			{
+				// copy views
+				var view1 = this.stim1.copyView();
+				var view2 = this.stim2.copyView();
+
+				var ksRes = KS_test(view1, view2);
 				if (ksRes.maxD > ksThreshold) {
 					done = false;
 				}

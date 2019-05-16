@@ -1,3 +1,15 @@
+if (!ArrayBuffer.prototype.slice)
+	ArrayBuffer.prototype.slice = function (start, end) {
+	var that = new Uint8Array(this);
+	if (end == undefined) end = that.length;
+	var result = new ArrayBuffer(end - start);
+	var resultArray = new Uint8Array(result);
+	for (var i = 0; i < resultArray.length; i++) {
+		resultArray[i] = that[i + start];
+	}
+	return result;
+}
+
 function ScalarField(width, height)
 {
 	if (width && height)
@@ -17,6 +29,11 @@ function ScalarField(width, height)
 		this.view = new Float32Array(this.buffer);
 	}
 	this.contour = -1;
+}
+
+ScalarField.prototype.copyView = function() {
+	var newBuffer = this.buffer.slice(0);
+	return new Float32Array(newBuffer);
 }
 
 ScalarField.prototype.setMask = function(theMask) 

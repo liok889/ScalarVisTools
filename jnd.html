@@ -89,12 +89,12 @@
 		</div>
 
 		<div style="border: solid 1px red; width: 257px; float: left">
-			<canvas id="stimLeft" width="256" height="256"></canvas>
+			<canvas id="stimLeft" width="200" height="200"></canvas>
 			<br>
 			<svg id="svgLeft" width="256" height="350" style="border: dashed 1px black"></svg>
 		</div>
 		<div style="border: solid 1px blue; width: 257px; float: right">
-			<canvas id="stimRight" width="256" height="256"></canvas>
+			<canvas id="stimRight" width="200" height="200"></canvas>
 			<br>
 			<svg id="svgRight" width="256" height="350" style="border: dashed 1px black"></svg>
 
@@ -108,16 +108,18 @@
 	</div>
 
 	<script type="text/javascript">
-		var STIM_W = 256;
-		var STIM_H = 256;
+		var STIM_W = 200;
+		var STIM_H = 200;
 		var HIST_W = 150;
 		var HIST_H = 150;
 		var HIST_OFFSET = 50;
 
-		var KS_TEST_THRESHOLD = 0.16;
-		var KS_TRIALS = 6;
+		var KS_TEST_THRESHOLD = 0.10;
+		var KS_TRIALS = 10;
+		var KS_TRIAL_EXTENSION = 4;
+		var KS_ENABLE = false;
 
-		var stimMagnitude = 1;
+		var stimMagnitude = 2;
 		var stimDiff = 0.7;
 
 		var stimulus = new TAFC(STIM_W, STIM_H);
@@ -157,6 +159,102 @@
 			return g;
 		}
 
+		function plotSimulationChart(simResults, xRange) 
+		{
+			var SIM_CHART_H = 150;
+			var SIM_CHART_W = 200;
+
+			var maxY = d3.max(simResults, function(d) { return d.avgDiff + d.errDiff; });
+			var xScale = d3.scaleLinear().domain([xRange[0], xRange[1]]).range([0, SIM_CHART_W]);
+			var yScale = d3.scaleLinear().domain([0, maxY]).range([SIM_CHART_H, 0]);
+
+			d3.select("#simChart").selectAll('*').remove();
+			var update = d3.select("#simChart").selectAll('circle')
+				.data(simResults);
+			update = update
+				.enter().append('circle').merge(update);
+			update
+				.attr('cx', function(d) { return xScale(d.x)})
+				.attr('cy', function(d) { return yScale(d.avgDiff)})
+				.attr('r', 3)
+				.style('fill', 'black')
+
+			update = d3.select('#simChart').selectAll('line')
+				.data(simResults);
+			update = update
+				.enter().append('line').merge(update);
+			update
+				.attr('x1', function(d) { return xScale(d.x)})
+				.attr('x2', function(d) { return xScale(d.x)})
+				.attr('y1', function(d) { return yScale(d.avgDiff+d.errDiff)})
+				.attr('y2', function(d) { return yScale(d.avgDiff-d.errDiff)})
+				.style('stroke', 'black')
+				.style('stroke-width', '1px');
+			
+			var xAxis = d3.axisBottom(xScale)
+			d3.select("#simChart")
+				.append('g').attr('transform', 'translate(0,' + SIM_CHART_H + 
+					')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale)
+			d3.select("#simChart")
+				.append('g')
+				.call(yAxis);
+		}
+
+		function runSimulationFrequency()
+		{
+			var freqRange = [LOW_GRADIENT, HI_GRADIENT];
+			var freqStep = (HI_GRADIENT-LOW_GRADIENT) / 15.0;
+			var trial = 12;
+			var simResults = [];
+
+			var diff = $('#sliderDiff').slider('value');
+			for (var f = freqRange[0]; f<=freqRange[1]; f += freqStep) {
+				var results = [];
+				for (var t=0; t<trial; t++) {
+					var res = stimulus.randomStimulus(f, diff);
+					results.push(res);
+				}
+				
+				// analyze the results
+				var successCount = 0;
+				var avgDiff = 0;
+				var stdDiff = 0;
+
+				for (var r=0; r<results.length; r++) 
+				{
+					var record = results[r];
+					if (record.success) {
+						successCount++;
+						avgDiff += Math.abs(record.requestedDiff - record.actualDiff);
+					}
+				}
+				if (successCount > 0) {
+					avgDiff /= successCount
+				}
+
+				for (var r=0; r<results.length; r++) 
+				{
+					var record = results[r];
+					if (record.success) {
+						stdDiff += Math.pow(avgDiff - Math.abs(record.requestedDiff-record.actualDiff),2);
+					}
+				}
+				stdDiff = Math.sqrt(stdDiff/(successCount-1));
+				errDiff = 1.96 * (stdDiff / Math.sqrt(successCount));
+				simResults.push({
+					x: f,
+					avgDiff: avgDiff,
+					errDiff: errDiff,
+					successCount: successCount,
+					allCount: results.length
+				});
+			}
+			plotSimulationChart(simResults, [freqRange[0]-1, freqRange[1]+1]);	
+		}
+
 		function runSimulationExponent()
 		{
 			// take current magnitude 
@@ -188,26 +286,32 @@
 				for (var r=0; r<results.length; r++) 
 				{
 					var record = results[r];
-					if (record.success) {
+					if (record.success) 
+					{
 						successCount++;
-						avgDiff += Math.abs(record.requestedDiff - record.actualDiff);
+						
+						// normalize the diff by requested
+						var nDiff = 100.0 * (record.requestedDiff - record.actualDiff) / record.requestedDiff;
+						record.nDiff = nDiff;
+						avgDiff += Math.abs(nDiff);
 					}
 				}
 				if (successCount > 0) {
-					avgDiff /= successCount
+					avgDiff /= successCount;
 				}
 
 				for (var r=0; r<results.length; r++) 
 				{
 					var record = results[r];
 					if (record.success) {
-						stdDiff += Math.pow(avgDiff - Math.abs(record.requestedDiff-record.actualDiff),2);
+						stdDiff += Math.pow(avgDiff - Math.abs(record.nDiff),2);
 					}
 				}
 				stdDiff = Math.sqrt(stdDiff/(successCount-1));
 				errDiff = 1.96 * (stdDiff / Math.sqrt(successCount));
 				simResults.push({
 					e: e,
+					x: e,
 					avgDiff: avgDiff,
 					errDiff: errDiff,
 					successCount: successCount,
@@ -215,46 +319,8 @@
 				});
 				maxDiff = Math.max(maxDiff, avgDiff + errDiff);
 			}
+			plotSimulationChart(simResults, [0, expRange[1]]);
 
-			var SIM_CHART_H = 150;
-			var SIM_CHART_W = 200;
-
-			var xScale = d3.scaleLinear().domain([0, expRange[1]]).range([0, SIM_CHART_W]);
-			var yScale = d3.scaleLinear().domain([0, maxDiff]).range([SIM_CHART_H, 0]);
-
-			d3.select("#simChart").selectAll('*').remove();
-			var update = d3.select("#simChart").selectAll('circle')
-				.data(simResults);
-			update = update
-				.enter().append('circle').merge(update);
-			update
-				.attr('cx', function(d) { return xScale(d.e)})
-				.attr('cy', function(d) { return yScale(d.avgDiff)})
-				.attr('r', 3)
-				.style('fill', 'black')
-
-			update = d3.select('#simChart').selectAll('line')
-				.data(simResults);
-			update = update
-				.enter().append('line').merge(update);
-			update
-				.attr('x1', function(d) { return xScale(d.e)})
-				.attr('x2', function(d) { return xScale(d.e)})
-				.attr('y1', function(d) { return yScale(d.avgDiff+d.errDiff)})
-				.attr('y2', function(d) { return yScale(d.avgDiff-d.errDiff)})
-				.style('stroke', 'black')
-				.style('stroke-width', '1px');
-			
-			var xAxis = d3.axisBottom(xScale)
-			d3.select("#simChart")
-				.append('g').attr('transform', 'translate(0,' + SIM_CHART_H + 
-					')')
-				.call(xAxis);
-
-			var yAxis = d3.axisLeft(yScale)
-			d3.select("#simChart")
-				.append('g')
-				.call(yAxis);
 		}
 
 		function refreshStimulus()
@@ -262,7 +328,7 @@
 			var done = false;
 			var timeStart = Date.now();
 
-			for (var trial = 0; !done && trial < KS_TRIALS; trial++)
+			for (var trial = 0, maxTrial = KS_TRIALS; !done && trial < maxTrial; trial++)
 			{
 
 				var magnitude = +$('#sliderMagnitude').slider('value');
@@ -274,7 +340,7 @@
 				d3.select("#sliderDiffValue").html(diff);
 				d3.select("#sliderExponentValue").html(getExponentWeight());
 
-				var randRes = stimulus.randomStimulus(magnitude, diff);
+				var randRes = stimulus.randomStimulus(magnitude, diff, KS_TEST_THRESHOLD);
 				if (!randRes.success && trial < KS_TRIALS-1) {
 					continue;
 				}
@@ -297,10 +363,17 @@
 				
 				// run a KS test and plot a qq plot
 				var ksTest = KS_test(stimulus.stim1.view, stimulus.stim2.view);
-				if (KS_TEST_THRESHOLD !== undefined && KS_TEST_THRESHOLD > 0.0) {
-					if (ksTest.maxD > KS_TEST_THRESHOLD) {
+				
+				if (KS_ENABLE && KS_TEST_THRESHOLD !== undefined && KS_TEST_THRESHOLD > 0.0) {
+					if (ksTest.maxD > KS_TEST_THRESHOLD) 
+					{
 						// large difference between the two distributions, repeat
-						console.log("** KS test failied; high difference")
+						console.log("** KS test failied; too high distribution difference");
+						if ((trial == KS_TRIALS-1) && (Date.now() - timeStart <= 7000) && maxTrial<2*KS_TRIALS) {
+							// extend the time
+							console.log("** extended to another " + KS_TRIAL_EXTENSION + " trials.")
+							maxTrial += KS_TRIAL_EXTENSION;
+						}
 					}
 					else {
 						done = true;
@@ -329,11 +402,11 @@
 
 
 		function createUI() {
-			$('#sliderMagnitude').slider({ step: 0.01, min: 0.01, max: 10, value: stimMagnitude, change: refreshStimulus });
+			$('#sliderMagnitude').slider({ step: 0.01, min: LOW_GRADIENT, max: HI_GRADIENT, value: stimMagnitude, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderMagnitudeValue").html(ui.value);} });
 
-			$('#sliderDiff').slider({ step: 0.05, min: 0.0, max: 12, value: stimMagnitude, change: refreshStimulus });
+			$('#sliderDiff').slider({ step: 0.05, min: DIFF[0], max: DIFF[1], value: stimMagnitude, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderDiffValue").html(ui.value);} });
 
-			$('#sliderExponent').slider({ step: 0.05, min: .1, max: 10, value: getExponentWeight(), change: refreshStimulus });
+			$('#sliderExponent').slider({ step: 0.05, min: .1, max: 10, value: getExponentWeight(), change: refreshStimulus,slide: function(event, ui) { d3.select("#sliderExponentValue").html(ui.value);} });
 
 			d3.select(document).on('keydown', function() {
 				if (d3.event.keyCode === 32 || d3.event.keyCode === 13) {
