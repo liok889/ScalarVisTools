@@ -5,7 +5,7 @@ var inversion = false;
 
 var exponentWeight = 2.2;
 var noiseScale = 4;
-var noiseWeights = [1, 0.75, 0.3, 0.1, 0.05];
+var noiseWeights = [1, 0.75, 0.3, 0.1/2, 0.05/5];
 var noiseOctaves = [1, 2, 4, 8, 16];
 
 var noiseFunc = function(x, y) 
@@ -34,7 +34,7 @@ function noiseGenerate(x, y, w, h)
 	var e = 
 		noiseWeights[0] * (.5 + .5 * noiseFunc(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
 		noiseWeights[1] * (.5 + .5 * noiseFunc(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
-		noiseWeights[2] * (.5 + .5 * noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny)) +
+		noiseWeights[2] * (.5 + .5 * noiseFunc(noiseOctaves[2] * nx, noiseOctaves[2] * ny));
 		noiseWeights[3] * (.5 + .5 * noiseFunc(noiseOctaves[3] * nx, noiseOctaves[3] * ny)) +
 		noiseWeights[4] * (.5 + .5 * noiseFunc(noiseOctaves[4] * nx, noiseOctaves[4] * ny)) ;
 	return Math.pow(e, exponentWeight);					

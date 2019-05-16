@@ -801,7 +801,7 @@ var COLOR_PRESETS = {
 			return d3.rgb(d3.hcl(t * 360, 1, .5));
 		},
 		
-		viridisLike: { URL: '/colormaps/viridis-like.json'}
+		//viridisLike: { URL: '/colormaps/viridis-like.json'}
 };
 
 function isFunction(obj) {
