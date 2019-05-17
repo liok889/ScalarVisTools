@@ -1,0 +1,177 @@
+<html>
+<head>
+
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="jnd/lib/d3.min.js"></script>
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+
+	<script src="jnd/lib/three.min.js"></script>
+
+	<script src="src/scalar.js"></script>
+	<script src="src/perlin.js"></script>
+	<script src="src/noisegen.js"></script>
+	<script src="src/terrain.js"></script>
+
+	<script src="design/src/colormap.js"></script>
+	<script src="design/src/gl_pipeline.js"></script>
+	<script src="design/src/coloranalysis.js"></script>
+
+	<script src="jnd/src/2afc.js"></script>
+	<script src="jnd/src/experiment.js"></script>
+	
+	<style>
+		body {
+			background-color: #eeeeee;
+			font-family: Helvetica;
+			font-size: 17px;
+
+			/* disable selection */
+			-webkit-user-select: none;
+			-moz-user-select: -moz-none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+
+		.uiParentDiv {
+			margin-bottom: 10px;
+			vertical-align: middle;
+		}
+		.uiDiv {
+			width: 80px;
+			display: inline-block;
+		}
+
+		.sliderDiv {
+			width: 80px;
+			height: 5px;
+			font-size: 10px;
+		}
+		.distRect {
+			fill: #cccccc;
+			stroke: #333333;
+			stroke-width: 1px;
+		}
+
+		#stimLeft {
+			margin: 5 5;
+		}
+		#stimRight {
+			margin: 5 5;
+		}
+
+		#divLeft {
+			border: solid 4px #eeeeee;
+		}
+		#divRight {
+			border: solid 4px #eeeeee;
+		}
+
+		#confirmButton {
+			font-size: 14px;
+
+		}
+
+	</style>
+</head>
+
+<body>
+	<div style="width: 600px; margin:0 auto;">
+		<div style="margin-bottom: 20px">
+			<!--
+			<div class="uiParentDiv">
+			
+				<div class="uiDiv">Gradient<br>magnitude</div>
+				<div class="uiDiv sliderDiv" id="sliderMagnitude"></div>
+				<div class="uiDiv" id="sliderMagnitudeValue"></div>
+
+			</div>
+			
+			<div class="uiParentDiv">
+
+				<div class="uiDiv">Diff</div>
+				<div class="uiDiv sliderDiv" id="sliderDiff"></div>
+				<div class="uiDiv" id="sliderDiffValue"></div>
+			</div>
+
+			<div class="uiParentDiv">
+
+				<div class="uiDiv">Exponent</div>
+				<div class="uiDiv sliderDiv" id="sliderExponent"></div>
+				<div class="uiDiv" id="sliderExponentValue"></div>
+			</div>
+			-->
+			<div class="uiParentDiv">
+				
+				<p>&nbsp;
+
+				<p>Terrain is steeper when there is larger CHANGE in elevation between adjacent locations in the map. 
+				
+				<p>Click on the map that shows STEEPER terrain on average. Press confirm
+				to make selection and get a new pair of images.
+
+				<p>&nbsp;
+			</div>
+
+
+
+		</div>
+
+		<div style="height: 230px">
+			<div id="divLeft" style="width: 210px; height: 210px; float: left">
+				<canvas id="stimLeft" width="200" height="200"></canvas>
+			</div>
+			<div id="divRight" style="width: 210px; height: 210px; float: right">
+				<canvas id="stimRight" width="200" height="200"></canvas>
+			</div>
+		</div>
+
+		<div style="text-align: center">
+			<button id="confirmButton">Confirm</button>
+			<br><img id="loadingImage" width="120" src="img/loading2.gif">
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		var selectedImage = null;
+		function unselect() 
+		{
+			d3.select("#divLeft")
+				.style("border", null);
+			d3.select("#divRight")
+				.style("border", null);
+			selectedImage = null;
+		}
+		d3.select("#divLeft").on("mousedown", function() { 
+			d3.select("#divRight").style("border", null);
+			d3.select(this).style("border", "4px solid red"); 
+			selectedImage = 'left';
+			d3.event.stopPropagation();
+
+		});
+		d3.select("#divRight").on("mousedown", function() { 
+			d3.select("#divLeft").style("border", null);
+			d3.select(this).style("border", "4px solid red"); 
+			selectedImage = 'right';
+			d3.event.stopPropagation();
+		});
+
+		d3.select("#confirmButton").on('click', function() {
+			if (!selectedImage) {
+				alert("Please answer by clicking one of the two maps.");
+			}
+			else
+			{
+				experiment.answer(selectedImage);
+			}
+		});
+
+		var experiment = null;
+		$(document).ready(function() {
+			experiment = new Experiment();
+		})
+	</script>
+</body>
+</html>
