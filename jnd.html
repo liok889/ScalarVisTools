@@ -326,6 +326,37 @@
 
 		}
 
+		function refreshStimulusThreaded() 
+		{
+			(function(stimulus, timeStart) 
+			{
+				var magnitude = +$('#sliderMagnitude').slider('value');
+				var diff = $('#sliderDiff').slider('value');
+				var expWeight = $('#sliderExponent').slider('value');
+				setExponentWeight(expWeight);
+
+				stimulus.randomStimulusThreaded(
+					magnitude,
+					diff,
+					KS_TEST_THRESHOLD,
+					function(results) {
+						// visualize the 2AFC images
+						visLeft.run('vis');
+						visRight.run('vis');
+		
+						var ksTest = KS_test(stimulus.stim1.view, stimulus.stim2.view);
+						d3.select("#svgLeft").select("g.qqplot").remove();
+						var gPlot = d3.select('#svgLeft').append('g')
+							.attr('class', 'qqplot')
+							.attr('transform', 'translate(' + HIST_OFFSET + ',' + (40 + HIST_H + 10) + ')');
+						plotQQ(gPlot, HIST_W, 120, ksTest.field1, ksTest.field2, ksTest.valueAtMax)
+						printTimeDiff(timeStart, Date.now(), "time");
+					}
+				);
+			})(stimulus, Date.now());
+
+		}
+
 		function refreshStimulus()
 		{
 			var done = false;
@@ -413,7 +444,7 @@
 
 			d3.select(document).on('keydown', function() {
 				if (d3.event.keyCode === 32 || d3.event.keyCode === 13) {
-					refreshStimulus();
+					refreshStimulusThreaded();
 				}
 			})
 

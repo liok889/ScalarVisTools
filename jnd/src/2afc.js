@@ -68,6 +68,80 @@ function TAFC(width, height)
 
 	this.stim1.setMask([width, height]);
 	this.stim2.setMask([width, height]);
+
+	// shuffle image position?
+	this.shuffle = false;
+	this.swaped = false;
+}
+
+TAFC.prototype.shuffleImagePosition = function() {
+	this.shuffle = true;
+}
+
+TAFC.prototype.isSwaped = function() {
+	return this.swaped;
+}
+
+TAFC.prototype.randomStimulusThreaded = function(targetScale, diff, ksThreshold, callback)
+{
+	(function(tafc, _targetScale, _diff, _ksThreshold, _callback) 
+	{
+		var w = tafc.stim1.w;
+		var h = tafc.stim1.h;
+		tafc.swaped = false;
+
+		var worker = new Worker('src/threaded_noisegen.js');
+		worker.onmessage = function(msg) 
+		{
+			var results = msg.data;
+
+			if (tafc.shuffle && Math.random() > .5)
+			{
+				tafc.stim1.buffer = results.stim2Buffer;
+				tafc.stim1.view = new Float32Array(results.stim2Buffer);
+				tafc.stim2.buffer = results.stim1Buffer;
+				tafc.stim2.view = new Float32Array(results.stim1Buffer);
+
+				tafc.swaped = true;
+			}
+			else
+			{
+				tafc.stim1.buffer = results.stim1Buffer;
+				tafc.stim1.view = new Float32Array(results.stim1Buffer);
+				tafc.stim2.buffer = results.stim2Buffer;
+				tafc.stim2.view = new Float32Array(results.stim2Buffer);
+			}
+
+			tafc.stim1.generated = true;
+			tafc.stim2.generated = true;
+			
+			tafc.stim1.updated();
+			tafc.stim2.updated();
+
+			// clear out references to buffers (not needed)
+			results.stim1Buffer = undefined;
+			results.stim2Buffer = undefined;
+			
+			callback(results);
+		}
+
+		
+		worker.postMessage({
+			w: w,
+			h: h,
+			exponentWeight: getExponentWeight(),
+			targetScale: _targetScale,
+			diff: _diff,
+			ksThreshold: _ksThreshold,
+
+			// iteration parameters
+			TRIALS: TRIALS,
+			TRIALS0: TRIALS0,
+			TOLERANCE: TOLERANCE
+		});
+		
+
+	})(this, targetScale, diff, ksThreshold, callback);
 }
 
 TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
@@ -75,6 +149,7 @@ TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 	var timeStart = Date.now();
 	function sign(x) { if (x >= 0) return 1; else return -1; }
 
+	this.swaped = false;
 	var done = false;
 	var minDiff = Number.MAX_VALUE;
 	var maxDiff = Number.MIN_VALUE;
@@ -114,6 +189,7 @@ TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 			if (Math.abs(delta) <= tolerance && sign(actualDiff) == sign(diff))
 			{
 				done = true;
+				/*
 				if (sign(actualDiff) != sign(diff)) 
 				{
 					// flip
@@ -126,6 +202,7 @@ TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 					g1 = g2;
 					g2 = temp;
 				}
+				*/
 			}
 
 			if (done && ksThreshold !== undefined && ksThreshold != 0.0) 

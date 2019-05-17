@@ -82,6 +82,8 @@ function makeNoise(scalarField, _noiseScale, _exponentWeight)
 }
 
 function seedNoise() {
-	noise.seed(Math.random());
+	var theSeed = Math.random()
+	noise.seed(theSeed);
+	return theSeed;
 }
 
