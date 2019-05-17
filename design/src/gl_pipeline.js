@@ -18,7 +18,7 @@ function getRenderer(nameOrCanvas)
 		var r = new THREE.WebGLRenderer({ 
 			canvas: canvas
 		});
-		r.setClearColor(0x000000, 1);
+		r.setClearColor(0x444444, 1);
 		RENDERERS[name] = r;
 		return r;
 	}

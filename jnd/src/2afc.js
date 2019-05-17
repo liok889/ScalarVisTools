@@ -1,8 +1,10 @@
 
+var ATTEMPTS = 6;
 var TRIALS0 = 15;
 var TRIALS = 15;
 
 var TOLERANCE = .07;
+var TOLERANCE_INTERCEPT = 0.035;
 var HIST_BIN = 10;
 
 // different types of noise functions to choose from
@@ -15,7 +17,7 @@ var NOISE_TYPE_DISPLACEMENT = 5;
 var LOW_GRADIENT = 1.5;
 var MED_GRADIENT = 2.5;
 var HI_GRADIENT = 5.0;
-var DIFF = [0.5, 15.0];
+var DIFF = [0.25, 15.0];
 
 var noiseType = NOISE_TYPE_SIMPLEX;
 
@@ -56,7 +58,6 @@ function genericNoiseFunction(_scalarField, targetScale)
 
 	}
 }
-
 
 function TAFC(width, height)
 {
@@ -137,7 +138,9 @@ TAFC.prototype.randomStimulusThreaded = function(targetScale, diff, ksThreshold,
 			// iteration parameters
 			TRIALS: TRIALS,
 			TRIALS0: TRIALS0,
-			TOLERANCE: TOLERANCE
+			TOLERANCE: TOLERANCE,
+			TOLERANCE_INTERCEPT: TOLERANCE_INTERCEPT,
+			ATTEMPTS: ATTEMPTS
 		});
 		
 
@@ -155,7 +158,7 @@ TAFC.prototype.randomStimulus = function(targetScale, diff, ksThreshold)
 	var maxDiff = Number.MIN_VALUE;
 	
 	var actualDiff;
-	var tolerance = Math.abs(diff * TOLERANCE);
+	var tolerance = Math.abs(diff * TOLERANCE) + TOLERANCE_INTERCEPT;
 	var g1, g2;
 
 	// TODO: randomize the position of the target

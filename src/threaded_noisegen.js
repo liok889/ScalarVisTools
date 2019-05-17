@@ -332,11 +332,8 @@ var inversion = false;
 
 var exponentWeight = 2.0;
 var noiseScale = 4;
-var noiseWeights = [1, 0.75, 0.3/2, 0.1/3, 0.05/5];
-var noiseOctaves = [1, 2, 4, 8, 16];
-
-var TOLERANCE = .07;
-
+var noiseWeights = [1, 0.75, 0.3/2]; //, 0.1/3, 0.05/5];
+var noiseOctaves = [1, 2, 4]; //, 8, 16];
 
 function setNoiseOffset(x, y) {
 	noiseOffset[0] = x;
@@ -378,6 +375,7 @@ function makeNoise(data, w, h, _noiseScale)
 {
 	var I = 0;
 
+	/*
 	if (_noiseScale && !isNaN(_noiseScale)) {
 		noiseScale = _noiseScale;
 	}
@@ -385,13 +383,14 @@ function makeNoise(data, w, h, _noiseScale)
 	noiseOffset[0] /= noiseScale / noiseZoom;
 	noiseOffset[1] /= noiseScale / noiseZoom;
 	noiseZoom = noiseScale;
+	*/
 
 	for (var y=0; y<h; y++)
 	{
 		for (var x=0; x<w; x++) 
 		{
-			var nx = noiseScale*((x + noiseOffset[0])/(w-1) - 0.5);
-			var ny = noiseScale*((y + noiseOffset[1])/(h-1) - 0.5);
+			var nx = _noiseScale*((x + noiseOffset[0])/(w-1) - 0.5);
+			var ny = _noiseScale*((y + noiseOffset[1])/(h-1) - 0.5);
 			var e = 
 				noiseWeights[0] * (.5 + .5*noise.simplex2(noiseOctaves[0] * nx, noiseOctaves[0] * ny)) +
 				noiseWeights[1] * (.5 + .5*noise.simplex2(noiseOctaves[1] * nx, noiseOctaves[1] * ny)) +
@@ -566,26 +565,33 @@ function randomStimulus(w, h, targetScale, diff, ksThreshold)
 	var maxDiff = Number.MIN_VALUE;
 	
 	var actualDiff;
-	var tolerance = Math.abs(diff * TOLERANCE);
+	var tolerance = Math.abs(diff * TOLERANCE) + TOLERANCE_INTERCEPT;
 	var g1, g2;
+
+	var seed1, seed2;
+	var offset1, offset2;
+	var K;
+	var ksRes = null;
 
 	var iterations = 0;
 	for (var longIt=0; longIt<TRIALS0 && !done; longIt++)
 	{
-		seedNoise();
-		setNoiseOffset(Math.random() * 10000, Math.random() * 10000);
+		seed1 = seedNoise();
+		offset1 = [Math.random() * 10000, Math.random() * 10000];
+		setNoiseOffset(offset1[0], offset1[1]);
 		makeNoise(stim1, w, h, targetScale);
 
 		g1 = calcAvgGradient(stim1, w, h);
 
 		for (var shortIt=0; shortIt<TRIALS && !done; shortIt++, iterations++)
 		{
-			seedNoise();
-			setNoiseOffset(Math.random() * 10000, Math.random() * 10000);
+			seed2 = seedNoise();
+			offset2 = [Math.random() * 10000, Math.random() * 10000];
+			setNoiseOffset(offset2[0], offset2[1]);
 
 			var K_RANGE = [.1,.1];
-			var k = Math.random() * (K_RANGE[1]-K_RANGE[0]) + K_RANGE[1];
-			makeNoise(stim2, w, h, targetScale+diff*k);
+			K = Math.random() * (K_RANGE[1]-K_RANGE[0]) + K_RANGE[1];
+			makeNoise(stim2, w, h, targetScale+diff*K);
 
 			// compute difference between the two stimuli
 			g2 = calcAvgGradient(stim2, w, h);
@@ -618,7 +624,7 @@ function randomStimulus(w, h, targetScale, diff, ksThreshold)
 				var view1 = new Float32Array(stim1Buffer.slice(0));
 				var view2 = new Float32Array(stim2Buffer.slice(0));
 
-				var ksRes = KS_test(view1, view2);
+				ksRes = KS_test(view1, view2);
 				if (ksRes.maxD > ksThreshold) {
 					done = false;
 				}
@@ -630,24 +636,45 @@ function randomStimulus(w, h, targetScale, diff, ksThreshold)
 
 	if (done) 
 	{
-		console.log('** base: ' + g1.toFixed(2) + ', actualDiff: ' + actualDiff.toFixed(3) + ", req: " + diff.toFixed(3) + ", converged: " + iterations);
+		//console.log('** base: ' + g1.toFixed(2) + ', actualDiff: ' + actualDiff.toFixed(3) + ", req: " + diff.toFixed(3) + ", converged: " + iterations);
 	}
 	else {
 		console.warn("could not converge. min Diff reached: " + minDiff);
 	}
 
 	return {
-		actualDiff: actualDiff,
-		requestedDiff: diff,
-		iterations: iterations,
+		// the actual stimuli
 		stim1Buffer: stim1Buffer,
 		stim2Buffer: stim2Buffer,
+
+		// difference paramters
+		actualDiff: actualDiff,
+		requestedDiff: diff,
+		targetScale: targetScale,
+		ksThreshold: ksThreshold,
+		ksMaxD: ksRes ? ksRes.maxD : null,
+
+		// number of iterations and whether we've converged
+		iterations: iterations,
 		success: done,
-		minDiff: diff,
+
+		// parameters
+		seed1: seed1,
+		seed2: seed2,
+		offset1: offset1,
+		offset2: offset2,
+		K: K,
+		g1: g1,
+		g2: g2,
+		w: w,
+		h: h,
+		exponentWeight: exponentWeight
 	};
 }
 var TRIALS0 = null;
 var TRIALS = null;
+var TOLERANCE = null;
+var TOLERANCE_INTERCEPT = 0.0;
 
 // start the generation
 onmessage = function(msg)
@@ -656,15 +683,22 @@ onmessage = function(msg)
 	TRIALS  = e.TRIALS;
 	TRIALS0 = e.TRIALS0;
 	TOLERANCE = e.TOLERANCE;
+	TOLERANCE_INTERCEPT = e.TOLERANCE_INTERCEPT;
+	
+	var attempts = e.ATTEMPTS;
 
 	setExponentWeight(e.exponentWeight);
-	var results = randomStimulus(
-		e.w,
-		e.h,
-		e.targetScale,
-		e.diff,
-		e.ksThreshold,
-	);
+	var results = null;
+	for (var i=0; (!results || !results.success) && i<attempts; i++)
+	{
+		results = randomStimulus(
+			e.w,
+			e.h,
+			e.targetScale,
+			e.diff,
+			e.ksThreshold,
+		);
+	}
 
 	postMessage(results);
 }

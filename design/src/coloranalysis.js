@@ -79,6 +79,11 @@ ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 	})(this, _readyCallback, _shaderList)
 }
 
+ColorAnalysis.prototype.clearCanvas = function() {
+	var gl = this.glCanvas.getContext('webgl');
+	gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
 ColorAnalysis.prototype.ready = function() {
 	return this.isReady === true;
 }

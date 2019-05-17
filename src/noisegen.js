@@ -57,10 +57,12 @@ function makeNoise(scalarField, _noiseScale, _exponentWeight)
 		exponentWeight = _exponentWeight;
 	}
 
+	/*
 	noiseOffset[0] /= noiseScale / noiseZoom;
 	noiseOffset[1] /= noiseScale / noiseZoom;
 	noiseZoom = noiseScale;
-
+	*/
+	
 	for (var y=0; y<h; y++)
 	{
 		for (var x=0; x<w; x++) 

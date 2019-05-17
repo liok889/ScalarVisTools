@@ -71,14 +71,20 @@
 
 		#confirmButton {
 			font-size: 14px;
+			height: 50px;
+			width: 110px;
 
+		}
+
+		#divColorScale {
+			text-align: center;
 		}
 
 	</style>
 </head>
 
 <body>
-	<div style="width: 600px; margin:0 auto;">
+	<div style="width: 650px; margin:0 auto;">
 		<div style="margin-bottom: 20px">
 			<!--
 			<div class="uiParentDiv">
@@ -107,15 +113,12 @@
 				
 				<p>&nbsp;
 
-				<p>Terrain is steeper when there is larger CHANGE in elevation between adjacent locations in the map. 
+				<p>Terrain is steeper when there is larger CHANGE in elevation between adjacent locations in the map. That is, elevation changes more quickly as you move across the map.  
 				
-				<p>Click on the map that shows STEEPER terrain on average. Press confirm
-				to make selection and get a new pair of images.
+				<p>Click on the map that shows STEEPER terrain on average. Press the <u>Confirm</u> button to submit choice and get a new pair of maps.
 
 				<p>&nbsp;
 			</div>
-
-
 
 		</div>
 
@@ -123,12 +126,21 @@
 			<div id="divLeft" style="width: 210px; height: 210px; float: left">
 				<canvas id="stimLeft" width="200" height="200"></canvas>
 			</div>
-			<div id="divRight" style="width: 210px; height: 210px; float: right">
+			
+			<div id="divColorScale" style="width: 80; height: 210px; float: right;">
+				<div style="margin-top: 35px; font-size: 13px">
+					high elevation<br><canvas id="colorScaleCanvas" width="25" height="100"></canvas><br>low<br>elevation
+				</div>
+			</div>
+
+			<div id="divRight" style="width: 210px; height: 210px; float: right;">
 				<canvas id="stimRight" width="200" height="200"></canvas>
 			</div>
+
 		</div>
 
-		<div style="text-align: center">
+		<div style="text-align: center; margin-top: 20px; margin-right: 75px">
+			<span id="alert" style="font-weight: bold; color: #db0000; font-size: 14px; visibility: hidden; color: ">Select one of the two maps!</span><br>
 			<button id="confirmButton">Confirm</button>
 			<br><img id="loadingImage" width="120" src="img/loading2.gif">
 		</div>
@@ -158,15 +170,25 @@
 			d3.event.stopPropagation();
 		});
 
-		d3.select("#confirmButton").on('click', function() {
-			if (!selectedImage) {
-				alert("Please answer by clicking one of the two maps.");
-			}
-			else
-			{
-				experiment.answer(selectedImage);
-			}
-		});
+		d3.select("#confirmButton")
+			.on('click', function() {
+				if (!selectedImage) {
+					d3.select("#alert").style('visibility', 'visible');
+					//alert("Please answer by clicking one of the two maps.");
+				}
+				else
+				{
+					d3.select("#alert").style('visibility', 'hidden');
+					experiment.answer(selectedImage);
+				}
+				d3.event.stopPropagation();
+
+			})
+			.on('mousedown', function() {
+				d3.event.stopPropagation();				
+			})
+
+		d3.select("body").on('mousedown', function() { unselect(); });
 
 		var experiment = null;
 		$(document).ready(function() {

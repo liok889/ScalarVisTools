@@ -10,8 +10,10 @@ var MAGNITUDES = [2.0, 3, 4, 5.0]
 var START_DIFF = 3.0;
 var TRIAL_COUNT = 50;
 
-var BACKWARD = 1.5;
-var FORWARD = 0.5;
+var STEP = 0.5/1.75;
+
+var BACKWARD = 2.5*STEP;
+var FORWARD = STEP;
 
 var visLeft, visRight;
 
@@ -58,12 +60,23 @@ function initExperimentGL(exp)
 				exp.visRight.createVisPipeline();
 
 				// initialize colormaps
-				exp.colormapLeft = 	getColorPreset('spectral', null, null, true);
-				exp.colormapRight = getColorPreset('spectral', null, null, true);
+				exp.colormapLeft = 	getColorPreset('greyscale', null, null, true);
+				exp.colormapRight = getColorPreset('greyscale', null, null, true);
 				
 				exp.stimulus.getFirst().setColorMap(exp.colormapLeft);
 				exp.stimulus.getSecond().setColorMap(exp.colormapRight);
 
+				// render color map
+				var scaleCanvas = d3.select("#colorScaleCanvas");
+				exp.colormapLeft.drawColorScale(
+					+scaleCanvas.attr('width'),
+					+scaleCanvas.attr('height'), 100,
+					'vertical',
+					scaleCanvas.node()
+				);
+
+				// when ready, visualize the stimulus
+				exp.next();
 			}
 		});
 }
@@ -93,16 +106,18 @@ function Experiment()
 	this.stimulus = new TAFC(STIM_W, STIM_H);
 	this.stimulus.shuffleImagePosition();
 
-	// initialize GL elements
-	initExperimentGL(this);
+	this.results = [];
+	this.correctCount = 0;
+	this.totalCount = 0;
 
 	// show loading image
 	d3.select("#loadingImage").style("visibility", 'visible')
 
 	// hide confirm button
-	d3.select("#confirmButton").style("visibility", 'hidden');
-	this.next();
+	d3.select("#confirmButton").node().disabled = true;
 
+	// initialize GL elements
+	initExperimentGL(this);
 }
 
 Experiment.prototype.randomStimulusThreaded = function() 
@@ -135,14 +150,17 @@ Experiment.prototype.visualize = function(results)
 	this.visLeft.run('vis');
 	this.visRight.run('vis');
 
+	unselect();
+
 	// hide loading image
 	d3.select("#loadingImage")
 		.style('visibility', 'hidden')
 
 	// show confirm button
 	d3.select('#confirmButton')
-		.style('visibility', 'visible');
-	unselect();
+		.node().disabled = false;
+		//.style('visibility', 'visible');
+
 }
 
 Experiment.prototype.next = function()
@@ -159,13 +177,13 @@ Experiment.prototype.answer = function(response)
 		(response == 'left' && this.stimulus.isSwaped()))
 	{
 		correct = true;
-		console.log("CORRECT!")
+		this.correctCount++;
 	}
 	else
 	{
 		correct = false;
-		console.log("INcorrect!")
 	}
+	this.totalCount++;
 	this.currentTrial++;
 	
 
@@ -177,19 +195,28 @@ Experiment.prototype.answer = function(response)
 	{
 		if (correct) {
 			this.currentDiff = Math.max(DIFF[0], this.currentDiff-FORWARD);
+			console.log("CORRECT! difficulty: " + this.currentDiff)
 		}
 		else {
 			this.currentDiff = Math.min(DIFF[1], this.currentDiff+BACKWARD);
+			console.log("inCORRECT :( difficulty rolled back to: " + this.currentDiff)
+
 		}
 
-		// move to next stimlus
-		this.next();
-
 		// show loading image
+		unselect();
 		d3.select("#loadingImage").style("visibility", 'visible')
 
 		// hide confirm button
-		d3.select("#confirmButton").style("visibility", 'hidden');
-		unselect();
+		d3.select("#confirmButton")
+			.node().disabled = true;
+			//.style("visibility", 'hidden');
+
+		// clear canvas
+		this.visLeft.clearCanvas();
+		this.visRight.clearCanvas();
+		// move to next stimlus
+		this.next();
+
 	}
 }
