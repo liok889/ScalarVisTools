@@ -1,5 +1,5 @@
 
-var ATTEMPTS = 6;
+var ATTEMPTS = 8;
 var TRIALS0 = 15;
 var TRIALS = 15;
 
@@ -17,7 +17,7 @@ var NOISE_TYPE_DISPLACEMENT = 5;
 var LOW_GRADIENT = 1.5;
 var MED_GRADIENT = 2.5;
 var HI_GRADIENT = 5.0;
-var DIFF = [0.25, 15.0];
+var DIFF = [0.1, 14.0];
 
 var noiseType = NOISE_TYPE_SIMPLEX;
 

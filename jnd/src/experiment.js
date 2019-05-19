@@ -6,14 +6,16 @@ var KS_TRIALS = 10;
 var KS_TRIAL_EXTENSION = 4;
 var KS_ENABLE = false;
 
-var MAGNITUDES = [2.0, 3, 4, 5.0]
+var MAGNITUDES = [2.0, 3.5, 5.0]
 var START_DIFF = 3.0;
-var TRIAL_COUNT = 50;
+var TRIAL_COUNT = 4;
 
 var STEP = 0.5/1.75;
 
 var BACKWARD = 2.5*STEP;
 var FORWARD = STEP;
+var ENGAGEMENT_CHECKS = 0;
+var ENGAGEMENT_DIFF = 14.0;
 
 var visLeft, visRight;
 
@@ -76,6 +78,7 @@ function initExperimentGL(exp)
 				);
 
 				// when ready, visualize the stimulus
+				exp.nextBlock();
 				exp.next();
 			}
 		});
@@ -97,16 +100,21 @@ function Experiment()
 	// randomize order of magnitudes
 	shuffleArray(MAGNITUDES);
 
-	this.currentDiff = START_DIFF;
-	this.currentMagnitude = MAGNITUDES[0];
-	this.currentMagnitudeIndex = 0;
-	this.currentTrial = 0;
+	// magnitudes
+	this.currentMagnitude = null;
+	this.currentMagnitudeIndex = -1;
+
+	// experimental data
+	this.experimentalData = [];
 
 	// stimulius object
 	this.stimulus = new TAFC(STIM_W, STIM_H);
 	this.stimulus.shuffleImagePosition();
 
+	// keep track of results
 	this.results = [];
+	this.engagements = [];
+	this.engagementCorrectCount = 0;
 	this.correctCount = 0;
 	this.totalCount = 0;
 
@@ -120,13 +128,84 @@ function Experiment()
 	initExperimentGL(this);
 }
 
-Experiment.prototype.randomStimulusThreaded = function() 
+Experiment.prototype.sendData = function(TRIALS) 
 {
-	(function(experiment, timeStart) 
+	var data2send = JSON.stringify({ 
+		experimentalData: this.experimentalData,
+		engagementsCorrect: this.engagementCorrectCount,
+		engagementsTotal: ENGAGEMENT_CHECKS * MAGNITUDES.length
+	});
+	console.log("data2send size: " + data2send.length);
+
+	(function(experiment, trial, _data2send) {
+		$.ajax({
+			type: "POST",
+			url: "php/experimental_data.php",
+		
+			data: _data2send,
+			dataType: "json",
+		
+			contentType: "application/json; charset=utf-8",
+			success: function(data) { 
+				//alert(data);
+				console.log("sendData SUCCESS");
+				window.location.replace('strategy.html');
+			},
+			failure: function(errMsg) {
+				//alert(errMsg);
+				console.log("sendData failed: errMsg");
+				console.log("trials left: " + (trial-1));
+				if (trials > 0) {
+					experiment.sendData(trials-1);
+				}
+				else
+				{
+					//window.location.replace('strategy.html');	
+				}
+			}
+		});
+	})(this, TRIALS !== undefined ? TRIALS : 3, data2send);
+}
+
+Experiment.prototype.nextBlock = function()
+{
+	// how far into the experiments should we place engagement tests?
+	var ENGAGEMENT_OFFSET = 3;
+
+	// compute position of engagements
+	this.engagements = [];
+	for (var i=0; i<ENGAGEMENT_CHECKS; i++) 
 	{
-		var magnitude = experiment.currentMagnitude;
-		var diff = experiment.currentDiff;
-	
+		var index = Math.floor(Math.random() * (TRIAL_COUNT - ENGAGEMENT_OFFSET*2) + ENGAGEMENT_OFFSET + .5);
+		if (index < ENGAGEMENT_OFFSET) 
+		{
+			index = ENGAGEMENT_OFFSET;
+		}
+		else if (index > TRIAL_COUNT-ENGAGEMENT_OFFSET-1) {
+			index = TRIAL_COUNT-ENGAGEMENT_OFFSET-2;
+		}
+		this.engagements.push(index);
+	}
+	this.engagements.sort(function(a,b) { return a-b; });
+
+	this.currentDiff = START_DIFF;
+	this.currentTrial = 0;
+	this.currentMagnitudeIndex++;
+	if (this.currentMagnitudeIndex >= MAGNITUDES.length) {
+		console.log("EXPERIMENT complete!")
+		return true;
+	}
+	else
+	{
+		this.currentMagnitude = MAGNITUDES[this.currentMagnitudeIndex];
+		return false;
+	}
+}
+
+Experiment.prototype.randomStimulusThreaded = function(_magnitude, _diff) 
+{
+	(function(experiment, timeStart, magnitude, diff) 
+	{
 		// exponent weight set by default in noisegen.js (don't change)	
 		// setExponentWeight(expWeight);
 
@@ -137,12 +216,19 @@ Experiment.prototype.randomStimulusThreaded = function()
 			
 			function(results) 
 			{
+
 				// visualize the 2AFC images
-				experiment.visualize(results);	
+				experiment.visualize(results);
+
+				// keep track of current results
+				experiment.currentStimulus = results;
+
+				// zero out the stimulus buffers
+				experiment.currentStimulus.stim1Buffer = undefined;
+				experiment.currentStimulus.stim2Buffer = undefined;
 			}
 		);
-	})(this, Date.now());
-
+	})(this, Date.now(), _magnitude, _diff);
 }
 
 Experiment.prototype.visualize = function(results)
@@ -165,14 +251,84 @@ Experiment.prototype.visualize = function(results)
 
 Experiment.prototype.next = function()
 {
+
+	// show loading image
+	unselect();
+	d3.select("#loadingImage").style("visibility", 'visible')
+
+	// hide confirm button
+	d3.select("#confirmButton")
+		.node().disabled = true;
+		//.style("visibility", 'hidden');
+
+	// clear canvas
+	this.visLeft.clearCanvas();
+	this.visRight.clearCanvas();
+
+
+	// see if it's time for engagement check
+	var magnitude = this.currentMagnitude;
+	var diff = this.currentDiff;
+
+	if (this.engagements.length > 0 && this.currentTrial == this.engagements[0]) 
+	{
+		this.displayingEngagement = true;
+		diff = ENGAGEMENT_DIFF;
+	}
+
 	// if worker is supported
 	if (window.Worker) {
-		this.randomStimulusThreaded();
+		this.randomStimulusThreaded(magnitude, diff);
 	}
 }
 
 Experiment.prototype.answer = function(response)
 {
+	if (this.displayingEngagement)
+	{
+		this.answerEngagement(response);
+	}
+	else
+	{
+		this.answerRegular(response);
+	}
+
+	// compute percentage complete to update progress bar
+	var p = 
+		(this.totalCount + this.currentMagnitudeIndex*ENGAGEMENT_CHECKS + ENGAGEMENT_CHECKS-this.engagements.length) /
+		((TRIAL_COUNT + ENGAGEMENT_CHECKS) * MAGNITUDES.length);
+	p = Math.min(1.0, p * .9 + .1);
+	d3.select("#rectProgress").attr('width', Math.floor(150*p+.5));
+	d3.select("#labelProgress").html(Math.floor(100*p + .5) + '%');
+
+}
+
+Experiment.prototype.answerEngagement = function(response)
+{
+	var correct;
+	if ((response == 'right' && !this.stimulus.isSwaped()) ||
+		(response == 'left' && this.stimulus.isSwaped()))
+	{
+		correct = true;
+	}
+	else
+	{
+		correct = false;
+	}
+	
+	if (correct) {
+		this.engagementCorrectCount++;
+	}
+
+	// remove one from engagement
+	this.engagements.shift();
+	this.displayingEngagement = false;
+	this.next();
+}
+
+Experiment.prototype.answerRegular = function(response)
+{
+	var correct;
 	if ((response == 'right' && !this.stimulus.isSwaped()) ||
 		(response == 'left' && this.stimulus.isSwaped()))
 	{
@@ -183,13 +339,47 @@ Experiment.prototype.answer = function(response)
 	{
 		correct = false;
 	}
+
+	// store the answer and sequence
+	this.currentStimulus.correct = correct;
+	this.currentStimulus.stimlusNum = this.totalCount;
+	this.currentStimulus.blockNum = this.currentMagnitudeIndex;
+
+
+	// store answer
+	this.experimentalData.push(this.currentStimulus)
+
+	// increment totals
 	this.totalCount++;
 	this.currentTrial++;
 	
-
-	if (this.currentTrial > TRIAL_COUNT)
+	// move to next stimulus or block
+	if (this.currentTrial >= TRIAL_COUNT)
 	{
-		console.log("experiment complete!")
+		console.log("block complete!");
+		if (this.nextBlock()) 
+		{
+			console.log("We're finished");
+
+			// send the data
+			this.sendData();
+
+			// clear canvas
+			this.visLeft.clearCanvas();
+			this.visRight.clearCanvas();
+
+
+			d3.select("#confirmButton")
+				.node().disabled = true;
+
+			d3.select("#loadingImage")
+				.style('visibility', 'visible');
+
+		}
+		else
+		{
+			this.next();
+		}
 	}
 	else
 	{
@@ -201,20 +391,9 @@ Experiment.prototype.answer = function(response)
 			this.currentDiff = Math.min(DIFF[1], this.currentDiff+BACKWARD);
 			console.log("inCORRECT :( difficulty rolled back to: " + this.currentDiff)
 
+
 		}
 
-		// show loading image
-		unselect();
-		d3.select("#loadingImage").style("visibility", 'visible')
-
-		// hide confirm button
-		d3.select("#confirmButton")
-			.node().disabled = true;
-			//.style("visibility", 'hidden');
-
-		// clear canvas
-		this.visLeft.clearCanvas();
-		this.visRight.clearCanvas();
 		// move to next stimlus
 		this.next();
 

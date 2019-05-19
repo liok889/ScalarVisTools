@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
 
@@ -56,10 +57,10 @@
 		}
 
 		#stimLeft {
-			margin: 5 5;
+			margin: 5px 5px;
 		}
 		#stimRight {
-			margin: 5 5;
+			margin: 5px 5px;
 		}
 
 		#divLeft {
@@ -69,11 +70,11 @@
 			border: solid 4px #eeeeee;
 		}
 
-		#confirmButton {
+		#confirmButton 
+		{
 			font-size: 14px;
-			height: 50px;
+			height: 60px;
 			width: 110px;
-
 		}
 
 		#divColorScale {
@@ -127,9 +128,9 @@
 				<canvas id="stimLeft" width="200" height="200"></canvas>
 			</div>
 			
-			<div id="divColorScale" style="width: 80; height: 210px; float: right;">
+			<div id="divColorScale" style="width: 90; height: 210px; float: right;">
 				<div style="margin-top: 35px; font-size: 13px">
-					high elevation<br><canvas id="colorScaleCanvas" width="25" height="100"></canvas><br>low<br>elevation
+					high<br>elevation<br><canvas id="colorScaleCanvas" width="25" height="100"></canvas><br>low<br>elevation
 				</div>
 			</div>
 
@@ -139,10 +140,20 @@
 
 		</div>
 
-		<div style="text-align: center; margin-top: 20px; margin-right: 75px">
-			<span id="alert" style="font-weight: bold; color: #db0000; font-size: 14px; visibility: hidden; color: ">Select one of the two maps!</span><br>
-			<button id="confirmButton">Confirm</button>
-			<br><img id="loadingImage" width="120" src="img/loading2.gif">
+		<div style="text-align: center; margin-top: 0px; margin-right: 50px">
+			<div>
+				<span id="alert" style="font-weight: bold; color: #db0000; font-size: 14px; visibility: hidden">Select one of the two maps!</span><br>
+				<button id="confirmButton">Confirm</button>
+				<br><img id="loadingImage" width="80" src="img/loading2.gif">
+			</div>
+			<div style="text-align: center; font-size: 14px">
+				Study progress:
+				<br>
+				<svg id="svgProgress" width="150" height="12" style="margtin-top: 5px; background-color: #cccccc">
+					<rect id="rectProgress" height="12" width="15" style="fill: #46a1fc"></rect>
+				</svg>
+				<span id="labelProgress">10%</span>
+			</div>
 		</div>
 	</div>
 

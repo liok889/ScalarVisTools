@@ -650,7 +650,7 @@ function randomStimulus(w, h, targetScale, diff, ksThreshold)
 		// difference paramters
 		actualDiff: actualDiff,
 		requestedDiff: diff,
-		targetScale: targetScale,
+		magnitude: targetScale,
 		ksThreshold: ksThreshold,
 		ksMaxD: ksRes ? ksRes.maxD : null,
 
