@@ -690,7 +690,7 @@ onmessage = function(msg)
 	setExponentWeight(e.exponentWeight);
 	var results = null;
 	var startTime = Date.now();
-	for (var i=0; (!results || !results.success) && i<attempts; i++)
+	for (var i=0; (!results || !results.converged) && i<attempts; i++)
 	{
 		results = randomStimulus(
 			e.w,
