@@ -8,7 +8,7 @@ var KS_ENABLE = false;
 
 var MAGNITUDES = [2.0, 3.5, 5.0]
 var START_DIFF = 3.0;
-var TRIAL_COUNT = 4;
+var TRIAL_COUNT = 1;
 
 var STEP = 0.5/1.75;
 
@@ -149,14 +149,14 @@ Experiment.prototype.sendData = function(TRIALS)
 			success: function(data) { 
 				//alert(data);
 				console.log("sendData SUCCESS");
-				window.location.replace('strategy.html');
+				
+				//window.location.replace('strategy.html');
 			},
-			failure: function(errMsg) {
-				//alert(errMsg);
-				console.log("sendData failed: errMsg");
+			error: function(errMsg) {
+				console.log("sendData failed: " + errMsg);
 				console.log("trials left: " + (trial-1));
-				if (trials > 0) {
-					experiment.sendData(trials-1);
+				if (trial > 0) {
+					experiment.sendData(trial-1);
 				}
 				else
 				{
@@ -164,6 +164,7 @@ Experiment.prototype.sendData = function(TRIALS)
 				}
 			}
 		});
+		console.log("send complete");
 	})(this, TRIALS !== undefined ? TRIALS : 3, data2send);
 }
 
@@ -219,6 +220,7 @@ Experiment.prototype.randomStimulusThreaded = function(_magnitude, _diff)
 
 				// visualize the 2AFC images
 				experiment.visualize(results);
+				experiment.stimDisplayTime = Date.now();
 
 				// keep track of current results
 				experiment.currentStimulus = results;
@@ -341,7 +343,8 @@ Experiment.prototype.answerRegular = function(response)
 	}
 
 	// store the answer and sequence
-	this.currentStimulus.correct = correct;
+	this.currentStimulus.responseTime = Date.now() - this.stimDisplayTime;
+	this.currentStimulus.correct = correct ? 1 : 0;
 	this.currentStimulus.stimlusNum = this.totalCount;
 	this.currentStimulus.blockNum = this.currentMagnitudeIndex;
 

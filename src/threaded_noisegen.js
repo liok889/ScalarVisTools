@@ -656,7 +656,7 @@ function randomStimulus(w, h, targetScale, diff, ksThreshold)
 
 		// number of iterations and whether we've converged
 		iterations: iterations,
-		success: done,
+		converged: done,
 
 		// parameters
 		seed1: seed1,
@@ -689,6 +689,7 @@ onmessage = function(msg)
 
 	setExponentWeight(e.exponentWeight);
 	var results = null;
+	var startTime = Date.now();
 	for (var i=0; (!results || !results.success) && i<attempts; i++)
 	{
 		results = randomStimulus(
@@ -698,7 +699,9 @@ onmessage = function(msg)
 			e.diff,
 			e.ksThreshold,
 		);
+		results.iterations += i*(TRIALS*TRIALS0);
 	}
+	results.generationTime = Date.now() - startTime;
 
 	postMessage(results);
 }

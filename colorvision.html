@@ -31,6 +31,10 @@
 			<button id="submitButton" style="font-size: 14px" onclick="nextPlate();">Submit</button>
 			<br><span id="warnLabel" style="visibility: hidden; font-size: 14px; font-weight: bold; color: #db0000">Enter a number or the word 'none'</span>
 
+			<form action="php/check_colorvision.php" name="theForm" method="post">
+				<input id="h_resC" type="hidden" name="resC" />
+				<input id="h_total" type="hidden" name="total" />
+			</form>
 		</div>
 	</div>
 
@@ -111,6 +115,11 @@
 					d3.select("#ishiharaPlate").attr('src', 'img/loading2.gif');
 					d3.select("#entry").style("visibility", 'hidden')
 					d3.select("#submitButton").node().disabled = true;
+					
+					d3.select("#h_resC").node().value = resC;
+					d3.select("#h_total").node().value = PLATES.length;
+					document.forms["theForm"].submit();
+					/*
 					if (resC >= 11) {
 						console.log("SUCCESS");
 					}
@@ -118,6 +127,7 @@
 					{
 						console.log("FAILED");
 					}
+					*/
 				}
 			
 			}
