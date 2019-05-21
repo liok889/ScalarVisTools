@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<script src="jnd/lib/d3.min.js"></script>
+	<style>
+		body {
+			background-color: #white;
+			font-family: Helvetica;
+			font-size: 17px;
+
+			/* disable selection */
+			-webkit-user-select: none;
+			-moz-user-select: -moz-none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+	</style>
+</head>
+<body>
+	<div style="width: 500px; margin:0 auto;">
+		<div width="100%" style="text-align: center">
+
+
+			<p>&nbsp;
+			<p style="font-size: 20px"><b>Qualification Test</b>
+
+			<p>Look at the following circle. Enter the number you see inside. If you don't see any number or if you see a random pattern, enter <b>none</b>.
+			<p><img id="ishiharaPlate">
+			<p><input id="entry" type="text" style="width: 70px; height: 30px; font-size: 18px"><br>
+			<button id="submitButton" style="font-size: 14px" onclick="nextPlate();">Submit</button>
+			<br><span id="warnLabel" style="visibility: hidden; font-size: 14px; font-weight: bold; color: #db0000">Enter a number or the word 'none'</span>
+
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		var currentIndex = 0;
+		var PLATES = [
+			{img: 'Ishihara-Plate-01-10.jpg', res: 12},
+			{img: 'Ishihara-Plate-02-10.jpg', res: 8},
+			{img: 'Ishihara-Plate-03-10.jpg', res: 29},
+			{img: 'Ishihara-Plate-04-10.jpg', res: 5},
+
+			{img: 'Ishihara-Plate-05-10.jpg', res: 74},
+			{img: 'Ishihara-Plate-06-10.jpg', res: 6},
+			{img: 'Ishihara-Plate-07-10.jpg', res: 97},
+			{img: 'Ishihara-Plate-08-10.jpg', res: 7},
+			
+
+			{img: 'Ishihara-Plate-09-10.jpg', res: 73},
+			{img: 'Ishihara-Plate-10-10.jpg', res: 26},
+			{img: 'Ishihara-Plate-11-14.jpg', res: null},
+			{img: 'Ishihara-Plate-12-14.jpg', res: null},
+
+			{img: 'Ishihara-Plate-13-14.jpg', res: null},
+			{img: 'Ishihara-Plate-14-14.jpg', res: 42}
+		];
+
+		PLATES.sort(function() { return Math.random()-.5; });
+
+		// show the first plate
+		d3.select("#ishiharaPlate").attr('src', 'img/ishihara/' + PLATES[currentIndex].img);
+		d3.select("#entry").on('keydown', function() {
+			if (d3.event.keyCode === 13) {
+				nextPlate();
+			}
+		});
+
+		var resC = 0;
+
+		function nextPlate() 
+		{
+			d3.select("#warnLabel").style('visibility', 'hidden');
+			var response = d3.select("#entry").node().value.trim().toLowerCase();
+			if (response.length == 0) {
+				d3.select("#warnLabel").style('visibility', 'visible');
+			}
+			else
+			{
+				if (response[0] == '"') {
+					response = response.substr(1);
+				}
+				
+				if (response[response.length-1] == '"') {
+					response = response.substr(0, response.length-1);
+				}
+
+				if (response.length > 4) {
+					response = response.substr(0, 4);
+				}
+
+				// test against expected
+				if (PLATES[currentIndex].res === null && (response == 'none' || response == 'non' || response == 'no')) 
+				{
+					resC++;
+				}
+				else if (PLATES[currentIndex].res == +response) {
+					resC++;
+				}
+				
+				// move to next
+				d3.select("#entry").node().value = '';
+				currentIndex++;
+				if (currentIndex < PLATES.length) 
+				{
+					d3.select("#ishiharaPlate").attr('src', 'img/ishihara/' + PLATES[currentIndex].img);
+				}
+				else
+				{
+					d3.select("#ishiharaPlate").attr('src', 'img/loading2.gif');
+					d3.select("#entry").style("visibility", 'hidden')
+					d3.select("#submitButton").node().disabled = true;
+					if (resC >= 11) {
+						console.log("SUCCESS");
+					}
+					else
+					{
+						console.log("FAILED");
+					}
+				}
+			
+			}
+		}
+
+	</script>
+
+</body>
+</html>
