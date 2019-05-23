@@ -345,8 +345,8 @@ Experiment.prototype.answerRegular = function(response)
 	// store the answer and sequence
 	this.currentStimulus.responseTime = Date.now() - this.stimDisplayTime;
 	this.currentStimulus.correct = correct ? 1 : 0;
-	this.currentStimulus.stimlusNum = this.totalCount;
-	this.currentStimulus.blockNum = this.currentMagnitudeIndex;
+	this.currentStimulus.stimulusNum = this.totalCount;
+	this.currentStimulus.blockNum = this.currentMagnitudeIndex+1;
 
 
 	// store answer
