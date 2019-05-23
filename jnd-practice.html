@@ -25,7 +25,7 @@
 	
 	<style>
 		body {
-			background-color: #eeeeee;
+			background-color: #ffffff;
 			font-family: Helvetica;
 			font-size: 17px;
 
@@ -64,10 +64,10 @@
 		}
 
 		#divLeft {
-			border: solid 4px #eeeeee;
+			border: solid 4px #ffffff;
 		}
 		#divRight {
-			border: solid 4px #eeeeee;
+			border: solid 4px #ffffff;
 		}
 
 		#confirmButton 
@@ -112,8 +112,10 @@
 			-->
 			<div class="uiParentDiv">
 				
-				<p>&nbsp;
-
+				<div style="font-weight: bold; font-size: 20px; background-color: #eeeeee; border: solid 1px black; width: 100%; height: 40px; padding-top: 20px; padding-bottom: 5px; padding: 5px 5px">
+					<span id="practiceLabel">Practice</span>
+				</div>
+				
 				<p>Terrain is steeper when there is larger CHANGE in elevation between adjacent locations in the map. That is, elevation changes more quickly as you move across the map.  
 				
 				<p>Click on the map that shows STEEPER terrain on average. Press the <u>Confirm</u> button to submit choice and get a new pair of maps.
@@ -144,10 +146,10 @@
 			<div>
 				<span id="alert" style="font-weight: bold; color: #db0000; font-size: 14px; visibility: hidden">Select one of the two maps!</span><br>
 				<button id="confirmButton">Confirm</button>
-				<br><img id="loadingImage" width="80" src="img/loading2.gif">
+				<br><img id="loadingImage1" width="80" src="img/loading2.gif" style="visibility: hidden">
 			</div>
 			<div style="text-align: center; font-size: 14px">
-				Study progress:
+				Practice progress:
 				<br>
 				<svg id="svgProgress" width="150" height="12" style="margtin-top: 5px; background-color: #cccccc">
 					<rect id="rectProgress" height="12" width="15" style="fill: #46a1fc"></rect>
@@ -159,9 +161,10 @@
 
 	<script type="text/javascript">
 		// trial config
-		var MAGNITUDES = [2.0, 3.5, 5.0]
-		var START_DIFF = 3.0;
-		var TRIAL_COUNT = 1;
+		var MAGNITUDES = [2.0, 3.5, 2.5];
+		var START_DIFF = 4.0;
+		var TRIAL_COUNT = 7;
+		var lastBlock = [];
 
 		// engagements
 		var ENGAGEMENT_CHECKS = 0;
@@ -169,12 +172,68 @@
 
 		// stepping
 		var STEP = 0.5/1.75;
-		var BACKWARD = 2.5*STEP;
+		var BACKWARD = 3.0*STEP;
 		var FORWARD = STEP;
-		var BORDER_STYLE = '4px solid blue';
-
 
 		var selectedImage = null;
+		var PRACTICE = true;
+		var FLASH_RATE = 80;
+		var BORDER_STYLE = '4px solid blue';
+		var BORDER_STYLE_ERROR = '4px solid red';
+		var overallAccuracy = 0.0;
+
+		if (DIFF) {
+			DIFF[0] = 0.5;
+		}
+
+		for (var i=0; i<TRIAL_COUNT; i++) {
+			lastBlock.push(true);
+		}
+
+		function getUrlParameter(name) {
+			name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+			var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+			var results = regex.exec(location.search);
+			return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+		};
+
+		var R = getUrlParameter('r');
+		if (R == '1') 
+		{
+			d3.select("#practiceLabel").html("Practice (2 / 2)");
+		}
+
+		function flash() {
+			if (!selectedImage) {
+				return;
+			}
+			var theDiv = selectedImage == 'left' ? d3.select('#divLeft') : d3.select('#divRight');
+			(function(_theDiv) {
+				theDiv.style('border', null)
+				setTimeout(function() {
+					theDiv.style('border', BORDER_STYLE_ERROR);
+					setTimeout(function() {
+						theDiv.style('border', null);
+						setTimeout(function() {
+							theDiv.style('border', BORDER_STYLE_ERROR);
+							setTimeout(function() {
+								theDiv.style('border', null);
+								setTimeout(function() {
+									theDiv.style('border', BORDER_STYLE_ERROR);
+									setTimeout(function() {
+										theDiv.style('border', null);
+										setTimeout(function() {
+											theDiv.style('border', BORDER_STYLE);
+										});
+									}, FLASH_RATE);
+								}, FLASH_RATE);
+							}, FLASH_RATE);
+						}, FLASH_RATE);
+					}, FLASH_RATE);
+				}, FLASH_RATE);
+			})(theDiv);
+		}
+
 		function unselect() 
 		{
 			d3.select("#divLeft")
@@ -183,6 +242,7 @@
 				.style("border", null);
 			selectedImage = null;
 		}
+
 		d3.select("#divLeft").on("mousedown", function() { 
 			d3.select("#divRight").style("border", null);
 			d3.select(this).style("border", BORDER_STYLE); 
@@ -197,17 +257,80 @@
 			d3.event.stopPropagation();
 		});
 
+		var newStimulus = true;
 		d3.select("#confirmButton")
-			.on('click', function() {
+			.on('click', function() 
+			{
 				if (!selectedImage) {
-					d3.select("#alert").style('visibility', 'visible');
-					//alert("Please answer by clicking one of the two maps.");
+					d3.select("#alert")
+						.style('visibility', 'visible')
+						.style("color", '#db0000')
+						.html("Select one of the two maps!");
 				}
 				else
 				{
+					var currentTrial = experiment.getCurrentTrial();
+					var currentBlock = experiment.getCurrentBlock()
+					
 					d3.select("#alert").style('visibility', 'hidden');
 					var result = experiment.answer(selectedImage);
+					if (currentBlock == MAGNITUDES.length-1) 
+					{
+						if (lastBlock[currentTrial]) 
+						{
+							lastBlock[currentTrial] = result;
+						}
+					}
+					if (newStimulus && result) {
+						overallAccuracy += 1.0 / (MAGNITUDES.length * TRIAL_COUNT);
+					}
+					if (!result && PRACTICE) {
+						d3.select("#alert")
+							.style("visibility", 'visible')
+							.style("color", '#db0000')
+							.html("Sorry, incorrect choice");
+						newStimulus = false;
+						flash();
+					}
+					else {
+						newStimulus = true;
+						d3.select("#alert")
+							.style('visibility', 'visible')
+							.style('color', '#009933')
+							.html("Correct!");
+						setTimeout(function() {
+							d3.select("#alert").style('visibility', 'hidden');
+						}, 750);
+					}
 				}
+
+				// see if the practice is over
+				if (experiment.isFinished()) {
+					// compute accuracy in the last block
+					var correct = 0;
+					for (var i=0; i<lastBlock.length; i++) {
+						if (lastBlock[i]) {
+							correct++;
+						}
+					}
+					
+					// check whether the last block has at least 
+					// a miniumum level of accuracy
+					if (correct >= 4 || overallAccuracy >= .66) 
+					{
+						window.location.replace('debrief.html')
+					}
+					else if (!R)
+					{
+						window.location.replace('jnd-practice.html?r=1');
+					}
+					else
+					{
+						// failed in a row
+						alert("Sorry, you repeatedly failed the training session");
+					}
+				}
+
 				d3.event.stopPropagation();
 
 			})
@@ -219,7 +342,7 @@
 
 		var experiment = null;
 		$(document).ready(function() {
-			experiment = new Experiment();
+			experiment = new Experiment(PRACTICE);
 		})
 	</script>
 </body>

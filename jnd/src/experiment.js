@@ -6,16 +6,7 @@ var KS_TRIALS = 10;
 var KS_TRIAL_EXTENSION = 4;
 var KS_ENABLE = false;
 
-var MAGNITUDES = [2.0, 3.5, 5.0]
-var START_DIFF = 3.0;
-var TRIAL_COUNT = 1;
 
-var STEP = 0.5/1.75;
-
-var BACKWARD = 2.5*STEP;
-var FORWARD = STEP;
-var ENGAGEMENT_CHECKS = 0;
-var ENGAGEMENT_DIFF = 14.0;
 
 var visLeft, visRight;
 
@@ -95,10 +86,13 @@ function shuffleArray(a) {
 	return a;
 }
 
-function Experiment()
+function Experiment(practice)
 {
 	// randomize order of magnitudes
-	shuffleArray(MAGNITUDES);
+	if (!practice) {
+		shuffleArray(MAGNITUDES);
+	}
+	this.practice = practice
 
 	// magnitudes
 	this.currentMagnitude = null;
@@ -128,7 +122,14 @@ function Experiment()
 	initExperimentGL(this);
 }
 
-Experiment.prototype.sendData = function(TRIALS) 
+Experiment.prototype.getCurrentBlock = function() {
+	return this.currentMagnitudeIndex;
+}
+Experiment.prototype.getCurrentTrial = function() {
+	return this.currentTrial;
+}
+
+Experiment.prototype.sendData = function(TRIALS, callback) 
 {
 	var data2send = JSON.stringify({ 
 		experimentalData: this.experimentalData,
@@ -137,35 +138,36 @@ Experiment.prototype.sendData = function(TRIALS)
 	});
 	console.log("data2send size: " + data2send.length);
 
-	(function(experiment, trial, _data2send) {
+	(function(experiment, trial, _data2send, _callback) {
 		$.ajax({
 			type: "POST",
 			url: "php/experimental_data.php",
 		
 			data: _data2send,
 			dataType: "json",
-		
 			contentType: "application/json; charset=utf-8",
-			success: function(data) { 
-				//alert(data);
+			
+			success: function(data) 
+			{ 
 				console.log("sendData SUCCESS");
-				
-				//window.location.replace('strategy.html');
+				_callback(true);				
 			},
-			error: function(errMsg) {
+
+			error: function(errMsg) 
+			{
 				console.log("sendData failed: " + errMsg);
-				console.log("trials left: " + (trial-1));
+				console.log("trials left: " + (trial));
 				if (trial > 0) {
-					experiment.sendData(trial-1);
+					experiment.sendData(trial-1, _callback);
 				}
 				else
 				{
-					//window.location.replace('strategy.html');	
+					_callback(false);
 				}
 			}
 		});
 		console.log("send complete");
-	})(this, TRIALS !== undefined ? TRIALS : 3, data2send);
+	})(this, TRIALS != undefined ? TRIALS : 3, data2send, callback);
 }
 
 Experiment.prototype.nextBlock = function()
@@ -286,13 +288,17 @@ Experiment.prototype.next = function()
 
 Experiment.prototype.answer = function(response)
 {
+	var result = null;
 	if (this.displayingEngagement)
 	{
-		this.answerEngagement(response);
+		result = this.answerEngagement(response);
 	}
 	else
 	{
-		this.answerRegular(response);
+		result = this.answerRegular(response);
+		if (this.practice && !result) {
+			return false;
+		}
 	}
 
 	// compute percentage complete to update progress bar
@@ -303,6 +309,7 @@ Experiment.prototype.answer = function(response)
 	d3.select("#rectProgress").attr('width', Math.floor(150*p+.5));
 	d3.select("#labelProgress").html(Math.floor(100*p + .5) + '%');
 
+	return result;
 }
 
 Experiment.prototype.answerEngagement = function(response)
@@ -326,6 +333,11 @@ Experiment.prototype.answerEngagement = function(response)
 	this.engagements.shift();
 	this.displayingEngagement = false;
 	this.next();
+	return correct;
+}
+
+Experiment.prototype.isFinished = function() { 
+	return this.finished === true;
 }
 
 Experiment.prototype.answerRegular = function(response)
@@ -340,6 +352,10 @@ Experiment.prototype.answerRegular = function(response)
 	else
 	{
 		correct = false;
+	}
+
+	if (this.practice && !correct) {
+		return false;
 	}
 
 	// store the answer and sequence
@@ -363,9 +379,20 @@ Experiment.prototype.answerRegular = function(response)
 		if (this.nextBlock()) 
 		{
 			console.log("We're finished");
+			this.finished = true;
 
 			// send the data
-			this.sendData();
+			if (!this.practice) {
+				this.sendData(undefined, function(sent) 
+				{
+					console.log("Going to strategy.html");
+					window.location.replace("strategy.html");
+				});
+			}
+			else
+			{
+				// practice complete
+			}
 
 			// clear canvas
 			this.visLeft.clearCanvas();
@@ -401,4 +428,5 @@ Experiment.prototype.answerRegular = function(response)
 		this.next();
 
 	}
+	return correct;
 }
