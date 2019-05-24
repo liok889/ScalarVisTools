@@ -134,8 +134,14 @@ Experiment.prototype.sendData = function(TRIALS, callback)
 	var data2send = JSON.stringify({ 
 		experimentalData: this.experimentalData,
 		engagementsCorrect: this.engagementCorrectCount,
-		engagementsTotal: ENGAGEMENT_CHECKS * MAGNITUDES.length
+		engagementsTotal: ENGAGEMENT_CHECKS * MAGNITUDES.length,
+		engagementAccuracy: ENGAGEMENT_CHECKS > 0 ? (this.engagementCorrectCount / (ENGAGEMENT_CHECKS * MAGNITUDES.length)) : 0.0,
+
+		stimulusCorrect: this.correctCount,
+		stimulusTotal: TRIAL_COUNT * MAGNITUDES.length,
+		stimulusAccuracy: this.correctCount / (TRIAL_COUNT * MAGNITUDES.length)
 	});
+
 	console.log("data2send size: " + data2send.length);
 
 	(function(experiment, trial, _data2send, _callback) {
@@ -361,8 +367,9 @@ Experiment.prototype.answerRegular = function(response)
 	// store the answer and sequence
 	this.currentStimulus.responseTime = Date.now() - this.stimDisplayTime;
 	this.currentStimulus.correct = correct ? 1 : 0;
-	this.currentStimulus.stimulusNum = this.totalCount;
-	this.currentStimulus.blockNum = this.currentMagnitudeIndex+1;
+	this.currentStimulus.stimulusNum = this.totalCount + 1;
+	this.currentStimulus.blockNum = this.currentMagnitudeIndex + 1;
+	this.currentStimulus.trialNum = this.currentTrial + 1;
 
 
 	// store answer
