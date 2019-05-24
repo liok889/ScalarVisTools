@@ -326,9 +326,8 @@
 					}
 					else
 					{
-						// failed in a row
-						alert("Sorry, you repeatedly failed the training session");
-						
+						// failed 2x in a row
+						window.location.replace('php/exit_practice.php');
 					}
 				}
 
