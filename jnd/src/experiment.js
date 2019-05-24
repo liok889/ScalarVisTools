@@ -230,7 +230,6 @@ Experiment.prototype.randomStimulusThreaded = function(_magnitude, _diff)
 			
 			function(results) 
 			{
-
 				// visualize the 2AFC images
 				experiment.visualize(results);
 				experiment.stimDisplayTime = Date.now();
@@ -361,29 +360,35 @@ Experiment.prototype.setBlockPause = function(callback) {
 
 Experiment.prototype.answerRegular = function(response)
 {
-	var correct;
+	var correct = false;
 	if ((response == 'right' && !this.stimulus.isSwaped()) ||
 		(response == 'left' && this.stimulus.isSwaped()))
 	{
 		correct = true;
-		this.correctCount++;
-	}
-	else
-	{
-		correct = false;
 	}
 
 	if (this.practice && !correct) {
 		return false;
 	}
 
+	if (!this.currentStimulus.converged && !this.skipped)
+	{
+		// just skip and get another one, but make sure we only do this once
+		// per cycle (i.e., no two skips in a row)
+		this.skipped = true;
+		console.log("inv stimulis. next()");
+		this.next();
+		return true;
+	}
+	this.skipped = undefined;
+
 	// store the answer and sequence
+	if (correct) { this.correctCount++; }
 	this.currentStimulus.responseTime = Date.now() - this.stimDisplayTime;
 	this.currentStimulus.correct = correct ? 1 : 0;
 	this.currentStimulus.stimulusNum = this.totalCount + 1;
 	this.currentStimulus.blockNum = this.currentMagnitudeIndex + 1;
 	this.currentStimulus.trialNum = this.currentTrial + 1;
-
 
 	// store answer
 	this.experimentalData.push(this.currentStimulus)
@@ -394,10 +399,7 @@ Experiment.prototype.answerRegular = function(response)
 	
 	// move to next stimulus or block
 	if (this.currentTrial >= TRIAL_COUNT)
-	{
-		// block complete
-		//console.log("block complete!");
-		
+	{	
 		// clear canvas
 		this.visLeft.clearCanvas();
 		this.visRight.clearCanvas();
@@ -425,7 +427,6 @@ Experiment.prototype.answerRegular = function(response)
 
 			d3.select("#loadingImage")
 				.style('visibility', 'visible');
-
 		}
 		else
 		{
@@ -443,18 +444,15 @@ Experiment.prototype.answerRegular = function(response)
 		// we're still in the same block
 		if (correct) {
 			this.currentDiff = Math.max(DIFF[0], this.currentDiff-FORWARD);
-			console.log("CORRECT! difficulty: " + this.currentDiff)
+			//console.log("CORRECT! difficulty: " + this.currentDiff)
 		}
 		else {
 			this.currentDiff = Math.min(DIFF[1], this.currentDiff+BACKWARD);
-			console.log("inCORRECT :( difficulty rolled back to: " + this.currentDiff)
-
-
+			//console.log("inCORRECT :( difficulty rolled back to: " + this.currentDiff)
 		}
 
 		// move to next stimlus
 		this.next();
-
 	}
 	return correct;
 }
