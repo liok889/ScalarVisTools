@@ -144,7 +144,7 @@
 
 		<div style="text-align: center; margin-top: 0px; margin-right: 50px">
 			<div>
-				<span id="alert" style="font-weight: bold; color: #db0000; font-size: 14px; visibility: hidden">Select one of the two maps!</span><br>
+				<span id="alert" style="font-weight: bold; color: #db0000; font-size: 17px; visibility: hidden">Select one of the two maps!</span><br>
 				<button id="confirmButton">Confirm</button>
 				<br><img id="loadingImage1" width="80" src="img/loading2.gif" style="visibility: hidden">
 			</div>
@@ -171,7 +171,7 @@
 		var ENGAGEMENT_DIFF = 14.0;
 
 		// stepping
-		var STEP = 0.5/1.75;
+		var STEP = .70 * (0.5/1.75);
 		var BACKWARD = 3.0*STEP;
 		var FORWARD = STEP;
 
@@ -288,7 +288,7 @@
 						d3.select("#alert")
 							.style("visibility", 'visible')
 							.style("color", '#db0000')
-							.html("Sorry, incorrect choice");
+							.html("Incorrect choice");
 						newStimulus = false;
 						flash();
 					}
@@ -300,7 +300,7 @@
 							.html("Correct!");
 						setTimeout(function() {
 							d3.select("#alert").style('visibility', 'hidden');
-						}, 750);
+						}, 1000);
 					}
 				}
 
