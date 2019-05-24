@@ -53,8 +53,12 @@ function initExperimentGL(exp)
 				exp.visRight.createVisPipeline();
 
 				// initialize colormaps
-				exp.colormapLeft = 	getColorPreset('greyscale', null, null, true);
-				exp.colormapRight = getColorPreset('greyscale', null, null, true);
+				var colormap = exp.colormap;
+				if (!colormap || colormap.length == 0) {
+					colormap = 'greyscale';
+				}
+				exp.colormapLeft = 	getColorPreset(colormap, null, null, true);
+				exp.colormapRight = getColorPreset(colormap, null, null, true);
 				
 				exp.stimulus.getFirst().setColorMap(exp.colormapLeft);
 				exp.stimulus.getSecond().setColorMap(exp.colormapRight);
@@ -86,13 +90,14 @@ function shuffleArray(a) {
 	return a;
 }
 
-function Experiment(practice)
+function Experiment(practice, _colormap)
 {
 	// randomize order of magnitudes
 	if (!practice) {
 		shuffleArray(MAGNITUDES);
 	}
-	this.practice = practice
+	this.practice = practice;
+	this.colormap = _colormap;
 
 	// magnitudes
 	this.currentMagnitude = null;
@@ -346,6 +351,14 @@ Experiment.prototype.isFinished = function() {
 	return this.finished === true;
 }
 
+Experiment.prototype.resumeBlock = function() 
+{
+	this.next();
+}
+Experiment.prototype.setBlockPause = function(callback) {
+	this.blockPause = callback;
+}
+
 Experiment.prototype.answerRegular = function(response)
 {
 	var correct;
@@ -382,7 +395,13 @@ Experiment.prototype.answerRegular = function(response)
 	// move to next stimulus or block
 	if (this.currentTrial >= TRIAL_COUNT)
 	{
-		console.log("block complete!");
+		// block complete
+		//console.log("block complete!");
+		
+		// clear canvas
+		this.visLeft.clearCanvas();
+		this.visRight.clearCanvas();
+
 		if (this.nextBlock()) 
 		{
 			console.log("We're finished");
@@ -392,7 +411,7 @@ Experiment.prototype.answerRegular = function(response)
 			if (!this.practice) {
 				this.sendData(undefined, function(sent) 
 				{
-					console.log("Going to strategy.html");
+					window.onbeforeunload = null;
 					window.location.replace("strategy.html");
 				});
 			}
@@ -400,11 +419,6 @@ Experiment.prototype.answerRegular = function(response)
 			{
 				// practice complete
 			}
-
-			// clear canvas
-			this.visLeft.clearCanvas();
-			this.visRight.clearCanvas();
-
 
 			d3.select("#confirmButton")
 				.node().disabled = true;
@@ -415,11 +429,18 @@ Experiment.prototype.answerRegular = function(response)
 		}
 		else
 		{
-			this.next();
+			if (this.blockPause) {
+				this.blockPause(this.currentMagnitudeIndex);
+			}
+			else
+			{
+				this.next();
+			}
 		}
 	}
 	else
 	{
+		// we're still in the same block
 		if (correct) {
 			this.currentDiff = Math.max(DIFF[0], this.currentDiff-FORWARD);
 			console.log("CORRECT! difficulty: " + this.currentDiff)
