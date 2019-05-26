@@ -57,6 +57,7 @@ function initExperimentGL(exp)
 				if (!colormap || colormap.length == 0) {
 					colormap = 'greyscale';
 				}
+				exp.currentColormap = colormap;
 				exp.colormapLeft = 	getColorPreset(colormap, null, null, true);
 				exp.colormapRight = getColorPreset(colormap, null, null, true);
 				
@@ -96,8 +97,14 @@ function Experiment(practice, _colormap)
 	if (!practice) {
 		shuffleArray(MAGNITUDES);
 	}
+	
+	// whether this is a practice trial
 	this.practice = practice;
+	
+
 	this.colormap = _colormap;
+
+
 
 	// magnitudes
 	this.currentMagnitude = null;
@@ -358,6 +365,10 @@ Experiment.prototype.setBlockPause = function(callback) {
 	this.blockPause = callback;
 }
 
+Experiment.prototype.getCurrentColormap = function() {
+	return this.currentColormap;
+}
+
 Experiment.prototype.answerRegular = function(response)
 {
 	var correct = false;
@@ -389,6 +400,7 @@ Experiment.prototype.answerRegular = function(response)
 	this.currentStimulus.stimulusNum = this.totalCount + 1;
 	this.currentStimulus.blockNum = this.currentMagnitudeIndex + 1;
 	this.currentStimulus.trialNum = this.currentTrial + 1;
+	this.currentStimulus.colormap = this.getCurrentColormap();
 
 	// store answer
 	this.experimentalData.push(this.currentStimulus)
