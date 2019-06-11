@@ -53,25 +53,23 @@ function initExperimentGL(exp)
 				exp.visRight.createVisPipeline();
 
 				// initialize colormaps
-				var colormap = exp.colormap;
-				if (!colormap || colormap.length == 0) {
-					colormap = 'greyscale';
-				}
-				exp.currentColormap = colormap;
-				exp.colormapLeft = 	getColorPreset(colormap, null, null, true);
-				exp.colormapRight = getColorPreset(colormap, null, null, true);
-				
-				exp.stimulus.getFirst().setColorMap(exp.colormapLeft);
-				exp.stimulus.getSecond().setColorMap(exp.colormapRight);
+				var colormap = null;
+				if (COLORMAPS && COLORMAPS.length>0)
+				{
+					exp.cycleColormaps = true;
+					exp.currentColormapIndex = 0;
+					colormap = COLORMAPS[0];
 
-				// render color map
-				var scaleCanvas = d3.select("#colorScaleCanvas");
-				exp.colormapLeft.drawColorScale(
-					+scaleCanvas.attr('width'),
-					+scaleCanvas.attr('height'), 100,
-					'vertical',
-					scaleCanvas.node()
-				);
+				}
+				else
+				{
+					exp.cycleColormaps = false;
+					colormap = exp.currentColormap;
+					if (!colormap || colormap.length == 0) {
+						colormap = 'greyscale';
+					}
+				}
+				exp.changeColormap(colormap);
 
 				// when ready, visualize the stimulus
 				exp.nextBlock();
@@ -90,21 +88,51 @@ function shuffleArray(a) {
 	}
 	return a;
 }
+function reorderArray(a, index) 
+{
+	if (typeof index === 'string') 
+	{
+		var newIndex = [];
+		for (var j=0; j<index.length; j++) 
+		{
+			var x = index.charAt(j);
+			if (x == 'a') x=0;
+			if (x == 'b') x=1;
+			if (x == 'c') x=2;
+			newIndex.push(+x);
+		}
+		index = newIndex;
+	}
+	var newA = [];
+	for (var i=0; i<index.length; i++) {
+		newA.push(a[index[i]]);
+	}
+	return newA;
+}
 
 function Experiment(practice, _colormap)
 {
 	// randomize order of magnitudes
+	/*
 	if (!practice) {
 		shuffleArray(MAGNITUDES);
 	}
+	*/
 	
 	// whether this is a practice trial
 	this.practice = practice;
-	
 
-	this.colormap = _colormap;
-
-
+	// colormap
+	if (COLORMAPS && COLORMAPS.length > 0)
+	{	
+		this.currentColormap = null;
+		this.currentColormapIndex = -1;
+	}
+	else
+	{
+		this.currentColormap = _colormap;
+		this.currentColormapIndex = null;
+	}
 
 	// magnitudes
 	this.currentMagnitude = null;
@@ -134,24 +162,51 @@ function Experiment(practice, _colormap)
 	initExperimentGL(this);
 }
 
-Experiment.prototype.getCurrentBlock = function() {
-	return this.currentMagnitudeIndex;
+Experiment.prototype.changeColormap = function(colormap) 
+{
+	this.colormapLeft = getColorPreset(colormap, null, null, true);
+	this.colormapRight = getColorPreset(colormap, null, null, true);
+				
+	this.stimulus.getFirst().setColorMap(this.colormapLeft);
+	this.stimulus.getSecond().setColorMap(this.colormapRight);
+
+	// render color map
+	var scaleCanvas = d3.select("#colorScaleCanvas");
+	this.colormapLeft.drawColorScale(
+		+scaleCanvas.attr('width'),
+		+scaleCanvas.attr('height'), +scaleCanvas.attr('height'),
+		'vertical',
+		scaleCanvas.node()
+	);
+	this.currentColormap = colormap;
 }
+
+Experiment.prototype.getCurrentBlock = function() {
+	var colormapBlocks = this.cycleColormaps ? this.currentColormapIndex*MAGNITUDES.length : 0
+	return this.currentMagnitudeIndex + colormapBlocks;
+}
+Experiment.prototype.getTotalBlocks = function() {
+	var colormapCount = this.cycleColormaps ? COLORMAPS.length : 1;
+	return MAGNITUDES.length * colormapCount;
+}
+
 Experiment.prototype.getCurrentTrial = function() {
 	return this.currentTrial;
 }
 
 Experiment.prototype.sendData = function(TRIALS, callback) 
 {
+	var colormapCount = this.cycleColormaps ? COLORMAPS.length : 1;
+
 	var data2send = JSON.stringify({ 
 		experimentalData: this.experimentalData,
 		engagementsCorrect: this.engagementCorrectCount,
-		engagementsTotal: ENGAGEMENT_CHECKS * MAGNITUDES.length,
-		engagementAccuracy: ENGAGEMENT_CHECKS > 0 ? (this.engagementCorrectCount / (ENGAGEMENT_CHECKS * MAGNITUDES.length)) : 0.0,
+		engagementsTotal: ENGAGEMENT_CHECKS * MAGNITUDES.length * colormapCount,
+		engagementAccuracy: ENGAGEMENT_CHECKS > 0 ? (this.engagementCorrectCount / (colormapCount * ENGAGEMENT_CHECKS * MAGNITUDES.length)) : 0.0,
 
 		stimulusCorrect: this.correctCount,
-		stimulusTotal: TRIAL_COUNT * MAGNITUDES.length,
-		stimulusAccuracy: this.correctCount / (TRIAL_COUNT * MAGNITUDES.length)
+		stimulusTotal: TRIAL_COUNT * MAGNITUDES.length * colormapCount,
+		stimulusAccuracy: this.correctCount / (TRIAL_COUNT * MAGNITUDES.length * colormapCount)
 	});
 
 	console.log("data2send size: " + data2send.length);
@@ -205,6 +260,8 @@ Experiment.prototype.nextBlock = function()
 		else if (index > TRIAL_COUNT-ENGAGEMENT_OFFSET-1) {
 			index = TRIAL_COUNT-ENGAGEMENT_OFFSET-2;
 		}
+		index = Math.max(0, index);
+		index = Math.min(TRIAL_COUNT-1, index);
 		this.engagements.push(index);
 	}
 	this.engagements.sort(function(a,b) { return a-b; });
@@ -212,9 +269,33 @@ Experiment.prototype.nextBlock = function()
 	this.currentDiff = START_DIFF;
 	this.currentTrial = 0;
 	this.currentMagnitudeIndex++;
-	if (this.currentMagnitudeIndex >= MAGNITUDES.length) {
-		console.log("EXPERIMENT complete!")
-		return true;
+	if (this.currentMagnitudeIndex >= MAGNITUDES.length) 
+	{
+		// cycle colormaps?
+		if (this.cycleColormaps)
+		{
+			this.currentColormapIndex++;
+			if (this.currentColormapIndex >= COLORMAPS.length)
+			{
+				console.log("EXPERIMENT complete!")
+				return true;
+			}
+			else
+			{
+				// change colormap
+				this.changeColormap(COLORMAPS[this.currentColormapIndex]);
+				
+				// reset magnitude
+				this.currentMagnitudeIndex = 0;
+				this.currentMagnitude = MAGNITUDES[0];
+				return false;
+			}
+		}
+		else {
+			// only one colormap, and we're finished with all magnitude
+			console.log("EXPERIMENT complete!")
+			return true;
+		}
 	}
 	else
 	{
@@ -319,9 +400,16 @@ Experiment.prototype.answer = function(response)
 	}
 
 	// compute percentage complete to update progress bar
+	/*
 	var p = 
 		(this.totalCount + this.currentMagnitudeIndex*ENGAGEMENT_CHECKS + ENGAGEMENT_CHECKS-this.engagements.length) /
 		((TRIAL_COUNT + ENGAGEMENT_CHECKS) * MAGNITUDES.length);
+	*/
+	
+	var colormapCount = this.cycleColormaps ? COLORMAPS.length : 1;
+	var magCount = MAGNITUDES.length;
+	var p = this.totalCount / ( TRIAL_COUNT * magCount * colormapCount );
+	
 	p = Math.min(1.0, p * .9 + .1);
 	d3.select("#rectProgress").attr('width', Math.floor(150*p+.5));
 	d3.select("#labelProgress").html(Math.floor(100*p + .5) + '%');
@@ -393,12 +481,15 @@ Experiment.prototype.answerRegular = function(response)
 	}
 	this.skipped = undefined;
 
-	// store the answer and sequence
-	if (correct) { this.correctCount++; }
+	if (correct) { 
+		this.correctCount++; 
+	}
+
+	// store the answer and its parameters (correctness, sequence, responseTime, etc...)
 	this.currentStimulus.responseTime = Date.now() - this.stimDisplayTime;
 	this.currentStimulus.correct = correct ? 1 : 0;
 	this.currentStimulus.stimulusNum = this.totalCount + 1;
-	this.currentStimulus.blockNum = this.currentMagnitudeIndex + 1;
+	this.currentStimulus.blockNum = this.getCurrentBlock() + 1;
 	this.currentStimulus.trialNum = this.currentTrial + 1;
 	this.currentStimulus.colormap = this.getCurrentColormap();
 
@@ -443,7 +534,7 @@ Experiment.prototype.answerRegular = function(response)
 		else
 		{
 			if (this.blockPause) {
-				this.blockPause(this.currentMagnitudeIndex);
+				this.blockPause(this.currentMagnitudeIndex, this.currentColormapIndex);
 			}
 			else
 			{

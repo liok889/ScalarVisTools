@@ -1,5 +1,5 @@
 <?php
-
+	
 	session_start();
 	if (!isset($_SESSION['user'])) {
 		header("Location: php/user.php");
@@ -17,7 +17,7 @@
 	$sql = "UPDATE user SET timeToStimulus=" . $timeToStimulus . " WHERE userid=" . $userid;
 	mysqli_query($conn, $sql);
 	mysqli_close($conn);
-
+	
 ?><!DOCTYPE html>
 <html>
 <head>
@@ -279,13 +279,30 @@
 
 		// trial config
 		var COLORMAP = <?php echo "'" . $_SESSION['condition'] . "';\n"; ?>
-		var MAGNITUDES = [2.0, 3.5, 5.0];
-		var COLORMAPS = [];
+		//var MAGNITUDES = [2.0, 3.5, 5.0];
+		var MAGNITUDES = [3.0, 5.0];
+		var COLORMAPS = [ 'rainbowjet', 'coolwarm', 'viridis' ];
 		var START_DIFF = 3.0;
-		var TRIAL_COUNT = 50;
+		var TRIAL_COUNT = 40;
+
+		var MAG_ORDER = <?php echo "'" . (isset($_SESSION['magOrder']) ? $_SESSION['magOrder'] : 'R') . "';\n"; ?>
+		var COL_ORDER = <?php echo "'" . (isset($_SESSION['colOrder']) ? $_SESSION['colOrder'] : 'R') . "';\n"; ?>
+
+		if (MAG_ORDER === 'r' || MAG_ORDER === 'R') {
+			shuffleArray(MAGNITUDES);
+		}
+		else if (typeof MAG_ORDER === 'string' && MAG_ORDER.length > 0) {
+			MAGNITUDES = reorderArray(MAGNITUDES, MAG_ORDER);
+		}
+		if (COL_ORDER === 'r' || COL_ORDER === 'R') {
+			shuffleArray(COLORMAPS);
+		}
+		else if (typeof COL_ORDER === 'string' && COL_ORDER.length > 0) {
+			COLORMAPS = reorderArray(COLORMAPS, COL_ORDER);
+		}
 
 		// engagements
-		var ENGAGEMENT_CHECKS = 4;
+		var ENGAGEMENT_CHECKS = 3;
 		var ENGAGEMENT_DIFF = 13.0;
 
 		// stepping
@@ -358,6 +375,7 @@
 			}, 15*1000);
 		}
 
+		var lastColormapNotification = -2;
 		$(document).ready(function() 
 		{
 			experiment = new Experiment(false, COLORMAP);
@@ -367,8 +385,19 @@
 			setModalCallback(function() {
 				experiment.resumeBlock();
 			});
-			experiment.setBlockPause(function(blockIndex) {
-				var left = MAGNITUDES.length-blockIndex;
+			experiment.setBlockPause(function(magnitudeIndex, colormapIndex) 
+			{
+				console.log("mag: " + magnitudeIndex + ', col: ' + colormapIndex);
+				var left = experiment.cycleColormaps ? COLORMAPS.length-colormapIndex : MAGNITUDES.length-magnitudeIndex;
+				if (colormapIndex === 0 || lastColormapNotification == colormapIndex) {
+					experiment.resumeBlock();
+					return;
+				}
+				if (experiment.cycleColormaps) 
+				{
+					lastColormapNotification = colormapIndex;
+				}
+
 				var text2 = null;
 				if (left == 1) {
 					text2 = "Only 1 set remaining.";
@@ -376,11 +405,10 @@
 				else
 				{
 					text2 = "There are " + left + " sets remaining.";
-
 				}
 
 				d3.select("#modalText2").html(text2);
-				if (blockIndex == 2)
+				if (colormapIndex < 0 && (magnitudeIndex == 2) || colormapIndex == 2)
 				{
 					d3.select("#modalText1").html("Almost finished. You may rest for a moment if you wish.");
 				}

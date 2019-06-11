@@ -1,5 +1,6 @@
 <?php
 
+	
 	session_start();
 	if (!isset($_SESSION['user'])) {
 		header("Location: php/user.php");
@@ -17,6 +18,7 @@
 	$sql = "UPDATE user SET timeToPractice=" . $timeToPractice . " WHERE userid=" . $userid;
 	mysqli_query($conn, $sql);
 	mysqli_close($conn);
+	
 
 ?><!DOCTYPE html>
 <html>
@@ -182,9 +184,10 @@
 	<script type="text/javascript">
 		// trial config
 		var COLORMAP = <?php echo "'" . $_SESSION['condition'] . "';\n"; ?>
-		var MAGNITUDES = [2.0, 3.5, 2.5];
+		var MAGNITUDES = [2.0, 4.0, 3];
+		var COLORMAPS = shuffleArray([ 'rainbowjet', 'viridis', 'coolwarm' ]);
 		var START_DIFF = 4.0;
-		var TRIAL_COUNT = 7;
+		var TRIAL_COUNT = 5;
 		var lastBlock = [];
 
 		// engagements
@@ -202,6 +205,7 @@
 		var BORDER_STYLE = '4px solid blue';
 		var BORDER_STYLE_ERROR = '4px solid red';
 		var overallAccuracy = 0.0;
+		var lastBlockAccuracy = 0.0;
 
 		if (DIFF) {
 			DIFF[0] = 0.5;
@@ -291,11 +295,13 @@
 				else
 				{
 					var currentTrial = experiment.getCurrentTrial();
-					var currentBlock = experiment.getCurrentBlock()
+					var currentBlock = experiment.getCurrentBlock();
+					//console.log("currentBlock: " + currentBlock + ', currentTrial: ' + currentTrial);
 					
 					d3.select("#alert").style('visibility', 'hidden');
 					var result = experiment.answer(selectedImage);
-					if (currentBlock == MAGNITUDES.length-1) 
+					var LAST_BLOCK = ((currentBlock+1) % MAGNITUDES.length == 0);
+					if ( LAST_BLOCK ) 
 					{
 						if (lastBlock[currentTrial]) 
 						{
@@ -303,7 +309,8 @@
 						}
 					}
 					if (newStimulus && result) {
-						overallAccuracy += 1.0 / (MAGNITUDES.length * TRIAL_COUNT);
+						overallAccuracy += 1.0 / 
+							(MAGNITUDES.length * TRIAL_COUNT * (COLORMAPS.length> 0 ? COLORMAPS.length : 1));
 					}
 					if (!result && PRACTICE) {
 						d3.select("#alert")
@@ -323,6 +330,21 @@
 							d3.select("#alert").style('visibility', 'hidden');
 						}, 1000);
 					}
+
+					if (result && LAST_BLOCK && (currentTrial == TRIAL_COUNT-1)) 
+					{
+						//console.log("** lastBlock: " + lastBlock)
+						// sum up accuracy of last block and reset
+						var acc = 0.0;
+						for (var j=0; j<lastBlock.length; j++) {
+							if (lastBlock[j]) {
+								acc += 1/TRIAL_COUNT;
+							}
+							lastBlock[j] = true;
+						}
+						lastBlockAccuracy += acc / (COLORMAPS.length> 0 ? COLORMAPS.length : 1);
+
+					}
 				}
 
 				// see if the practice is over
@@ -337,7 +359,7 @@
 					
 					// check whether the last block has at least 
 					// a miniumum level of accuracy
-					if (correct >= 4 || overallAccuracy >= .66) 
+					if (lastBlockAccuracy >= .66 || overallAccuracy >= .66) 
 					{
 						window.location.replace('debrief.html')
 					}
