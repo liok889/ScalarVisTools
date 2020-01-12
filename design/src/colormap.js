@@ -937,7 +937,8 @@ var COLOR_PRESETS = {
 			[223,	230,	11],
 			[233,	231,	19],
 			[243,	233,	28]
-]
+],
+
 		//viridisLike: { URL: '/colormaps/viridis-like.json'}
 };
 

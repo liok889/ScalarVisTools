@@ -102,6 +102,8 @@
 	</div>
 
 	<div>
+		<p>&nbsp;<p><canvas id="colormapCanvas" width="200" height="30"></canvas>
+		<p>
 		<svg width="400" height="200" style="border: solid 1px black">
 			<g id="simChart" transform="translate(40,10)"></g>
 		</svg>
@@ -339,7 +341,8 @@
 					magnitude,
 					diff,
 					KS_TEST_THRESHOLD,
-					function(results) {
+					function(results) 
+					{
 						// visualize the 2AFC images
 						visLeft.run('vis');
 						visRight.run('vis');
@@ -443,20 +446,27 @@
 			$('#sliderExponent').slider({ step: 0.05, min: .1, max: 10, value: getExponentWeight(), change: refreshStimulus,slide: function(event, ui) { d3.select("#sliderExponentValue").html(ui.value);} });
 
 			d3.select(document).on('keydown', function() {
-				if (d3.event.keyCode === 32 || d3.event.keyCode === 13) {
+				if (d3.event.keyCode === 13) {
 					refreshStimulusThreaded();
+				}
+				else if (d3.event.keyCode == 32) {
+					createVisLeft(function() 
+					{
+						visLeft.createVisPipeline();
+						visLeft.run('vis');
+					});
 				}
 			})
 
 		}
 
-		function initExperiment()
-		{
-			var shaderList = [
+		var shaderList = [
 				{name: 'vis',		path: 'design/src/shaders/vis.frag'},
 				{name: 'vertex',	path: 'design/src/shaders/vertex.vert' }
-			];
-			function createVisLeft(callback) {
+		];
+
+		function createVisLeft(callback) {
+				console.log('create vis left');
 				visLeft = new ColorAnalysis(
 					stimulus.getFirst(),
 					d3.select("#stimLeft").node(),
@@ -464,7 +474,12 @@
 				);
 			}
 
-			function createVisRight(callback) {
+
+		function initExperiment()
+		{
+			
+			function createVisRight(callback) 
+			{
 				visRight = new ColorAnalysis(
 					stimulus.getSecond(),
 					d3.select("#stimRight").node(),
@@ -497,9 +512,28 @@
 						createUI();
 					}
 				});
+		}
 
-			
- 	
+		function setColorMap(name) 
+		{
+			colormapLeft = 	getColorPreset(name, null, null, true);
+			colormapRight = getColorPreset(name, null, null, true);
+			if (!colormapLeft && !colormapRight) {
+				console.error("Could not find colormap: " + name);
+			}
+			else
+			{
+				stimulus.getFirst().setColorMap(colormapLeft);
+				stimulus.getSecond().setColorMap(colormapRight);
+
+				var scaleCanvas = d3.select("#colormapCanvas");
+				colormapLeft.drawColorScale(
+					+scaleCanvas.attr('width'),
+					+scaleCanvas.attr('height'), +scaleCanvas.attr('width'),
+					'horizontal',
+					scaleCanvas.node()
+				);
+			}
 		}
 
 		/*
