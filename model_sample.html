@@ -12,6 +12,7 @@
 	<script src="design/src/gl_pipeline.js"></script>
 	<script src="design/src/coloranalysis.js"></script>
 	<script src="jnd/lib/three.min.js"></script>
+	<script src="jnd/src/gaussmix.js"></script>
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
@@ -29,7 +30,6 @@
 		<svg width="500" height="500" style="position: absolute; top: 0px; left: 0px; border: solid 1px black">
 			<g transform="translate(50,100)">
 				<g id="models"></g>
-				<rect id="scalarCanvas" stroke="black" style="stroke-width: 0.5px" fill="#cccccc"></rect>
 			</g>
 		</svg>
 
@@ -39,150 +39,41 @@
 	</div>
 
 	<script>
-		var MODEL_COLORS = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#a65628','#f781bf','#999999'];
-		var WIDTH=300;
-		var HEIGHT=300;
-		var P_HEIGHT = 40;
+		var WIDTH=200;
+		var HEIGHT=200;
 
-		var models = [];
+		var mainModel = new GaussMix(WIDTH, HEIGHT, d3.select("#models"));
+		mainModel.init();
 
-		function gauss(x, p) {
-			var mue = p[0]
-			var delta = p[1];
-			var scaler = (p[2] === undefined || p[2] === null) ? 1 : p[2];
-
-			var k = delta * Math.sqrt(2*Math.PI);
-			return scaler * (1/k)*Math.exp(-0.5 * Math.pow((x-mue)/delta, 2) );
-
-		}
-
-		// add a few guassians
-		models.push({
-			t: gauss,
-			param: [WIDTH*.5, WIDTH*.1, 1],
-			axis: 'x'
-		});
-
-
-		models.push({
-			t: gauss,
-			param: [HEIGHT*.5, HEIGHT*.1, 1],
-			axis: 'y'
-		});
-
-
-
-		var modelMaxX = 0, modelMaxY;
-		var mouseCoord = null;
-
-		var MAP_SIZE=100;
-		var cdfX, mapX, cdfY, mapY;
-		function computeCFDs()
-		{
-			var X=d3.range(0, WIDTH);
-			var Y=d3.range(0, HEIGHT);
-
-
-			for (var x=0; x<WIDTH; x++) {
-				X[x]=0;
-			}
-			for (var y=0; y<HEIGHT; y++) {
-				Y[y]=0;
-			}
-
-
-			// compute probability distribution
-			for (var m=0; m<models.length; m++)
-			{
-				var model=models[m];
-				var outs = model.outputs;
-
-				var len = model.axis=='x' ? WIDTH : HEIGHT;
-				var P = model.axis=='x' ? X : Y;
-				for (var i=0; i<len; i++)
-				{
-					P[i] += outs[i].y;
-				}
-			}
-
-			// compute CDFs and normalize
-			cdfX=d3.range(0, WIDTH);
-			cdfY=d3.range(0, HEIGHT);
-
-			var cumm=0;
-			for (var x=0; x<WIDTH; x++) {
-				cumm+=X[x];
-				cdfX[x]=cumm;
-			}
-			for (var x=0; x<WIDTH; x++) {
-				cdfX[x] /= cumm;
-			}
-
-			var cumm=0;
-			for (var y=0; y<HEIGHT; y++) {
-				cumm+=Y[y];
-				cdfY[y]=cumm;
-			}
-			for (var y=0; y<HEIGHT; y++) {
-				cdfY[y] /= cumm;
-			}
-
-			// compute a descrete map: this allows us to map from discrete
-			// uniform p distribution to the distribution characterized by the above CDFs
-			mapX=d3.range(WIDTH*MAP_SIZE);
-			mapY=d3.range(HEIGHT*MAP_SIZE);
-
-			for (var x=0, last=0, p=0, len=WIDTH*MAP_SIZE, step=1/(WIDTH*MAP_SIZE); x<len; x++, p+=step)
-			{
-				while (cdfX[last] <= p)
-				{
-					last++;
-				}
-				mapX[x]=last;
-			}
-
-			for (var y=0, last=0, p=0, len=HEIGHT*MAP_SIZE, step=1/(HEIGHT*MAP_SIZE); y<len; y++, p+=step)
-			{
-				while (cdfY[last] < p)
-				{
-					last++;
-				}
-				mapY[y]=last;
-			}
-		}
-
+		// create a new scalar field
 		var field=new ScalarField(WIDTH, HEIGHT);
+
+		// number of samples per pixel
 		var N=100;
 
-		function sampleModel(N, _field)
-		{
-			var view = _field.view;
-			var iterations = N*WIDTH*HEIGHT;
-			for (var i=0; i<iterations; i++)
-			{
-				var x = Math.min(mapX.length-1, Math.floor(Math.random()*mapX.length));
-				var y = Math.min(mapY.length-1, Math.floor(Math.random()*mapY.length));
-
-				var r=mapY[y];
-				var c=mapX[x];
-				view[ r*WIDTH + c ] += 1.0;
-			}
-			_field.normalize();
-			_field.updated();
-		}
-
+		// a visualizaiton pipeline
 		var visualizer = null;
 		function visualizeField(_field)
 		{
+
+		}
+
+		function initVis()
+		{
+			d3.select("#visCanvas")
+				.attr('width', WIDTH)
+				.attr('height', HEIGHT);
+
 			// shaders
 			var shaderList = [
-					{name: 'vis',		path: 'design/src/shaders/vis.frag'},
-					{name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
-					{name: 'blur',		path: 'design/src/shaders/blur.frag'}
+				{name: 'vis',		path: 'design/src/shaders/vis.frag'},
+				{name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
+				{name: 'blur',		path: 'design/src/shaders/blur.frag'}
 			];
 
 			function pipelineReady(__field)
 			{
+				/*
 				console.log("pipeline ready");
 				var visBlurPipeline = new GLPipeline(visualizer.glCanvas);
 				visBlurPipeline.addStage({
@@ -199,274 +90,49 @@
 				visualizer.pipelines = {
 					blur: visBlurPipeline
 				};
+				*/
 
-				//visualizer.createVisPipeline();
+				visualizer.createVisPipeline();
+			}
+
+			function sampleAndDrawModel()
+			{
+				console.log("draw model");
+				mainModel.sampleModel(N, field);
+
+				// render scatterplot
+				if (visualizer.ready())
+				{
+					// make sure the field has an associated colormap
+					if (!field.getColorMap()) {
+						// if not, use viridis as default
+						field.setColorMap(getColorPreset('viridis', null, null, true))
+					}
+					visualizer.run('vis');
+				}
 
 			}
+
 
 			// if first time, create the visualizer
 			if (!visualizer) {
 				visualizer = new ColorAnalysis(
-					_field,
+					field,
 					d3.select("#visCanvas").node(),
-					function() {pipelineReady(_field);}, shaderList
+					function() {pipelineReady(field);}, shaderList
 				)
 			}
-			else if (visualizer.ready())
-			{
-				// make sure the field has an associated colormap
-				if (!_field.getColorMap()) {
-					// if not, use viridis as default
-					_field.setColorMap(getColorPreset('viridis', null, null, true))
-				}
-				visualizer.run('blur');
-			}
-		}
-		function drawModel()
-		{
-			sampleModel(N, field);
-			visualizeField(field);
-		}
-
-		function plotModels()
-		{
-			modelMaxX = 0;
-			modelMaxY = 0;
-
-			// compute probability density
-			var modelOutputs = [];
-			for (var m=0; m<models.length; m++)
-			{
-				var model = models[m];
-				var points = [];
-				if (model.axis == 'x') {
-					points = d3.range(0, WIDTH);
-				}
-				else if (model.axis == 'y') {
-					points = d3.range(0, HEIGHT);
-				}
-
-				var maxVal = 0;
-				for (var i=0; i<points.length; i++) {
-					var p = points[i];
-					var out = {
-						x: p,
-						y: model.t(p, model.param)
-					}
-					maxVal = Math.max(maxVal, out.y) ;
-					points[i] = out;
-				}
-
-				model.outputs = points;
-				modelOutputs.push(points);
-
-				if (model.axis == 'x')
-				{
-					modelMaxX = Math.max(modelMaxX, maxVal);
-				}
-				else {
-					modelMaxY = Math.max(modelMaxY, maxVal);
-				}
-			}
-
-			// compute CDFs and maps
-			computeCFDs();
-
-			//var yScale = d3.scaleLinear().domain([0, modelMax]).range([0, -P_HEIGHT]);
-
-			// plot distribution
-			var lineGeneratorX = d3.line()
-				.x(function(d) { return d.x; })
-				.y(function(d) { return -P_HEIGHT * (d.y/modelMaxX); });
-
-			var lineGeneratorY = d3.line()
-				.x(function(d) { return d.x; })
-				.y(function(d) { return -P_HEIGHT * (d.y/modelMaxY); });
-
-			var paths = d3.select("#models").selectAll('path').data(models)
-
-			paths.exit().remove();
-			var enter = paths.enter().append('path');
-			paths = paths.merge(enter);
-			paths
-				.attr('d', function(d) {
-					return d.axis=='x' ? lineGeneratorX(d.outputs) : lineGeneratorY(d.outputs)
-				})
-				.attr('class', 'modelPath')
-				.attr('stroke', function(d, i) {
-					return MODEL_COLORS[Math.min(i, MODEL_COLORS.length-1)];
-				})
-				.attr('transform', function(d)
-				{
-					if (d.axis == 'y') {
-						return 'translate(' + WIDTH + ',0) ,rotate(90)';
-					}
-					else {
-						return null;
-					}
-				})
-				.on('mousedown', function(d) {
-					mouseCoord = d3.mouse(d3.select("#models").node());
-					(function(model, oldDelta, oldScaler, mouseCoord) {
-						d3.select(document).on('mousemove.moveDist', function() {
-
-							var dMove, dScaler, mouse = d3.mouse(d3.select("#models").node());
-							if (model.axis=='x')
-							{
-								dMove = mouse[0] - mouseCoord[0];
-								dScaler = -(mouse[1] - mouseCoord[1]);
-							}
-							else {
-								dMove = mouse[1] - mouseCoord[1];
-								dScaler = mouse[0] - mouseCoord[0];
-							}
-
-							var newDelta = oldDelta + dMove;
-							newDelta = Math.max(1, newDelta);
-							newDelta = Math.min(model.axis=='x' ? WIDTH-1 : HEIGHT-1, newDelta);
-
-							newScaler = oldScaler + dScaler/P_HEIGHT;
-							model.param[1] = newDelta;
-							model.param[2] = Math.max(0.05, newScaler);
-
-							plotModels();
-
-						});
-
-						d3.select(document).on('mouseup.moveDist', function() {
-							drawModel();
-							d3.select(document).on('mousemove.moveDist', null)
-							d3.select(document).on('mouseup.moveDist', null)
-
-						})
-					})(d, d.param[1], d.param[2], mouseCoord)
-				});
-
-
-			// plot model center
-			var lines = d3.select("#models").selectAll('line').data(models)
-			lines.exit().remove();
-			enter = lines.enter().append('line');
-			lines = lines.merge(enter);
-			lines
-				.attr('x1', function(d) {
-					return d.axis=='x' ? d.param[0] : -1 * (-P_HEIGHT * d.t(d.param[0], d.param)/modelMaxY);
-				})
-				.attr('x2', function(d) { return d.axis=='x' ? d.param[0] : 0; })
-				.attr('y1', function(d) { return d.axis=='x' ? (-P_HEIGHT * d.t(d.param[0], d.param)/modelMaxX) : d.param[0]})
-				.attr('y2', function(d) { return d.axis=='x' ? 0 : d.param[0] })
-				.attr('stroke', 'black')
-				.attr('transform', function(d)
-				{
-					if (d.axis == 'y') {
-						return 'translate(' + WIDTH + ',0)';
-					}
-					else {
-						return null;
-					}
-				})
-				.attr('stroke', function(d, i) {
-					return MODEL_COLORS[Math.min(i, MODEL_COLORS.length-1)];
-				})
-				.style('stroke-width', '3px')
-				.on('mousedown', function(d) {
-					mouseCoord = d3.mouse(d3.select("#models").node());
-					(function(model, oldMue, oldScaler, mouseCoord) {
-						d3.select(document).on('mousemove.moveLine', function() {
-
-							var dMove=0, dScaler=0, mouse = d3.mouse(d3.select("#models").node());
-							if (model.axis=='x')
-							{
-								dMove = mouse[0] - mouseCoord[0];
-								//dScaler = -(mouse[1] - mouseCoord[1]);
-							}
-							else {
-								dMove = mouse[1] - mouseCoord[1];
-								//dScaler = mouse[0] - mouseCoord[0];
-							}
-
-							var newMue = oldMue + dMove;
-							newMue = Math.max(0, newMue);
-							newMue = Math.min(model.axis=='x' ? WIDTH-1 : HEIGHT-1, newMue);
-
-							newScaler = oldScaler + dScaler/P_HEIGHT;
-							model.param[0] = newMue;
-							model.param[2] = Math.max(0.05, newScaler);
-
-							plotModels();
-
-						});
-
-						d3.select(document).on('mouseup.moveLine', function() {
-							drawModel();
-							d3.select(document).on('mousemove.moveLine', null)
-							d3.select(document).on('mouseup.moveLine', null)
-
-						})
-					})(d, d.param[0], d.param[2], mouseCoord)
-
-				})
+			mainModel.setCallback(sampleAndDrawModel);
 
 		}
 
-		function vis()
-		{
-			d3.select("#scalarCanvas")
-				.attr('width', WIDTH)
-				.attr('height', HEIGHT);
+		function addX() { mainModel.add('x'); }
+		function addY() { mainModel.add('y'); }
 
-			plotModels();
-		}
+		function removeX() { mainModel.remove('x'); }
+		function removeY() { mainModel.remove('y'); }
 
-		function addX() {
-			models.push({
-				t: gauss,
-				param: [WIDTH*.5 + (Math.random()-0.5)*WIDTH*.2, WIDTH*.1 + (Math.random()-0.5)*WIDTH*(.1/3), 1],
-				axis: 'x'
-			});
-			plotModels();
-		}
-
-		function removeX() {
-			var m=null, mCount=0;
-			for (i=0; i<models.length; i++) {
-				if (models[i].axis=='x') {
-					mCount++;
-					m=i;
-				}
-			}
-			if (mCount > 1) {
-				models.splice(m, 1);
-				plotModels();
-			}
-		}
-
-		function addY() {
-			models.push({
-				t: gauss,
-				param: [HEIGHT*.5 + (Math.random()-0.5)*HEIGHT*.2, HEIGHT*.1 + (Math.random()-0.5)*HEIGHT*(.1/3), 1],
-				axis: 'y'
-			});
-			plotModels();
-
-		}
-
-		function removeY() {
-			var m=null, mCount=0;
-			for (i=0; i<models.length; i++) {
-				if (models[i].axis=='y') {
-					mCount++;
-					m=i;
-				}
-			}
-			if (mCount > 1) {
-				models.splice(m, 1);
-				plotModels();
-			}
-		}
-
-
-		vis();
+		initVis();
 	</script>
 
 </body>
