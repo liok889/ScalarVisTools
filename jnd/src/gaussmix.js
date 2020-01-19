@@ -1,4 +1,6 @@
-// when sampling, how big is the splat?
+// when sampling, how wide/long is a single sample? note: splat is centered
+// around a randomly drawn coordinate
+// 0 -> 1 pixel, 1-> 3 pixels, etc...
 var SPLAT_SIZE=1;
 
 // colors
@@ -124,7 +126,7 @@ GaussMix.prototype.computeCDFs = function()
     }
 
 
-    // compute probability distribution
+    // compute PDFs
     for (var m=0; m < this.models.length; m++)
     {
         var model = this.models[m];
@@ -169,6 +171,7 @@ GaussMix.prototype.computeCDFs = function()
     this.cdfY = cdfY;
 
     /*
+    // old way of computing CDFs; slightly more accurate but slower
     cdfX=d3.range(0, w);
     cdfY=d3.range(0, h);
 
@@ -193,8 +196,9 @@ GaussMix.prototype.computeCDFs = function()
     this.cdfY = cdfY;
     */
 
-    // compute a descrete map: this allows us to map from discrete
+    // compute a descrete p map: this allows us to map from discrete
     // uniform p distribution to the distribution characterized by the above CDFs
+    // larger MAP_SIZE=less aliasing (at the cost of memory and initial compute time)
     mapX=d3.range(w*MAP_SIZE);
     mapY=d3.range(h*MAP_SIZE);
 
@@ -244,7 +248,7 @@ GaussMix.prototype.sampleModel = function(_iterations, _field, rotate)
     var w_2 = Math.floor(w/2);
     var h_2 = Math.floor(h/2);
 
-    // reset field with zeros
+    // reset scalar field with zeros
     _field.zero();
 
     var view = _field.view;
@@ -285,7 +289,7 @@ GaussMix.prototype.sampleModel = function(_iterations, _field, rotate)
         }
         */
 
-        // create a splat (instead of a single pixel)
+        // create a splat
         var I=0;
 
 
@@ -293,12 +297,12 @@ GaussMix.prototype.sampleModel = function(_iterations, _field, rotate)
         var C0 = Math.max(0, C-SPLAT_SIZE), C1 = Math.min(w_1, C+SPLAT_SIZE);
         var P=0;
 
-        // compute the total density at this splat
+        // compute total density at this splat
         for (var r=R0; r<=R1; r++)
         {
             for (var c=C0; c<=C1; c++, I++)
             {
-                var p = pdfX[c]*pdfY[c];
+                var p = pdfX[c]*pdfY[r];
                 splat[I] = p;
                 P += p;
             }
@@ -306,7 +310,7 @@ GaussMix.prototype.sampleModel = function(_iterations, _field, rotate)
         var iP = 1/P;
         I = 0;
 
-        // distribute the density at the splat
+        // distribute density throughout the splat according to the PDF
         for (var r=R0; r<=R1; r++)
         {
             for (var c=C0; c<=C1; c++, I++)
