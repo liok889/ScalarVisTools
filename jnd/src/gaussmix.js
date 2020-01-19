@@ -1,3 +1,5 @@
+// when sampling, how big is the splat?
+var SPLAT_SIZE=3;
 
 // colors
 var MODEL_COLORS = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#a65628','#f781bf','#999999'];
@@ -34,27 +36,73 @@ function GaussMix(w, h, svg)
     this.cdfY = null;
     this.mapY = null;
 
-    this.callback = null;
+    this.callbacks = [];
 }
 
-GaussMix.prototype.setCallback = function(_callback) {
-    this.callback = _callback;
-}
-
-GaussMix.prototype.init = function()
+GaussMix.prototype.copyTo = function(newModel, dontUpdate)
 {
-    this.models.push({
-        t: gauss,
-        param: [this.w*.5, this.w*.1, 1],
-        axis: 'x'
-    });
+    if (!newModel) {
+        newModel = new GaussMix(this.w, this.h, null);
+    }
+    else {
+        newModel.w = this.w;
+        newModel.h = this.h;
+    }
 
+    newModel.models = [];
+    for (var i=0; i<this.models.length; i++) {
+        var m = this.models[i];
+        newModel.models.push({
+            t: m.t,
+            param: m.param.slice(),
+            axis: m.axis
+        });
+    }
+    if (!dontUpdate) {
+        newModel.updateModel();
+    }
+    return newModel;
+}
 
-    this.models.push({
-        t: gauss,
-        param: [this.h*.5, this.h*.1, 1],
-        axis: 'y'
+GaussMix.prototype.addCallback = function(_callback) {
+    var _id = Math.random();
+    this.callbacks.push({
+        callback: _callback,
+        id: _id
     });
+    return _id;
+}
+
+GaussMix.prototype.unregisterCallback = function(callbackID) {
+    for (var i=0; i<this.callbacks.length; i++) {
+        if (this.callbacks[i].id == callbackID) {
+            this.callbacks.splice(i, 1);
+            return true;
+        }
+    }
+    return false;
+}
+
+GaussMix.prototype.fireCallbacks = function() {
+    for (var i=0; i<this.callbacks.length; i++) {
+        this.callbacks[i].callback(this);
+    }
+}
+
+GaussMix.prototype.init = function(clearOld)
+{
+    if (clearOld) {
+        this.models = [];
+    }
+
+    // add a few random gausses
+    for (var i=0, count=1+Math.floor(.499 + Math.random()*3); i<count; i++ ) {
+        this.add('x');
+    }
+    for (var i=0, count=1+Math.floor(.499 + Math.random()*3); i<count; i++ ) {
+        this.add('y');
+    }
+
     this.updateModel();
 }
 
@@ -66,6 +114,7 @@ GaussMix.prototype.computeCDFs = function()
     var X=d3.range(0, w);
     var Y=d3.range(0, h);
 
+    var cdfX, cdfY;
 
     for (var x=0; x<w; x++) {
         X[x]=0;
@@ -93,6 +142,36 @@ GaussMix.prototype.computeCDFs = function()
     cdfX=d3.range(0, w);
     cdfY=d3.range(0, h);
 
+    var cummX=0;
+    for (var i=0, len=X.length; i<len; i++) {
+        cummX += X[i];
+        cdfX[i] = 0;
+    }
+    for (var i=0, cdf=0, len=X.length; i<len; i++) {
+        X[i] /= cummX;
+        cdf += X[i];
+        cdfX[i] = cdf;
+    }
+
+    var cummY=0;
+    for (var i=0, len=Y.length; i<len; i++) {
+        cummY += Y[i];
+    }
+    for (var i=0, cdf=0, len=Y.length; i<len; i++) {
+        Y[i] /= cummY;
+        cdf += Y[i];
+        cdfY[i] = cdf;
+
+    }
+    this.pdfX = X;
+    this.pdfY = Y;
+    this.cdfX = cdfX;
+    this.cdfY = cdfY;
+
+    /*
+    cdfX=d3.range(0, w);
+    cdfY=d3.range(0, h);
+
     var cumm=0;
     for (var x=0; x<w; x++) {
         cumm+=X[x];
@@ -110,6 +189,9 @@ GaussMix.prototype.computeCDFs = function()
     for (var y=0; y<h; y++) {
         cdfY[y] /= cumm;
     }
+    this.cdfX = cdfX;
+    this.cdfY = cdfY;
+    */
 
     // compute a descrete map: this allows us to map from discrete
     // uniform p distribution to the distribution characterized by the above CDFs
@@ -138,22 +220,103 @@ GaussMix.prototype.computeCDFs = function()
     this.mapY = mapY;
 }
 
-GaussMix.prototype.sampleModel = function(N, _field)
+GaussMix.prototype.sampleModel = function(_iterations, _field, rotate)
 {
+    var SPLAT_AREA=(SPLAT_SIZE*2+1)*(SPLAT_SIZE*2+1);
+    var splat = [];
+    for (var j=0;j<SPLAT_AREA; j++) {
+        splat.push(0);
+    }
+
+    if (!this.mapX) {
+        this.computeCDFs();
+    }
     var mapX = this.mapX;
     var mapY = this.mapY;
+    var pdfX = this.pdfX;
+    var pdfY = this.pdfY;
 
     var w = this.w;
+    var h = this.h;
+    var w_1 = w-1;
+    var h_1 = h-1;
+
+    var w_2 = Math.floor(w/2);
+    var h_2 = Math.floor(h/2);
+
+    // reset field with zeros
+    _field.zero();
+
     var view = _field.view;
-    var iterations = N*this.w*this.h;
+    var iterations = _iterations;
+
+    /*
+    rotation stuff
+    var theta, cosTheta, sinTheta; rotate=ROTATE;
+    if (rotate) {
+        theta = (Math.random()*2-1) * Math.PI;
+        cosTheta = Math.cos(theta);
+        sinTheta = Math.sin(theta);
+    }
+    */
+
     for (var i=0; i<iterations; i++)
     {
         var x = Math.min(mapX.length-1, Math.floor(Math.random()*mapX.length));
         var y = Math.min(mapY.length-1, Math.floor(Math.random()*mapY.length));
 
-        var r=mapY[y];
-        var c=mapX[x];
-        view[ r*w + c ] += 1.0;
+
+        var R=mapY[y];
+        var C=mapX[x];
+
+        /*
+        // rotation stuff
+        if (rotate)
+        {
+            var tY = R-h_2, tX = C-w_2;
+            var x_ = Math.floor(.5 + tX*cosTheta - tY*sinTheta + w_2);
+            var y_ = Math.floor(.5 + tX*sinTheta + tY*cosTheta + h_2);
+
+            // test if within range
+            if (x_ >= 0 && x_ < w && y_ >=0 && y_ < h) {
+                R = y_;
+                C = x_;
+            }
+        }
+        */
+
+        // create a splat (instead of a single pixel)
+        var I=0;
+
+
+        var R0 = Math.max(0, R-SPLAT_SIZE), R1 = Math.min(h_1, R+SPLAT_SIZE);
+        var C0 = Math.max(0, C-SPLAT_SIZE), C1 = Math.min(w_1, C+SPLAT_SIZE);
+        var P=0;
+
+        // compute the total density at this splat
+        for (var r=R0; r<=R1; r++)
+        {
+            for (var c=C0; c<=C1; c++, I++)
+            {
+                var p = pdfX[c]*pdfY[c];
+                splat[I] = p;
+                P += p;
+            }
+        }
+        var iP = 1/P;
+        I = 0;
+
+        // distribute the density at the splat
+        for (var r=R0; r<=R1; r++)
+        {
+            for (var c=C0; c<=C1; c++, I++)
+            {
+                view[ r*w + c ] += splat[I] * iP;
+            }
+        }
+
+
+        //view[ R*w + C ] += 1.0;
     }
     _field.normalize();
     _field.updated();
@@ -165,7 +328,11 @@ GaussMix.prototype.add = function(axis)
 
     this.models.push({
         t: gauss,
-        param: [L*.5 + (Math.random()-0.5)*L*.2, L*.1 + (Math.random()-0.5)*L*(.1/3), 1],
+        param: [
+            L * ( 0.5 + (Math.random()*2 - 1) * 0.5   ),    // center
+            L * ( 0.1 + (Math.random()*2 - 1) * (.1/2)),    // std
+            0.7  + (Math.random()*2 - 1)*0.3
+        ],
         axis: axis
     });
     this.updateModel();
@@ -234,7 +401,15 @@ GaussMix.prototype.updateModel = function()
     // compute CDFs and maps
     this.computeCDFs();
 
-    //var yScale = d3.scaleLinear().domain([0, modelMax]).range([0, -P_HEIGHT]);
+    // plot to svg
+    this.plotModelCurves();
+}
+
+GaussMix.prototype.plotModelCurves = function()
+{
+    if (!this.svg) {
+        return;
+    }
 
     // plot distribution
     var lineGeneratorX = (function(models) {
@@ -271,7 +446,13 @@ GaussMix.prototype.updateModel = function()
                 else {
                     return null;
                 }
+            })
+
+            .on('mouseover', function() { d3.select(this).style('stroke', '#333333'); })
+            .on('mouseout', function(d, j) {
+                d3.select(this).style('stroke', MODEL_COLORS[Math.min(j, MODEL_COLORS.length-1)]);
             });
+
 
         paths.on('mousedown', function(d) {
             var mouseCoord = d3.mouse(models.svg.node());
@@ -303,9 +484,7 @@ GaussMix.prototype.updateModel = function()
 
                 d3.select(document).on('mouseup.moveDist', function()
                 {
-                    if (models.callback) {
-                        models.callback()
-                    }
+                    models.fireCallbacks();
                     d3.select(document).on('mousemove.moveDist', null)
                     d3.select(document).on('mouseup.moveDist', null)
 
@@ -327,7 +506,6 @@ GaussMix.prototype.updateModel = function()
             .attr('x2', function(d) { return d.axis=='x' ? d.param[0] : 0; })
             .attr('y1', function(d) { return d.axis=='x' ? (-P_HEIGHT * d.t(d.param[0], d.param)/models.modelMaxX) : d.param[0]})
             .attr('y2', function(d) { return d.axis=='x' ? 0 : d.param[0] })
-            .attr('stroke', 'black')
             .attr('transform', function(d)
             {
                 if (d.axis == 'y') {
@@ -340,7 +518,13 @@ GaussMix.prototype.updateModel = function()
             .attr('stroke', function(d, i) {
                 return MODEL_COLORS[Math.min(i, MODEL_COLORS.length-1)];
             })
+
             .style('stroke-width', '3px')
+            .on('mouseover', function() { d3.select(this).style('stroke', '#333333'); })
+            .on('mouseout', function(d, j)
+             {
+                d3.select(this).style('stroke', MODEL_COLORS[Math.min(j, MODEL_COLORS.length-1)]);
+            })
             .on('mousedown', function(d) {
                 var mouseCoord = d3.mouse(models.svg.node());
                 (function(model, oldMue, oldScaler, mouseCoord) {
@@ -372,9 +556,7 @@ GaussMix.prototype.updateModel = function()
                     d3.select(document).on('mouseup.moveLine', function() {
 
                         // notify there's been a model update
-                        if (models.callback) {
-                            models.callback();
-                        }
+                        models.fireCallbacks();
                         d3.select(document).on('mousemove.moveLine', null)
                         d3.select(document).on('mouseup.moveLine', null)
 

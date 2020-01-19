@@ -13,126 +13,230 @@
 	<script src="design/src/coloranalysis.js"></script>
 	<script src="jnd/lib/three.min.js"></script>
 	<script src="jnd/src/gaussmix.js"></script>
+	<script src="jnd/src/scalar_sample.js"></script>
+	<script src="jnd/src/lineup.js"></script>
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
 		.modelPath {fill: none; stroke-width: 3px;}
 		button {font-size: 15px;}
+
+		.sliderDiv {
+			width: 80px;
+			height: 5px;
+			font-size: 10px;
+		}
+
 	</style>
 </head>
 <body>
 
-	<p>edit model<br>
-	<button onclick="addX()">add X</button>&nbsp;&nbsp;<button onclick="removeX()">remove X</button><br>
-	<button onclick="addY()">add Y</button>&nbsp;&nbsp;<button onclick="removeY()">remove Y</button><br>
+	<div>
+		<p>edit model<br>
+		<p><button onclick="addX()">add X</button>&nbsp;&nbsp;<button onclick="removeX()">remove X</button><br>
+		<button onclick="addY()">add Y</button>&nbsp;&nbsp;<button onclick="removeY()">remove Y</button><br>
+		<p><button onclick="copyToDecoy()">perturb decoy</button> &nbsp;&nbsp;
 
-	<div style="position: relative">
-		<svg width="500" height="500" style="position: absolute; top: 0px; left: 0px; border: solid 1px black">
-			<g transform="translate(50,100)">
+		<p><button onclick="randomLineup()" style="background-color: #d9ff66">new linup (or press ENTER)</button>
+		&nbsp;&nbsp;<button onclick="randomModel()" style="background-color: #ffe0b3">random model</button>
+
+		<p><table>
+			<tr>
+				<td>lineup sampling fidelity</td>
+				<td><div class="uiDiv sliderDiv" id="sliderN"></div></td>
+				<td><span id="sliderNValue"></span></td>
+			</tr>
+			<tr>
+				<td colspan="3"><input type="checkbox" id="checkDecoy" onclick="toggleHighlightDecoy()"></input>highlight decoy position
+			</tr>
+
+			<tr>
+				<td colspan="3"><input type="checkbox" id="checkPerturbDecoy" checked></input>randomly pertub decoy model a bit
+			</tr>
+
+
+		</table>
+
+	</div>
+	<div style="margin-top: 10px; height: 310px">
+	<div style="position: relative;">
+		<svg width="550" height="300" style="position: absolute; top: 0px; left: 0px;">
+			<!-- a transparent grey drop-shadow that blends with the background colour -->
+			<defs>
+			<filter id="dropshadow" x="0" y="0" width="200%" height="200%">
+		      <feOffset result="offOut" in="SourceAlpha" dx="20" dy="20" />
+		      <feGaussianBlur result="blurOut" in="offOut" stdDeviation="10" />
+		      <feBlend in="SourceGraphic" in2="blurOut" mode="normal" />
+		    </filter>
+			</defs>
+
+
+			<g transform="translate(50,50)">
 				<g id="models"></g>
+			</g>
+
+			<g transform="translate(300,50)"
+				<g id="decoyModel"></g>
 			</g>
 		</svg>
 
-		<canvas id="visCanvas" width="300" height="300" style="z-index: 10; position: absolute; top: 100px; left: 50px; border: solid 1px black;">
+		<canvas id="mainCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 50px; border: solid 1px black;">
 		</canvas>
 
+		<canvas id="decoyCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 300px; border: solid 1px black;">
+		</canvas>
+	</div>
+	</div>
+
+	<div>
+		click on the picture below that doesn't belong. <span id="answer"></span>
+		<table cellspacing="3" cellpadding="3" id="lineupTable">
+		</table>
 	</div>
 
 	<script>
-		var WIDTH=200;
-		var HEIGHT=200;
-
-		var mainModel = new GaussMix(WIDTH, HEIGHT, d3.select("#models"));
-		mainModel.init();
-
-		// create a new scalar field
-		var field=new ScalarField(WIDTH, HEIGHT);
+		// dimensions of samples
+		var WIDTH=150;
+		var HEIGHT=150;
+		var ROTATE = false;
 
 		// number of samples per pixel
-		var N=100;
+		var goodN = 30*WIDTH*HEIGHT;
+		var N=14000;
+		var lineupN = 6;
 
-		// a visualizaiton pipeline
-		var visualizer = null;
-		function visualizeField(_field)
+		function copyToDecoy()
 		{
+			var CENTER_PERTURB = .1/2;
+			var DENSITY_PERTURB = 4;	// of maxiumum weight
+
+			var perturb = d3.select("#checkPerturbDecoy").node().checked;
+			mainModel.copyTo(decoyModel, perturb);
+
+			if (perturb)
+			{
+				// TODO: find a more principled approach of doing this (e.g., residual rotation)
+				var maxXDensity = decoyModel.modelMaxX;
+				var maxYDensity = decoyModel.modelMaxY;
+
+				for (var i=0; i<decoyModel.models.length; i++) {
+					var m = decoyModel.models[i];
+					var c = m.axis=='x' ? WIDTH : HEIGHT;
+						c *= (Math.random()*2-1) * CENTER_PERTURB;
+					var d = m.axis=='x' ? maxXDensity : maxYDensity;
+						d *= (Math.random()*2-1) * DENSITY_PERTURB;
+					m.param[0] += c;
+					m.param[2] += d;
+
+					// don't bother perturbing the SD for now
+				}
+				decoyModel.updateModel();
+			}
+			decoyModel.fireCallbacks();
 
 		}
 
-		function initVis()
+		// one "main" and one decoy model
+		var mainModel = new GaussMix(WIDTH, HEIGHT, d3.select("#models"));
+		mainModel.init();
+		var mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
+		mainSample.setSamplingFidelity(goodN);
+		mainSample.setModel(mainModel);
+
+		var decoyModel = new GaussMix(WIDTH, HEIGHT, d3.select("#decoyModel"));
+		copyToDecoy();
+		var decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
+		decoySample.setSamplingFidelity(goodN);
+		decoySample.setModel(decoyModel);
+
+		function randomLineup()
 		{
-			d3.select("#visCanvas")
+			// new lineup
+			var start = Date.now();
+			if (lineup)
+			{
+				lineup.sample();
+				lineup.layoutCanvases(d3.select("#lineupTable"));
+			}
+			console.log("lineup took: " + Math.floor(Date.now() - start) + " milliseconds");
+
+			// hide answer
+			d3.select("#answer").html('');
+			d3.select('#lineupTable').selectAll('canvas').on('click', function()
+			{
+				console.log('clicked lineup canvas');
+				d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
+			})
+
+			d3.select('#sample' + (lineupN-1)).on('click', function()
+			{
+				d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+			})
+		}
+		// create lineup
+		var lineup = new Lineup(WIDTH, HEIGHT, lineupN, mainModel, decoyModel);
+		randomLineup();
+
+		function randomModel() {
+			mainModel.init(true);
+			copyToDecoy();
+			refreshModel();
+		}
+
+		function refreshModel()
+		{
+			mainSample.sampleAndVis();
+			decoySample.sampleAndVis();
+			refreshStimulus();
+		}
+
+		function refreshStimulus()
+		{
+			N = +$('#sliderN').slider('value');
+			randomLineup();
+		}
+
+		function toggleHighlightDecoy() {
+			var check = d3.select("#checkDecoy").node().checked;
+			d3.select("#sample" + (lineupN-1))
+				.style("border", check ? 'solid 3px red' : null);
+		}
+
+		function initInterface()
+		{
+			d3.select("#mainCanvas")
 				.attr('width', WIDTH)
 				.attr('height', HEIGHT);
 
-			// shaders
-			var shaderList = [
-				{name: 'vis',		path: 'design/src/shaders/vis.frag'},
-				{name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
-				{name: 'blur',		path: 'design/src/shaders/blur.frag'}
-			];
+			d3.select("#decoyCanvas")
+				.attr('width', WIDTH)
+				.attr('height', HEIGHT);
 
-			function pipelineReady(__field)
-			{
-				/*
-				console.log("pipeline ready");
-				var visBlurPipeline = new GLPipeline(visualizer.glCanvas);
-				visBlurPipeline.addStage({
-					uniforms: {
-						scalarField: {},
-						colormap: {},
-						contour: {value: -1.0}
-						//pitch: {value: [1/__field.w, 1/__field.h]}
-					},
-					inTexture: 'scalarField',
-					fragment: visualizer.shaders['vis'],
-					vertex: visualizer.shaders['vertex']
-				});
-				visualizer.pipelines = {
-					blur: visBlurPipeline
-				};
-				*/
-
-				visualizer.createVisPipeline();
-			}
-
-			function sampleAndDrawModel()
+			function sampleAndPlotModel()
 			{
 				console.log("draw model");
 				mainModel.sampleModel(N, field);
+			}
 
-				// render scatterplot
-				if (visualizer.ready())
-				{
-					// make sure the field has an associated colormap
-					if (!field.getColorMap()) {
-						// if not, use viridis as default
-						field.setColorMap(getColorPreset('viridis', null, null, true))
-					}
-					visualizer.run('vis');
+			// keyboard events
+			d3.select(document).on('keydown', function() {
+				if (d3.event.keyCode === 13) {
+					randomLineup();
 				}
+			});
 
-			}
-
-
-			// if first time, create the visualizer
-			if (!visualizer) {
-				visualizer = new ColorAnalysis(
-					field,
-					d3.select("#visCanvas").node(),
-					function() {pipelineReady(field);}, shaderList
-				)
-			}
-			mainModel.setCallback(sampleAndDrawModel);
+			// sliders
+			$('#sliderN').slider({ step: 10, min: 300, max: goodN/15, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
 		}
 
-		function addX() { mainModel.add('x'); }
-		function addY() { mainModel.add('y'); }
+		function addX() { mainModel.add('x'); refreshModel(); }
+		function addY() { mainModel.add('y'); refreshModel(); }
 
-		function removeX() { mainModel.remove('x'); }
-		function removeY() { mainModel.remove('y'); }
+		function removeX() { mainModel.remove('x');  refreshModel();}
+		function removeY() { mainModel.remove('y');  refreshModel();}
 
-		initVis();
+		initInterface();
 	</script>
 
 </body>
