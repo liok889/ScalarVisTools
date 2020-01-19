@@ -1,5 +1,5 @@
 // when sampling, how big is the splat?
-var SPLAT_SIZE=3;
+var SPLAT_SIZE=1;
 
 // colors
 var MODEL_COLORS = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#a65628','#f781bf','#999999'];

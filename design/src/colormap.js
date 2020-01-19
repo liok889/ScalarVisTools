@@ -3,7 +3,7 @@ var COLOR_INTERP_LAB = 1;
 var COLOR_INTERP_JAB = 2;
 var COLOR_INTERP_ELSE = 10;
 
-function isLabColor(c) 
+function isLabColor(c)
 {
 	return c !== null && c !== undefined && !isNaN(c.l) && !isNaN(c.a) && !isNaN(c.b);
 }
@@ -65,7 +65,7 @@ function ColorMap(colorset, interpType)
 	}
 }
 
-ColorMap.prototype.getColorSet = function() { 
+ColorMap.prototype.getColorSet = function() {
 	return this.colorMap;
 }
 
@@ -75,14 +75,14 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 		// force interpolation in the CIELAB color space if non other specified
 		interpType = 'lab';
 	}
-	
+
 	this.colorMap = colorMap || this.colorMap;
 	this.colorInterpolator = [];
 	this.interpType = interpType;
 
 	if (colorMap.length > 1)
 	{
-		for (var i=0, len=colorMap.length; i<len-1; i++) 
+		for (var i=0, len=colorMap.length; i<len-1; i++)
 		{
 			var range = [
 				colorMap[i].value,
@@ -90,7 +90,7 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 			];
 
 			var interpolator = null;
-			if (colorMap[i].lab && colorMap[i+1].lab) 
+			if (colorMap[i].lab && colorMap[i+1].lab)
 			{
 				var lab1 = colorMap[i].lab;
 				var lab2 = colorMap[i+1].lab;
@@ -121,15 +121,15 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 					interpolator = d3.interpolateHsl(
 						d3.lab(lab1[0], lab1[1], lab1[2]),
 						d3.lab(lab2[0], lab2[1], lab2[2])
-					);					
+					);
 				}
-				else 
+				else
 				{
 					interpolator = d3.interpolateRgb(
 						d3.lab(lab1[0], lab1[1], lab1[2]),
 						d3.lab(lab2[0], lab2[1], lab2[2])
 					);
-				}				
+				}
 			}
 			else
 			{
@@ -159,7 +159,7 @@ ColorMap.prototype.setMap = function(colorMap, interpType)
 						d3.rgb(rgb2[0], rgb2[1], rgb2[2])
 					);
 				}
-				
+
 				//console.log("Error in creating ColorMap: unspecified 'lab' control points.");
 			}
 
@@ -200,7 +200,7 @@ ColorMap.prototype.addColor = function()
 	var newCount = this.colorMap.length+1;
 
 	var newSet = [];
-	for (var i=0; i<newCount; i++) 
+	for (var i=0; i<newCount; i++)
 	{
 		var v = i/(newCount-1) * (minmax[1] - minmax[0]) + minmax[0];
 		var c = this.mapValue(v);
@@ -222,7 +222,7 @@ ColorMap.prototype.removeColor = function() {
 	var newCount = this.colorMap.length-1;
 
 	var newSet = [];
-	for (var i=0; i<newCount; i++) 
+	for (var i=0; i<newCount; i++)
 	{
 		var v = i/(newCount-1) * (minmax[1] - minmax[0]) + minmax[0];
 		var c = this.mapValue(v);
@@ -240,11 +240,11 @@ ColorMap.prototype.createGPUColormap = function(colorMap)
 	if (this.gpuTexture !== undefined) {
 		this.dispose();
 	}
-	
+
 	// create an internal canvas and draw the colorscale onto it
 	var internalCanvas = document.createElement('canvas');
 	internalCanvas.width = 1024;
-	internalCanvas.height = 1; 
+	internalCanvas.height = 1;
 
 	// draw color scale
 	if (!colorMap) {
@@ -254,7 +254,7 @@ ColorMap.prototype.createGPUColormap = function(colorMap)
 	colorMap.drawColorScale(
 		internalCanvas.width,
 		internalCanvas.height,
-		1024, 
+		1024,
 		'horizontal',
 		internalCanvas
 	);
@@ -275,14 +275,14 @@ ColorMap.prototype.createGPUColormap = function(colorMap)
 }
 
 ColorMap.prototype.dispose = function() {
-	if (this.gpuTexture !== undefined) 
+	if (this.gpuTexture !== undefined)
 	{
 		this.gpuTexture.dispose();
 		this.gpuTexture = undefined;
 	}
 }
 
-ColorMap.prototype.visualize = function(svg) 
+ColorMap.prototype.visualize = function(svg)
 {
 	/*
 	var colorset = this.colorMap.slice(0);
@@ -331,12 +331,12 @@ ColorMap.prototype.visualize = function(svg)
 
 	var internalCanvas = document.createElement('canvas');
 		internalCanvas.width = COLOR_RECT_W;
-		internalCanvas.height = COLOR_LIGHTNESS_H; 
+		internalCanvas.height = COLOR_LIGHTNESS_H;
 
 	this.drawColorScale(
 		internalCanvas.width,
 		internalCanvas.height,
-		COLOR_LIGHTNESS_H/2, 
+		COLOR_LIGHTNESS_H/2,
 		'vertical',
 		internalCanvas);
 
@@ -351,17 +351,17 @@ ColorMap.prototype.visualize = function(svg)
 	var lightnessValues = [], diffValues = [];
 	var minmax = this.getMinMax();
 
-	for (var i=0, len=50; i<len; i++) 
+	for (var i=0, len=50; i<len; i++)
 	{
 		var v = (minmax[1]-minmax[0]) * (i/(len-1)) + minmax[0];
 		var vv = this.mapValue(v);
 		var cLab = d3.lab( d3.rgb(vv.r, vv.g, vv.b) );
-		lightnessValues.push({ 
-			x: COLOR_LIGHTNESS_W * cLab.l/100, 
-			y: COLOR_LIGHTNESS_H - COLOR_LIGHTNESS_H * i/(len-1) 
+		lightnessValues.push({
+			x: COLOR_LIGHTNESS_W * cLab.l/100,
+			y: COLOR_LIGHTNESS_H - COLOR_LIGHTNESS_H * i/(len-1)
 		});
 	}
-	
+
 	for (var i=0, len=this.colorDiffs.length; i<len; i++) {
 		var d = this.colorDiffs[i];
 		diffValues[i] = {
@@ -369,7 +369,7 @@ ColorMap.prototype.visualize = function(svg)
 			y: COLOR_LIGHTNESS_H - COLOR_LIGHTNESS_H * i/(len-1)
 		};
 	}
-	
+
 
 	gLightness.append('rect')
 		.style('fill', 'none')
@@ -398,14 +398,14 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 	var maxDiff = -Number.MAX_VALUE;
 	var avgDiff = 0, N=0;
 
-	for (var i=0, len=SAMPLES; i<len; i++) 
+	for (var i=0, len=SAMPLES; i<len; i++)
 	{
 		var v = (minmax[1]-minmax[0]) * (i/(len-1)) + minmax[0];
 		var vv = this.mapValue(v);
 		var cLab = d3.lab( d3.rgb(vv.r, vv.g, vv.b) );
 
 		if (lastCLab) {
-			
+
 			var d = ciede2000(cLab.l, cLab.a, cLab.b, lastCLab.l, lastCLab.a, lastCLab.b);//cie76Diff(lastCLab, cLab);
 			diffValues.push(d);
 			maxDiff = Math.max(d, maxDiff);
@@ -428,7 +428,7 @@ ColorMap.prototype.computeColorDiff = function(m0, m1)
 	};
 }
 
-ColorMap.prototype.scaleColorDiff = function(s) 
+ColorMap.prototype.scaleColorDiff = function(s)
 {
 	console.log("scale color diff: " + s);
 	var diffValues = this.colorDiffs;
@@ -446,8 +446,8 @@ ColorMap.prototype.mapValue = function(v, dontMapAnyway)
 	else
 	{
 		var interpolators = this.colorInterpolator;
-		
-		for (var i=0, len=interpolators.length; i < len; i++) 
+
+		for (var i=0, len=interpolators.length; i < len; i++)
 		{
 			var interpolator = interpolators[i];
 			var range = interpolator.range;
@@ -458,7 +458,7 @@ ColorMap.prototype.mapValue = function(v, dontMapAnyway)
 				var interp = interpolator.interpolator;
 				var c;
 
-				if (ColorInterpolator.prototype.isPrototypeOf(interp)) 
+				if (ColorInterpolator.prototype.isPrototypeOf(interp))
 				{
 					c = interp.interpolate(n);
 					if (c.displayable()) {
@@ -475,8 +475,8 @@ ColorMap.prototype.mapValue = function(v, dontMapAnyway)
 							return d3.rgb(0,0,0);
 						}
 					}
-				} 
-				else 
+				}
+				else
 				{
 					c = interp(n)
 					return c;
@@ -520,7 +520,7 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 	}
 
 	var dontMapAnyway = h > 4;
-	for (var i=0; i<steps; i++, x += dX, y += dY) 
+	for (var i=0; i<steps; i++, x += dX, y += dY)
 	{
 		var v = (minmax[1]-minmax[0]) * ( (invert ? steps-1-i : i )/(steps-1)) + minmax[0];
 		var c = this.mapValue(v, dontMapAnyway);
@@ -528,7 +528,7 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 		context.fillStyle = c !== null ? c.toString() : '#000000';
 		context.fillRect(x, y, ww, hh);
 
-		if (c === null) 
+		if (c === null)
 		{
 			// strike through with a red line
 			context.strokeStyle="#FFFF00";
@@ -558,7 +558,7 @@ var COLOR_PRESETS = {
 			[255, 255, 0],
 			[255, 0, 0],
 		],
-		
+
 		rainbowcie: [
 			[0, 0, 255],
 			[0, 255, 255],
@@ -633,7 +633,7 @@ var COLOR_PRESETS = {
 			[143,   0,   0],
 			[127,   0,   0]
 		],
-		
+
 		// a rainbow without greens
 		/*
 		rainbowcustomcie: [
@@ -763,7 +763,7 @@ var COLOR_PRESETS = {
 			[8,81,156],
 			[8,48,107]
 		].reverse(),
-		
+
 
 		multihue: [
 			[255,255,217],
@@ -871,7 +871,7 @@ var COLOR_PRESETS = {
 		rainbowhcl: function(t) {
 			return d3.rgb(d3.hcl(t * 360, 1, .5));
 		},
-		
+
 		viridis: [
 			[72,		0,		84],
 			[74,		1,		91],
@@ -939,6 +939,9 @@ var COLOR_PRESETS = {
 			[243,	233,	28]
 ],
 
+turbo: [[48,18,59],[50,21,67],[51,24,74],[52,27,81],[53,30,88],[54,33,95],[55,36,102],[56,39,109],[57,42,115],[58,45,121],[59,47,128],[60,50,134],[61,53,139],[62,56,145],[63,59,151],[63,62,156],[64,64,162],[65,67,167],[65,70,172],[66,73,177],[66,75,181],[67,78,186],[68,81,191],[68,84,195],[68,86,199],[69,89,203],[69,92,207],[69,94,211],[70,97,214],[70,100,218],[70,102,221],[70,105,224],[70,107,227],[71,110,230],[71,113,233],[71,115,235],[71,118,238],[71,120,240],[71,123,242],[70,125,244],[70,128,246],[70,130,248],[70,133,250],[70,135,251],[69,138,252],[69,140,253],[68,143,254],[67,145,254],[66,148,255],[65,150,255],[64,153,255],[62,155,254],[61,158,254],[59,160,253],[58,163,252],[56,165,251],[55,168,250],[53,171,248],[51,173,247],[49,175,245],[47,178,244],[46,180,242],[44,183,240],[42,185,238],[40,188,235],[39,190,233],[37,192,231],[35,195,228],[34,197,226],[32,199,223],[31,201,221],[30,203,218],[28,205,216],[27,208,213],[26,210,210],[26,212,208],[25,213,205],[24,215,202],[24,217,200],[24,219,197],[24,221,194],[24,222,192],[24,224,189],[25,226,187],[25,227,185],[26,228,182],[28,230,180],[29,231,178],[31,233,175],[32,234,172],[34,235,170],[37,236,167],[39,238,164],[42,239,161],[44,240,158],[47,241,155],[50,242,152],[53,243,148],[56,244,145],[60,245,142],[63,246,138],[67,247,135],[70,248,132],[74,248,128],[78,249,125],[82,250,122],[85,250,118],[89,251,115],[93,252,111],[97,252,108],[101,253,105],[105,253,102],[109,254,98],[113,254,95],[117,254,92],[121,254,89],[125,255,86],[128,255,83],[132,255,81],[136,255,78],[139,255,75],[143,255,73],[146,255,71],[150,254,68],[153,254,66],[156,254,64],[159,253,63],[161,253,61],[164,252,60],[167,252,58],[169,251,57],[172,251,56],[175,250,55],[177,249,54],[180,248,54],[183,247,53],[185,246,53],[188,245,52],[190,244,52],[193,243,52],[195,241,52],[198,240,52],[200,239,52],[203,237,52],[205,236,52],[208,234,52],[210,233,53],[212,231,53],[215,229,53],[217,228,54],[219,226,54],[221,224,55],[223,223,55],[225,221,55],[227,219,56],[229,217,56],[231,215,57],[233,213,57],[235,211,57],[236,209,58],[238,207,58],[239,205,58],[241,203,58],[242,201,58],[244,199,58],[245,197,58],[246,195,58],[247,193,58],[248,190,57],[249,188,57],[250,186,57],[251,184,56],[251,182,55],[252,179,54],[252,177,54],[253,174,53],[253,172,52],[254,169,51],[254,167,50],[254,164,49],[254,161,48],[254,158,47],[254,155,45],[254,153,44],[254,150,43],[254,147,42],[254,144,41],[253,141,39],[253,138,38],[252,135,37],[252,132,35],[251,129,34],[251,126,33],[250,123,31],[249,120,30],[249,117,29],[248,114,28],[247,111,26],[246,108,25],[245,105,24],[244,102,23],[243,99,21],[242,96,20],[241,93,19],[240,91,18],[239,88,17],[237,85,16],[236,83,15],[235,80,14],[234,78,13],[232,75,12],[231,73,12],[229,71,11],[228,69,10],[226,67,10],[225,65,9],[223,63,8],[221,61,8],[220,59,7],[218,57,7],[216,55,6],[214,53,6],[212,51,5],[210,49,5],[208,47,5],[206,45,4],[204,43,4],[202,42,4],[200,40,3],[197,38,3],[195,37,3],[193,35,2],[190,33,2],[188,32,2],[185,30,2],[183,29,2],[180,27,1],[178,26,1],[175,24,1],[172,23,1],[169,22,1],[167,20,1],[164,19,1],[161,18,1],[158,16,1],[155,15,1],[152,14,1],[149,13,1],[146,11,1],[142,10,1],[139,9,2],[136,8,2],[133,7,2],[129,6,2],[126,5,2],[122,4,3]],
+
+
 		//viridisLike: { URL: '/colormaps/viridis-like.json'}
 };
 
@@ -965,16 +968,16 @@ function getColorPreset(preset, m0, m1, brandNew)
 		specialInterpolation = 'hsl';
 	}
 
-	
-	if (!colorScheme) 
+
+	if (!colorScheme)
 	{
 		console.error("Could not find preset: " + preset);
-		return null;		
+		return null;
 	}
 	else
 	{
 		var colorset;
-		
+
 		if (Array.isArray(colorScheme))
 		{
 			colorset = [];
@@ -1025,16 +1028,16 @@ function getColorPreset(preset, m0, m1, brandNew)
 	}
 }
 
-function loadExternalColorPresets(callback) 
+function loadExternalColorPresets(callback)
 {
 	function loadExternalColorMap(presetName, path, _callback)
 	{
-		d3.text(path).then(function(text, error) 
+		d3.text(path).then(function(text, error)
 		{
 			if (error) {
 				_callback(error);
 				throw error;
-			} 
+			}
 			else
 			{
 				var colorScheme = JSON.parse(text);
@@ -1052,9 +1055,9 @@ function loadExternalColorPresets(callback)
 
 	// load URL and parse it as JSON
 	var q = d3.queue();
-	for (var presetName in COLOR_PRESETS) 
+	for (var presetName in COLOR_PRESETS)
 	{
-		if (COLOR_PRESETS.hasOwnProperty(presetName)) 
+		if (COLOR_PRESETS.hasOwnProperty(presetName))
 		{
 			preset = COLOR_PRESETS[presetName];
 			if (typeof(preset) === 'object' && preset.URL && typeof(preset.URL) === 'string')
@@ -1064,7 +1067,7 @@ function loadExternalColorPresets(callback)
 		}
 	}
 	q.awaitAll(function(error) {
-		if (error) { 
+		if (error) {
 			throw error;
 		}
 		if (callback) {
@@ -1077,9 +1080,9 @@ function drawColorPresets(svg, callback)
 {
 	var maxColorDiff = -Number.MAX_VALUE;
 	var presets = [];
-	for (var preset in COLOR_PRESETS) 
+	for (var preset in COLOR_PRESETS)
 	{
-		if (COLOR_PRESETS.hasOwnProperty(preset)) 
+		if (COLOR_PRESETS.hasOwnProperty(preset))
 		{
 			var p = {
 				name: preset,
@@ -1171,7 +1174,7 @@ function cie2000Diff(c1, c2)
 	var C2_ = Math.sqrt(Math.pow(a2_, 2) + b2_2);
 	var C_  = .5 * (C1_ + C2_); //if (C1_>0 && C2_>0) C_ /= 2;
 	var dC = C2_ - C1_;
-	
+
 	// compute hue angle diffrentials
 	var dh, dH, H;
 
@@ -1179,9 +1182,9 @@ function cie2000Diff(c1, c2)
 	var h2 = Math.atan2(b2, a2_) % TWO_PI;
 
 	// note: an indeterminate atan2 happens when both b and a are 0
-	// In this case, the Math.atan2 returns 0, which is what is assumed in the following 
+	// In this case, the Math.atan2 returns 0, which is what is assumed in the following
 	// calculations
-	var h21 = h2 - h1;	
+	var h21 = h2 - h1;
 
 	if (C1_ == 0 || C2_ == 0) {
 		dh = 0;
@@ -1211,7 +1214,7 @@ function cie2000Diff(c1, c2)
 	}
 
 	var T = 1 -
-		0.17 * Math.cos(H - THIRTY) + 
+		0.17 * Math.cos(H - THIRTY) +
 		0.24 * Math.cos(2*H) +
 		0.32 * Math.cos(3*H + SIX) -
 		0.20 * Math.cos(4*H - SIXTY_THREE);
@@ -1220,18 +1223,18 @@ function cie2000Diff(c1, c2)
 	var SL = 1 + 0.015 * L50 / (Math.sqrt(20 + L50));
 	var SC = 1 + 0.045 * C_;
 	var SH = 1 + 0.015 * C_ * T;
-	
+
 	var expH = Math.pow( (H - TWO_SEVENTY_FIVE) / TWENTY_FIVE, 2);
-	var RT = 
-		-2 * C725 * 
+	var RT =
+		-2 * C725 *
 		Math.sin(SIXTY * Math.exp( -expH ));
 
 	var dCSC = dC/SC;
 	var dHSH = dH/SH;
 
-	var deltaE00_2 = 
-		Math.pow(dL/SL,2) + 
-		Math.pow(dCSC, 2) + 
+	var deltaE00_2 =
+		Math.pow(dL/SL,2) +
+		Math.pow(dCSC, 2) +
 		Math.pow(dHSH, 2) +
 		RT * dCSC * dHSH;
 

@@ -1,4 +1,5 @@
-var BLUR=false;
+var BLUR=true;
+ALL_SAMPLERS = [];
 function ScalarSample(w, h, canvas, model, colormap)
 {
     this.w = w;
@@ -30,6 +31,17 @@ function ScalarSample(w, h, canvas, model, colormap)
 
     if (!colormap) {
         this.field.setColorMap(getColorPreset('viridis'));
+    }
+    ALL_SAMPLERS.push(this);
+}
+
+ScalarSample.setUniversalColormap = function(colormap) {
+    for (var i=0; i<ALL_SAMPLERS.length; i++)
+    {
+        ALL_SAMPLERS[i].field.setColorMap(colormap);
+
+        // render?
+        ALL_SAMPLERS[i].vis();
     }
 }
 

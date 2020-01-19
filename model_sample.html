@@ -80,6 +80,8 @@
 			</g>
 		</svg>
 
+		<svg width="200" height="300" id="svgColormaps" style="position: absolute; top: 0px; left: 550px;"></svg>
+
 		<canvas id="mainCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 50px; border: solid 1px black;">
 		</canvas>
 
@@ -101,8 +103,8 @@
 		var ROTATE = false;
 
 		// number of samples per pixel
-		var goodN = 30*WIDTH*HEIGHT;
-		var N=14000;
+		var goodN = 10*WIDTH*HEIGHT;
+		var N=12000;
 		var lineupN = 6;
 
 		function copyToDecoy()
@@ -177,10 +179,13 @@
 		var lineup = new Lineup(WIDTH, HEIGHT, lineupN, mainModel, decoyModel);
 		randomLineup();
 
-		function randomModel() {
+		function randomModel()
+		{
+			var start = Date.now();
 			mainModel.init(true);
 			copyToDecoy();
 			refreshModel();
+			console.log('model took: ' + Math.floor(Date.now()-start) + ' milliseconds');
 		}
 
 		function refreshModel()
@@ -200,6 +205,38 @@
 			var check = d3.select("#checkDecoy").node().checked;
 			d3.select("#sample" + (lineupN-1))
 				.style("border", check ? 'solid 3px red' : null);
+		}
+
+		function showColormaps() {
+			var COLORMAPS = [
+				'viridis', 'rainbowjet', 'turbo', 'coolwarm', 'spectral'
+			];
+			var MAP_W=100, MAP_H=15, MAP_PAD=5;
+			d3.select('#svgColormaps').selectAll('image').data(COLORMAPS)
+				.enter().append('image')
+				.attr('x', function(d, i) { return 20; })
+				.attr('y', function(d, i) {
+					return i*(MAP_H+MAP_PAD);
+				})
+				.attr('width', MAP_W)
+				.attr('height', MAP_H)
+				.attr('xlink:href', function(d, i) {
+					var colormap = getColorPreset(d, null, null);
+					var canvas = colormap.drawColorScale(MAP_W, MAP_H, MAP_W, 'horizontal');
+					return canvas.toDataURL("image/png");
+				})
+				.on('click', function(d) {
+					ScalarSample.setUniversalColormap(getColorPreset(d));
+				});
+
+			d3.select('#svgColormaps').selectAll('text').data(COLORMAPS)
+				.enter().append('text')
+				.attr('x', function(d, i) { return 20 + MAP_W + 10; })
+				.attr('y', function(d, i) {
+					return 12+ i*(MAP_H+MAP_PAD);
+				})
+				.html(function(d) { return d});
+
 		}
 
 		function initInterface()
@@ -228,6 +265,7 @@
 			// sliders
 			$('#sliderN').slider({ step: 10, min: 300, max: goodN/15, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
+			showColormaps();
 		}
 
 		function addX() { mainModel.add('x'); refreshModel(); }
