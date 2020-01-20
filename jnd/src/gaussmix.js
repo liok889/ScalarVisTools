@@ -91,12 +91,10 @@ GaussMix.prototype.fireCallbacks = function() {
     }
 }
 
-GaussMix.prototype.init = function(clearOld)
+GaussMix.prototype.init = function()
 {
-    if (clearOld) {
-        this.models = [];
-    }
-
+    this.models = [];
+    
     // add a few random gausses
     for (var i=0, count=1+Math.floor(.499 + Math.random()*3); i<count; i++ ) {
         this.add('x');
@@ -355,6 +353,29 @@ GaussMix.prototype.remove = function(axis)
         this.models.splice(m, 1);
         this.updateModel();
     }
+}
+
+// randomly perturbs the model a bit
+GaussMix.prototype.randomPerturb = function()
+{
+    var CENTER_PERTURB = .1/2;
+    var DENSITY_PERTURB = 4;	// of maxiumum weight
+
+    var maxXDensity = this.modelMaxX;
+    var maxYDensity = this.modelMaxY;
+
+    for (var i=0; i<this.models.length; i++) {
+        var m = this.models[i];
+        var c = m.axis=='x' ? WIDTH : HEIGHT;
+            c *= (Math.random()*2-1) * CENTER_PERTURB;
+        var d = m.axis=='x' ? maxXDensity : maxYDensity;
+            d *= (Math.random()*2-1) * DENSITY_PERTURB;
+        m.param[0] += c;
+        m.param[2] += d;
+
+        // don't bother perturbing the SD for now
+    }
+    this.updateModel();
 }
 
 GaussMix.prototype.updateModel = function()

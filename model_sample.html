@@ -13,6 +13,7 @@
 	<script src="design/src/coloranalysis.js"></script>
 	<script src="jnd/lib/three.min.js"></script>
 	<script src="jnd/src/gaussmix.js"></script>
+	<script src="jnd/src/gaussmix_bivariate.js"></script>
 	<script src="jnd/src/scalar_sample.js"></script>
 	<script src="jnd/src/lineup.js"></script>
 
@@ -33,8 +34,9 @@
 
 	<div>
 		<p>edit model<br>
-		<p><button onclick="addX()">add X</button>&nbsp;&nbsp;<button onclick="removeX()">remove X</button><br>
-		<button onclick="addY()">add Y</button>&nbsp;&nbsp;<button onclick="removeY()">remove Y</button><br>
+		<p><button id="buttonModelType" onClick="switchModelType()">switch to</button>
+		<p><button id="buttonAddX" onclick="addX()">add X</button>&nbsp;&nbsp;<button id="buttonRemoveX" onclick="removeX()">remove X</button><br>
+		<button id="buttonAddY" onclick="addY()">add Y</button>&nbsp;&nbsp;<button id="buttonRemoveY" onclick="removeY()">remove Y</button><br>
 		<p><button onclick="copyToDecoy()">perturb decoy</button> &nbsp;&nbsp;
 
 		<p><button onclick="randomLineup()" style="background-color: #d9ff66">new linup (or press ENTER)</button>
@@ -53,14 +55,12 @@
 			<tr>
 				<td colspan="3"><input type="checkbox" id="checkPerturbDecoy" checked></input>randomly pertub decoy model a bit
 			</tr>
-
-
 		</table>
 
 	</div>
 	<div style="margin-top: 10px; height: 310px">
 	<div style="position: relative;">
-		<svg width="550" height="300" style="position: absolute; top: 0px; left: 0px;">
+		<svg width="550" height="300" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
 			<!-- a transparent grey drop-shadow that blends with the background colour -->
 			<defs>
 			<filter id="dropshadow" x="0" y="0" width="200%" height="200%">
@@ -102,6 +102,9 @@
 		var HEIGHT=150;
 		var ROTATE = false;
 
+		var BIVARIATE = window.location.href.search('univariate') >-1 ? false : true;
+		var ModelType = BIVARIATE ? GaussMixBivariate : GaussMix;
+
 		// number of samples per pixel
 		var goodN = 10*WIDTH*HEIGHT;
 		var N=12000;
@@ -109,47 +112,35 @@
 
 		function copyToDecoy()
 		{
-			var CENTER_PERTURB = .1/2;
-			var DENSITY_PERTURB = 4;	// of maxiumum weight
+			// copy main model to decoy
+			mainModel.copyTo(decoyModel);
 
+			// perturb a bit?
 			var perturb = d3.select("#checkPerturbDecoy").node().checked;
-			mainModel.copyTo(decoyModel, perturb);
-
 			if (perturb)
 			{
-				// TODO: find a more principled approach of doing this (e.g., residual rotation)
-				var maxXDensity = decoyModel.modelMaxX;
-				var maxYDensity = decoyModel.modelMaxY;
-
-				for (var i=0; i<decoyModel.models.length; i++) {
-					var m = decoyModel.models[i];
-					var c = m.axis=='x' ? WIDTH : HEIGHT;
-						c *= (Math.random()*2-1) * CENTER_PERTURB;
-					var d = m.axis=='x' ? maxXDensity : maxYDensity;
-						d *= (Math.random()*2-1) * DENSITY_PERTURB;
-					m.param[0] += c;
-					m.param[2] += d;
-
-					// don't bother perturbing the SD for now
-				}
-				decoyModel.updateModel();
+				decoyModel.randomPerturb();
 			}
 			decoyModel.fireCallbacks();
 
 		}
 
 		// one "main" and one decoy model
-		var mainModel = new GaussMix(WIDTH, HEIGHT, d3.select("#models"));
-		mainModel.init();
-		var mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
-		mainSample.setSamplingFidelity(goodN);
-		mainSample.setModel(mainModel);
+		var mainModel, decoyModel, mainSample, decoySample;
+		function initModels()
+		{
+			mainModel = new ModelType(WIDTH, HEIGHT, d3.select("#models"));
+			mainModel.init();
+			mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
+			mainSample.setSamplingFidelity(goodN);
+			mainSample.setModel(mainModel);
 
-		var decoyModel = new GaussMix(WIDTH, HEIGHT, d3.select("#decoyModel"));
-		copyToDecoy();
-		var decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
-		decoySample.setSamplingFidelity(goodN);
-		decoySample.setModel(decoyModel);
+			decoyModel = new ModelType(WIDTH, HEIGHT, d3.select("#decoyModel"));
+			copyToDecoy();
+			decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
+			decoySample.setSamplingFidelity(goodN);
+			decoySample.setModel(decoyModel);
+		}
 
 		function randomLineup()
 		{
@@ -175,14 +166,11 @@
 				d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
 			})
 		}
-		// create lineup
-		var lineup = new Lineup(WIDTH, HEIGHT, lineupN, mainModel, decoyModel);
-		randomLineup();
 
 		function randomModel()
 		{
 			var start = Date.now();
-			mainModel.init(true);
+			mainModel.init();
 			copyToDecoy();
 			refreshModel();
 			console.log('model took: ' + Math.floor(Date.now()-start) + ' milliseconds');
@@ -241,6 +229,17 @@
 
 		function initInterface()
 		{
+			if (BIVARIATE) {
+				d3.select("#buttonAddY").remove();
+				d3.select("#buttonRemoveY").remove();
+
+				d3.select("#buttonAddX").html('add gaussian');
+				d3.select("#buttonRemoveX").html('remove gaussian');
+			}
+			d3.select("#buttonModelType").html('switch to ' + (BIVARIATE ? 'UNIVARIATE' : 'BIVARIATE') + ' models');
+
+
+
 			d3.select("#mainCanvas")
 				.attr('width', WIDTH)
 				.attr('height', HEIGHT);
@@ -273,8 +272,28 @@
 
 		function removeX() { mainModel.remove('x');  refreshModel();}
 		function removeY() { mainModel.remove('y');  refreshModel();}
+		function switchModelType() {
+			var href = window.location.href;
+			var qMark = href.search(/\?/);
+			if (qMark>-1) {
+				href = href.substr(0, qMark);
+			}
+			if (BIVARIATE)
+			{
+				window.location.replace(href + "?model=univariate");
+			}
+			else {
+				window.location.replace(href + "?model=bivariate");
+			}
+		}
 
 		initInterface();
+		initModels();
+
+		// create lineup
+		var lineup = new Lineup(WIDTH, HEIGHT, lineupN, mainModel, decoyModel);
+		randomLineup();
+
 	</script>
 
 </body>
