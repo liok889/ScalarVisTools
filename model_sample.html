@@ -33,14 +33,15 @@
 <body>
 
 	<div>
-		<p>edit model<br>
 		<p><button id="buttonModelType" onClick="switchModelType()">switch to</button>
-		<p><button id="buttonAddX" onclick="addX()">add X</button>&nbsp;&nbsp;<button id="buttonRemoveX" onclick="removeX()">remove X</button><br>
-		<button id="buttonAddY" onclick="addY()">add Y</button>&nbsp;&nbsp;<button id="buttonRemoveY" onclick="removeY()">remove Y</button><br>
-		<p><button onclick="copyToDecoy()">perturb decoy</button> &nbsp;&nbsp;
 
-		<p><button onclick="randomLineup()" style="background-color: #d9ff66">new linup (or press ENTER)</button>
-		&nbsp;&nbsp;<button onclick="randomModel()" style="background-color: #ffe0b3">random model</button>
+			<p>edit model&nbsp;<button id="buttonAddX" onclick="addX()">add X</button>&nbsp;&nbsp;<button id="buttonRemoveX" onclick="removeX()">remove X</button><br>
+		<button id="buttonAddY" onclick="addY()">add Y</button>&nbsp;&nbsp;<button id="buttonRemoveY" onclick="removeY()">remove Y</button><br>
+
+		<p>
+			<button onclick="copyToDecoy()">perturb decoy</button> &nbsp;
+			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup (or press ENTER)</button> &nbsp;
+			<button onclick="randomModel()" style="background-color: #ffe0b3">random model</button>
 
 		<p><table>
 			<tr>
@@ -58,9 +59,9 @@
 		</table>
 
 	</div>
-	<div style="margin-top: 10px; height: 310px">
+	<div style="margin-top: 10px; height: 230px">
 	<div style="position: relative;">
-		<svg width="550" height="300" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
+		<svg width="550" height="200" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
 			<!-- a transparent grey drop-shadow that blends with the background colour -->
 			<defs>
 			<filter id="dropshadow" x="0" y="0" width="200%" height="200%">

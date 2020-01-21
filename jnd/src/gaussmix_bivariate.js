@@ -1,4 +1,5 @@
-var BI_MAP_SIZE=10;
+// somewhere between 2 and 5 seems (visually) like a reasonable tradeoff
+var BI_MAP_SIZE=2;
 
 function GaussMixBivariate(w, h, svg)
 {
@@ -47,7 +48,7 @@ GaussMixBivariate.prototype.init = function()
     this.models = [];
 
     // add a few random gausses
-    for (var i=0, count=1+Math.floor(.499 + Math.random()*3); i<count; i++ ) {
+    for (var i=0, count=1+Math.floor(.499 + Math.random()*4); i<count; i++ ) {
         this.add();
     }
     this.updateModel();
@@ -291,6 +292,10 @@ GaussMixBivariate.prototype.computeCDFs = function()
     }
 
     // CDF
+    if (this.cdfMap.length != w * h * BI_MAP_SIZE * BI_MAP_SIZE) {
+        this.cdfMap = new Float32Array(new ArrayBuffer(4 * w * h * BI_MAP_SIZE * BI_MAP_SIZE));
+    }
+
     var cdfMap = this.cdfMap;
     var cdfLen = this.cdfMap.length;
 

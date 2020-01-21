@@ -36,7 +36,7 @@ ScalarField.prototype.copyView = function() {
 	return new Float32Array(newBuffer);
 }
 
-ScalarField.prototype.setMask = function(theMask) 
+ScalarField.prototype.setMask = function(theMask)
 {
 	this.mask = theMask;
 }
@@ -50,7 +50,7 @@ ScalarField.prototype.getMaskedW = function() {
 		return this.w;
 	}
 }
-ScalarField.prototype.getMaskedH = function() 
+ScalarField.prototype.getMaskedH = function()
 {
 	if (this.mask) {
 		return Math.min(this.h, this.mask[1]);
@@ -62,13 +62,13 @@ ScalarField.prototype.getMaskedH = function()
 }
 
 
-ScalarField.prototype.duplicate = function() 
+ScalarField.prototype.duplicate = function()
 {
 	var field = this.view;
 	var newScalar = new ScalarField(this.w, this.h);
 	var newField = newScalar.view;
-	
-	for (var i=0, len=field.length; i<len; i++) 
+
+	for (var i=0, len=field.length; i<len; i++)
 	{
 		newField[i] = field[i];
 	}
@@ -109,9 +109,9 @@ ScalarField.prototype.crop = function(x, y, w, h)
 	var newView = new Float32Array(newBuffer);
 	var view = this.view;
 
-	for (var y=y0, I=0; y<y1; y++) 
+	for (var y=y0, I=0; y<y1; y++)
 	{
-	    for (var x=x0; x<x1; x++) 
+	    for (var x=x0; x<x1; x++)
 	    {
 	    	newView[I++] = view[ y*this.w + x ]
 	    }
@@ -129,16 +129,16 @@ ScalarField.prototype.guassian = function(kernelSize, proceduralFunc)
 	var w = this.w, h = this.h;
 
 	// create kernel
-	var kernel = [], kernelLen = kernelSize * 2 + 1; 
+	var kernel = [], kernelLen = kernelSize * 2 + 1;
 	kernel.length = kernelLen * kernelLen;
-	
-	// set guassian parameter so that the middle 
+
+	// set guassian parameter so that the middle
 	// 3 delta = kernelSize -> delta = kernelSize / 3
 	var delta = kernelSize / 3;
 	var deltaSq = 2 * delta * delta;
 	var totalDensity = 0;
 
-	for (var r=0; r<kernelLen; r++) 
+	for (var r=0; r<kernelLen; r++)
 	{
 		for (var c=0; c<kernelLen; c++)
 		{
@@ -160,9 +160,9 @@ ScalarField.prototype.guassian = function(kernelSize, proceduralFunc)
 	var originalMinMax = this.originalMinMax;
 
 	// apply the kernel
-	for (var r=0; r < h; r++) 
+	for (var r=0; r < h; r++)
 	{
-		for (var c=0; c < w; c++) 
+		for (var c=0; c < w; c++)
 		{
 			var p = 0.0;
 			if ((!proceduralFunc) && (r < kernelSize  || r >= (h - kernelSize) || c < kernelSize || c >= (w - kernelSize)))
@@ -175,16 +175,16 @@ ScalarField.prototype.guassian = function(kernelSize, proceduralFunc)
 			else
 			{
 				var k = 0;
-				for (var kr=-kernelSize; kr<= kernelSize; kr++) 
+				for (var kr=-kernelSize; kr<= kernelSize; kr++)
 				{
-					for (var kc=-kernelSize; kc<=kernelSize; kc++) 
+					for (var kc=-kernelSize; kc<=kernelSize; kc++)
 					{
 						var y = r+kr, x = c+kc;
 						var f = null;
 
 						if (x < 0 || x >= w || y < 0 || y >= h) {
 							f = proceduralFunc(x, y, w, h);
-							if (originalMinMax) 
+							if (originalMinMax)
 							{
 								f = (f - originalMinMax[0]) / (originalMinMax[1] - originalMinMax[0]);
 							}
@@ -216,11 +216,11 @@ ScalarField.prototype.scale = function(newW, newH, cropW, cropH)
 
 
 	// create a new image
-	var stopH = cropH ? cropH : newH; 
+	var stopH = cropH ? cropH : newH;
 	var w = this.w, h=this.h, view = this.view;
 	var newBuffer = new ArrayBuffer(4 * newW * stopH);
 	var newView = new Float32Array(newBuffer);
-    
+
     for (var i=0, r=0; r<stopH; r++) {
     	for (var c=0; c<newW; c++, i++) {
 
@@ -229,7 +229,7 @@ ScalarField.prototype.scale = function(newW, newH, cropW, cropH)
 
 			var gxi = Math.floor(gx);
 			var gyi = Math.floor(gy);
-			
+
 			var c00 = view[  gyi*w    + gxi  ];
 			var c10 = view[  gyi*w    + gxi+1];
 			var c01 = view[ (gyi+1)*w + gxi  ];
@@ -248,7 +248,7 @@ ScalarField.prototype.scale = function(newW, newH, cropW, cropH)
 	this.minmax = undefined;
 }
 
-ScalarField.prototype.getMinMax = function() 
+ScalarField.prototype.getMinMax = function()
 {
 	if (!this.minax)
 	{
@@ -282,9 +282,9 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 	var h_1 = this.h-1;
 
 	// min/max and mean
-	for (var r=y, rr=y+h; r<rr; r++) 
+	for (var r=y, rr=y+h; r<rr; r++)
 	{
-		for (var c=x, cc=x+w; c<cc; c++, count++) 
+		for (var c=x, cc=x+w; c<cc; c++, count++)
 		{
 			var v = view[ r*sW + c ];
 			minmax[0] = Math.min(minmax[0], v);
@@ -300,13 +300,13 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 	var steepness = 0;
 	var steepnessCount = 0, maxSteepness = 0;
 
-	for (var r=y, rr=y+h; r<rr; r++) 
+	for (var r=y, rr=y+h; r<rr; r++)
 	{
-		for (var c=x, cc=x+w; c<cc; c++) 
+		for (var c=x, cc=x+w; c<cc; c++)
 		{
 			std += Math.pow(view[ r*sW + c ]-mean, 2);
-			
-			if (c > 0 && c < w_1 && r > 0 && r < h_1) 
+
+			if (c > 0 && c < w_1 && r > 0 && r < h_1)
 			{
 				// kernel components
 				var aaa  = view[r    *sW+c-1];
@@ -314,7 +314,7 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 				var www  = view[(r-1)*sW+c  ];
 				var xxx  = view[(r+1)*sW+c  ];
 				var eee  = view[(r-1)*sW+c+1];
-				var ccc  = view[(r+1)*sW+c+1];				
+				var ccc  = view[(r+1)*sW+c+1];
 				var qqq  = view[(r-1)*sW+c-1];
 				var zzz  = view[(r+1)*sW+c-1];
 
@@ -344,16 +344,16 @@ ScalarField.prototype.flipV = function()
 {
 	var view = this.view;
 	var h1=0, h2=this.h-1, w=this.w;
-	while (h1 < h2) 
+	while (h1 < h2)
 	{
 		var h1o = h1*w;
 		var h2o = h2*w;
 
-		for (var c=0; c<w; c++) 
+		for (var c=0; c<w; c++)
 		{
 			var temp = view[h1o+c];
 			view[h1o+c] = view[h2o+c];
-			view[h2o+c] = temp; 
+			view[h2o+c] = temp;
 		}
 		h1++;
 		h2--;
@@ -364,33 +364,33 @@ ScalarField.prototype.flipH = function()
 {
 	var view = this.view;
 	var w=this.w, h=this.h;
-	
+
 	for (var r=0; r<h; r++)
 	{
 		var c1=0, c2=w-1;
 		var rOffset = r*w;
 
-		while (c1 < c2) 
+		while (c1 < c2)
 		{
 			var temp = view[rOffset+c1];
 			view[rOffset+c1] = view[rOffset+c2];
-			view[rOffset+c2] = temp; 
-			
+			view[rOffset+c2] = temp;
+
 			c1++;
 			c2--;
 		}
 	}
 }
 
-ScalarField.prototype.normalize = function() 
+ScalarField.prototype.normalize = function()
 {
 	if (this.w > 0 && this.h > 0)
 	{
 		var minmax = this.getMinMax();
 		var len = minmax[1] - minmax[0];
 
-		
-		if (len > 0 && !(minmax[0] == 0 && minmax[1] == 1)) 
+
+		if (len > 0 && !(minmax[0] == 0 && minmax[1] == 1))
 		{
 			var view = this.view;
 			var m0 = minmax[0];
@@ -431,13 +431,13 @@ ScalarField.prototype.setColorMap = function(colorMap)
 		this.colorMap = colorMap;
 	}
 
-	if (this.gpuTexture) 
+	if (this.gpuTexture)
 	{
-		if (!this.gpuColormapTexture || colorMap) 
+		if (!this.gpuColormapTexture || colorMap)
 		{
 			if (this.gpuColormapTexture) {
 				this.gpuColormapTexture.dispose();
-				this.gpuColormapTexture = undefined;	
+				this.gpuColormapTexture = undefined;
 			}
 			var theColorMap = colorMap || this.colorMap;
 			this.gpuColormapTexture = theColorMap.createGPUColormap();
@@ -472,15 +472,15 @@ ScalarField.prototype.drawFFT = function()
 	var LOG_MAX = Math.log(LOG_RANGE);
 	var minmaxrange = this.fftMaxMag-this.fftMinMag;
 	var minval = this.fftMinMag;
-	
-	for (var r=0, i=0, j=0; r<h; r++) 
+
+	for (var r=0, i=0, j=0; r<h; r++)
 	{
-		for (var c=0; c<w; c++, i++, j+=4) 
+		for (var c=0; c<w; c++, i++, j+=4)
 		{
 			var nval = (magnitude[i] - minval) / minmaxrange;
 			var lval = (LOG_RANGE-1) * nval + 1;
-			var l = Math.log(lval) / LOG_MAX;                    
-			
+			var l = Math.log(lval) / LOG_MAX;
+
 			/*
 			var c = this.colorMap.mapValue(l);
 			data[j] = c.r;
@@ -523,7 +523,7 @@ ScalarField.prototype.generatePicture = function()
 
 	var colorMap = this.colorMap;
 	var view = this.view;
-	for (var i=0, j=0, len=this.w * this.h; i<len; i++, j+=4) 
+	for (var i=0, j=0, len=this.w * this.h; i<len; i++, j+=4)
 	{
 		var c = colorMap.mapValue(view[i]);
 		data[j] = c.r;
@@ -537,13 +537,13 @@ ScalarField.prototype.generatePicture = function()
 
 ScalarField.prototype.createGPUTexture = function(colorDif)
 {
-	var texture = new THREE.DataTexture( 
-		this.view, 
-		this.w, this.h, 
+	var texture = new THREE.DataTexture(
+		this.view,
+		this.w, this.h,
 		THREE.LuminanceFormat, //THREE.RGBAFormat,
 		THREE.FloatType,
-		
-		THREE.UVMapping, 
+
+		THREE.UVMapping,
 		THREE.ClampToEdgeWrapping, 		// wrapS
 		THREE.ClampToEdgeWrapping,		// wrapT
 		THREE.NearestFilter, 			// mag filter
@@ -551,7 +551,7 @@ ScalarField.prototype.createGPUTexture = function(colorDif)
 		1
 	);
 	texture.needsUpdate = true;
-		
+
 	this.gpuTexture = texture;
 }
 
@@ -571,12 +571,12 @@ ScalarField.prototype.updated = function()
 	}
 }
 
-ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF) 
+ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)
 {
 	// upload the source scalar field data
 	if (!this.gpuTexture)
 	{
-		this.createGPUTexture();	
+		this.createGPUTexture();
 	}
 
 	// upload / update colormap
@@ -587,13 +587,13 @@ ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)
 	if (!this.colormapShader)
 	{
 		// load uniforms
-		this.colormapUniforms = 
+		this.colormapUniforms =
 		{
 			scalarField: { type: "t", value: this.gpuTexture},
 			colormap: { type: "t", value: this.gpuColormapTexture},
 			contour: { value: this.contour }
 		};
-				
+
 		this.colormapShader = new THREE.ShaderMaterial({
 			uniforms: this.colormapUniforms,
 			fragmentShader: document.getElementById('colormapFragment').textContent,
@@ -607,15 +607,15 @@ ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)
 		this.colormapUniforms.colormap.value = this.gpuColormapTexture;
 		this.colormapUniforms.contour.value = this.contour;
 	}
-			
+
 	if (!this.quadScene)
 	{
-		var squareMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), this.colormapShader); 
+		var squareMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), this.colormapShader);
 		this.quadScene = new THREE.Scene();
 		this.quadScene.add(squareMesh);
 		this.orthoCamera = new THREE.OrthographicCamera(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 	}
-	
+
 	if (!this.renderer)
 	{
 		if (typeof getRenderer == 'undefined' || typeof getRenderer == 'null' )
@@ -633,12 +633,12 @@ ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)
 	this.renderer.render(this.quadScene, this.orthoCamera);
 }
 
-ScalarField.prototype.generateColorDiffGL = function(canvas) 
+ScalarField.prototype.generateColorDiffGL = function(canvas)
 {
 	// upload the source scalar field data
 	if (!this.gpuTexture)
 	{
-		this.createGPUTexture();	
+		this.createGPUTexture();
 	}
 
 	// upload / update colormap
@@ -654,8 +654,8 @@ ScalarField.prototype.generateColorDiffGL = function(canvas)
 
 	if (!this.colorDiffShader)
 	{
-		
-		this.colorDiffUniforms = 
+
+		this.colorDiffUniforms =
 		{
 			scalarField: { type: "t", value: this.gpuTexture},
 			colormap: { type: "t", value: this.gpuColormapTexture},
@@ -665,7 +665,7 @@ ScalarField.prototype.generateColorDiffGL = function(canvas)
 			vPitch: { value: 1.0 / this.h }
 
 		};
-				
+
 		this.colorDiffShader = new THREE.ShaderMaterial({
 			uniforms: this.colorDiffUniforms,
 			fragmentShader: document.getElementById('colorDiffFragment').textContent,
@@ -679,21 +679,21 @@ ScalarField.prototype.generateColorDiffGL = function(canvas)
 		this.colorDiffUniforms.scalarField.value = this.gpuTexture;
 		this.colorDiffUniforms.colormap.value = this.gpuColormapTexture;
 	}
-			
+
 	if (!this.quadSceneDiff)
 	{
-		var squareMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), this.colorDiffShader); 
+		var squareMesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), this.colorDiffShader);
 		this.quadSceneDiff = new THREE.Scene();
 		this.quadSceneDiff.add(squareMesh);
 		this.diffOrthoCamera = new THREE.OrthographicCamera(-1.0, 1.0, 1.0, -1.0, -1.0, 1.0);
 	}
-	
+
 	if (!this.renderer)
 	{
 		if (typeof getRenderer == 'undefined' || typeof getRenderer == 'null' )
 		{
-			this.renderer = new THREE.WebGLRenderer({ 
-				canvas: canvas 
+			this.renderer = new THREE.WebGLRenderer({
+				canvas: canvas
 			});
 			this.renderer.setClearColor(0x000000, 1)
 		}
@@ -711,7 +711,7 @@ ScalarField.prototype.fft = function()
 {
 	var w = this.w;
 	var h = this.h;
-	
+
 	var mW = w;
 	var mH = h;
 	var n = h * (mW);
@@ -729,7 +729,7 @@ ScalarField.prototype.fft = function()
 		// FFT
 		spectrum = rfft2d(this.view, this.w, this.h);
 		this.sepctrum = spectrum;
-		
+
 		// measure stop time
 	 	stop = performance.now();
 	 	console.log("FFT: " + (stop-start).toFixed(2) + " milliseconds");
@@ -738,7 +738,7 @@ ScalarField.prototype.fft = function()
  	// calculate FFT magnitude components
  	var maxmag = Number.MIN_VALUE, minmag = Number.MAX_VALUE;
 	var magnitude = new Float32Array(n);
-	for (var cH = 0, cW = 0, j=0, i=0, len=n*2; i<len; cW++, j++, i += 2) 
+	for (var cH = 0, cW = 0, j=0, i=0, len=n*2; i<len; cW++, j++, i += 2)
 	{
 		if (cW >= w/2+1) {
 			cW = 0;
@@ -774,7 +774,7 @@ ScalarField.prototype.calcAmplitudeFrequency = function(_bins)
 	{
 		var R = this.w * r;
 
-		for (var c=0, cLen=this.getMaskedW(); c<cLen; c++) 
+		for (var c=0, cLen=this.getMaskedW(); c<cLen; c++)
 		{
 			var b = Math.min(BINS-1, Math.floor(view[R+c] * BINS));
 			histogram[b]++;
@@ -786,7 +786,7 @@ ScalarField.prototype.calcAmplitudeFrequency = function(_bins)
 	}
 
 	return histogram;
-	
+
 }
 
 ScalarField.prototype.calcSpatialFrequency = function()
@@ -806,11 +806,11 @@ ScalarField.prototype.calcSpatialFrequency = function()
 	var maxFreq = Number.MIN_VALUE;
 
 
-	for (var r=0; r<mH; r++) 
+	for (var r=0; r<mH; r++)
 	{
-		for (var c=0; c<mW; c++) 
+		for (var c=0; c<mW; c++)
 		{
-			//if (c == center[0] && r == center[1]) 
+			//if (c == center[0] && r == center[1])
 			if (c == center[0] && r == center[1])
 			{
 				// DC point, ignore
@@ -839,12 +839,12 @@ ScalarField.prototype.calcSpatialFrequency = function()
 	}
 
 
-	for (var i=0, len=frequencies.length; i<len; i++) 
+	for (var i=0, len=frequencies.length; i<len; i++)
 	{
 		var freq = frequencies[i];
 		var f = freq.f;
 		var bin = Math.min( FREQ_BIN-1, Math.floor(((f - minFreq) / (maxFreq-minFreq)) * FREQ_BIN) );
-		
+
 		freqHistogram[bin] += freq.contrast;
 		freqCount[bin]++;
 	}
@@ -861,7 +861,7 @@ ScalarField.prototype.calcSpatialFrequency = function()
 	var powerSpectra = [];
 	var spectraIndex = [];
 
-	for (var i=0, len=frequencies.length; i<len; i++) 
+	for (var i=0, len=frequencies.length; i<len; i++)
 	{
 		var freq = frequencies[i];
 		var f = freq.f;
@@ -895,7 +895,7 @@ ScalarField.prototype.calcSpatialFrequency = function()
 	powerSpectra.sort(function(a, b) {
 		return a.x-b.x;
 	});
-		
+
 	return {
 		histogram: freqHistogram,
 		counts: freqCount,
@@ -918,7 +918,7 @@ ScalarField.prototype.sampleProfile = function(p1, p2, samples)
 	var w = this.w;
 	var view = this.view;
 
-	for (var i=0; i<samples; i++) 
+	for (var i=0; i<samples; i++)
 	{
 		var alpha = i/(samples-1);
 		var gx = p1.x + alpha * diff.x;
@@ -926,7 +926,7 @@ ScalarField.prototype.sampleProfile = function(p1, p2, samples)
 
 		var gxi = Math.floor(gx);
 		var gyi = Math.floor(gy);
-			
+
 		var c00 = view[  gyi*w    + gxi  ];
 		var c10 = view[  gyi*w    + gxi+1];
 		var c01 = view[ (gyi+1)*w + gxi  ];
@@ -964,14 +964,14 @@ ScalarField.prototype.blur = function(kernelSize)
 
 	var maxP = -Number.MAX_VALUE, minP = Number.MAX_VALUE;
 
-	for (var r=hks, R=this.h-hks; r < R; r++) 
+	for (var r=hks, R=this.h-hks; r < R; r++)
 	{
-		for (var c=hks, W=this.w-hks; c < W; c++) 
+		for (var c=hks, W=this.w-hks; c < W; c++)
 		{
 			var p = 0.0;
-			for (var rr=0; rr<kernelSize; rr++) 
+			for (var rr=0; rr<kernelSize; rr++)
 			{
-				for (var cc=0; cc<kernelSize; cc++) 
+				for (var cc=0; cc<kernelSize; cc++)
 				{
 					p += kernel[rr][cc] * field[ (r+rr-hks) * w + c+cc-hks ];
 				}
@@ -984,9 +984,9 @@ ScalarField.prototype.blur = function(kernelSize)
 
 	for (var i=0; i<2; i++ )
 	{
-		for (var r=(i==0 ? 0 : this.h-hks), j=0; j<hks; j++, r++) 
+		for (var r=(i==0 ? 0 : this.h-hks), j=0; j<hks; j++, r++)
 		{
-			for (var c = 0; c<this.w; c++) 
+			for (var c = 0; c<this.w; c++)
 			{
 				var p = field[r * this.w + c];
 				maxP = Math.max(p, maxP);
@@ -998,9 +998,9 @@ ScalarField.prototype.blur = function(kernelSize)
 
 	for (var i=0; i<2; i++ )
 	{
-		for (var c=(i==0 ? 0 : this.w-hks), j=0; j<hks; j++, c++) 
+		for (var c=(i==0 ? 0 : this.w-hks), j=0; j<hks; j++, c++)
 		{
-			for (var r = 0; r<this.h; r++) 
+			for (var r = 0; r<this.h; r++)
 			{
 				var p = field[r * this.w + c];
 				maxP = Math.max(p, maxP);
@@ -1009,14 +1009,14 @@ ScalarField.prototype.blur = function(kernelSize)
 			}
 		}
 	}
-	
+
 	this.buffer = newBuffer;
 	this.view = newField;
 	this.minmax = [minP, maxP];
 	this.normalize();
 }
 
-function scalarFromImageData(imgData, cropW, cropH) 
+function scalarFromImageData(imgData, cropW, cropH)
 {
 	var w = imgData.width;
 	var h = imgData.height;
@@ -1030,7 +1030,7 @@ function scalarFromImageData(imgData, cropW, cropH)
 	if (cropH) sH = Math.min(sH, cropH);
 
 	var scalar = new ScalarField(sW, sH);
-	
+
 	// convert image to scalar
 	for (var r=0, j=0; r<h; r++)
 	{
@@ -1055,7 +1055,7 @@ function scalarFromImageData(imgData, cropW, cropH)
 				{
 					l = rr;
 				}
-				else 
+				else
 				{
 					l = Math.min(255, Math.floor(.5 + 0.21*rr + 0.72*gg + 0.07*bb));
 				}
@@ -1070,17 +1070,17 @@ function mirror_n_fftshift(input, m, n)
 {
 	var m2 = m/2;
 	var n2 = n/2;
-	for (var r=1, rMirror=n-1; r<n; r++, rMirror--) 
+	for (var r=1, rMirror=n-1; r<n; r++, rMirror--)
 	{
-		for (var c=0, cMirror=m-1; c<m2; c++, cMirror--) 
+		for (var c=0, cMirror=m-1; c<m2; c++, cMirror--)
 		{
 			input[rMirror*m + cMirror] = input[ r*m + c ];
 		}
 	}
 
-	for (var r=0; r<n2; r++) 
+	for (var r=0; r<n2; r++)
 	{
-		for (var c=0; c<m; c++) 
+		for (var c=0; c<m; c++)
 		{
 			var rr = (r + n2) % n;
 			var cc = (c + m2) % m;
@@ -1098,4 +1098,3 @@ function mirror_n_fftshift(input, m, n)
 	}
 	return input;
 }
-
