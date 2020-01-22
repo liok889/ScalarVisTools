@@ -40,8 +40,8 @@
 
 		<p>
 			<button onclick="copyToDecoy()">perturb decoy</button> &nbsp;
-			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup (or press ENTER)</button> &nbsp;
-			<button onclick="randomModel()" style="background-color: #ffe0b3">random model</button>
+			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup</button> &nbsp;
+			<button onclick="randomModel()" style="background-color: #ffe0b3">random model (or press ENTER)</button>
 
 		<p><table>
 			<tr>
@@ -50,12 +50,23 @@
 				<td><span id="sliderNValue"></span></td>
 			</tr>
 			<tr>
-				<td colspan="3"><input type="checkbox" id="checkDecoy" onclick="toggleHighlightDecoy()"></input>highlight decoy position
+				<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; lineup.sample();" checked></input>blur
+			</tr>
+
+			<tr>
+				<td colspan="3"><input type="checkbox" id="checkDecoy" onclick="toggleHighlightDecoy()"></input>highlight decoy position in lineup
 			</tr>
 
 			<tr>
 				<td colspan="3"><input type="checkbox" id="checkPerturbDecoy" checked></input>randomly pertub decoy model a bit
 			</tr>
+
+			<tr>
+				<td colspan="3">
+					<input type="checkbox" id="checkDontShow" onclick="hideOverlay()" />
+					don't show model
+			</tr>
+
 		</table>
 
 	</div>
@@ -79,6 +90,9 @@
 			<g transform="translate(300,50)"
 				<g id="decoyModel"></g>
 			</g>
+
+			<g id="hideOverlay" style="visibility: hidden">
+				<rect width="550" height="220" fill="white"></rect>
 		</svg>
 
 		<svg width="200" height="300" id="svgColormaps" style="position: absolute; top: 0px; left: 550px;"></svg>
@@ -228,6 +242,13 @@
 
 		}
 
+		function hideOverlay() {
+			var g = d3.select("#hideOverlay");
+			var c = !d3.select("#checkDontShow").node().checked;
+			g.style("visibility", c ? 'hidden' : null);
+
+		}
+
 		function initInterface()
 		{
 			if (BIVARIATE) {
@@ -258,12 +279,12 @@
 			// keyboard events
 			d3.select(document).on('keydown', function() {
 				if (d3.event.keyCode === 13) {
-					randomLineup();
+					randomModel();
 				}
 			});
 
 			// sliders
-			$('#sliderN').slider({ step: 10, min: 300, max: goodN/15, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
+			$('#sliderN').slider({ step: 10, min: 300, max: goodN/10, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
 			showColormaps();
 		}
