@@ -45,10 +45,12 @@ GaussMixBivariate.prototype.constructor = GaussMixBivariate;
 
 GaussMixBivariate.prototype.init = function()
 {
+    var MAX_GUASS = 5;
+
     this.models = [];
 
     // add a few random gausses
-    for (var i=0, count=1+Math.floor(.499 + Math.random()*4); i<count; i++ ) {
+    for (var i=0, count=1+Math.floor(.499 + Math.random()*MAX_GUASS); i<count; i++ ) {
         this.add();
     }
     this.updateModel();
@@ -81,14 +83,18 @@ var MIN_SIGMA = 10;
 GaussMixBivariate.prototype.add = function()
 {
     // center
-    var mX = this.w/2 + (Math.random()*2-1) * (this.w*0.4);
-    var mY = this.h/2 + (Math.random()*2-1) * (this.h*0.4);
+    var mX = this.w/2 + (Math.random()*2-1) * (this.w*0.3);
+    var mY = this.h/2 + (Math.random()*2-1) * (this.h*0.3);
 
     // standard deviation
-    var sigmaX = (Math.random()*.8 + .2) * this.w * .3;
-    var sigmaY = (Math.random()*.8 + .2) * this.h * .3;
-    var scaler = 0.7  + (Math.random()*2 - 1)*0.3;
+    var sigmaX = (Math.random()*.5 + .2) * this.w * .3;
+    var sigmaY = (Math.random()*.5 + .2) * this.h * .3;
+
+    // correlation
     var rho = Math.random()*2-1;
+
+    // scaler
+    var scaler = 1.0; //0.7  + (Math.random()*2 - 1)*0.3;
 
     this.models.push(new biGauss(mX, mY, sigmaX, sigmaY, rho, scaler));
     this.updateModel();
@@ -107,7 +113,38 @@ GaussMixBivariate.prototype.remove = function() {
 
 GaussMixBivariate.prototype.randomPerturb = function()
 {
+    var MAX_M_PERTURB = Math.min(this.w * .1, this.h *.1);
+    var MIN_M_PERTURB = Math.min(this.w * .05, this.h *.05);
 
+    var MIN_RHO = 0.05;
+    var MAX_RHO = 0.2;
+
+    for (var i=0; i<this.models.length; i++)
+    {
+
+        var l = 0;
+        var r = [0, 0];
+        do {
+            r = [Math.random()*2-1, Math.random()*2-1];
+            l = r[0]*r[0]+r[1]*r[1];
+        } while (l==0);
+
+        var p = Math.random() * (MAX_M_PERTURB-MIN_M_PERTURB) + MIN_M_PERTURB;
+        l = p/Math.sqrt(l);
+
+        var m = this.models[i];
+        m.mX += r[0] * l;
+        m.mY += r[1] * l;
+
+        var rhoP = (Math.random() > .5 ? 1 : -1) * (Math.random() * (MAX_RHO-MIN_RHO)+MIN_RHO);
+        var newRho = m.rho + rhoP;
+        if (newRho > 1 || newRho < -1) {
+            rhoP*=-1;
+            newRho = m.rho + rhoP;
+        }
+        m.updateRho(newRho);
+    }
+    this.updateModel();
 }
 
 GaussMixBivariate.prototype.plotModelCurves = function()
