@@ -4,8 +4,13 @@ var BI_MAP_SIZE=2;
 function GaussMixBivariate(w, h, svg)
 {
     GaussMix.call(this, w, h, svg);
+
+    // double precision for pdf
+    this.pdf = new ScalarField(w, h, true);
     this.cdf = new ScalarField(w, h);
-    this.cdfMap = new Float32Array(new ArrayBuffer(4 * w * h * BI_MAP_SIZE * BI_MAP_SIZE));
+
+    var cdfMapSize = 4 * w * h * BI_MAP_SIZE * BI_MAP_SIZE;
+    this.cdfMap = new Float32Array(new ArrayBuffer(cdfMapSize));
 }
 
 function biGauss(mX, mY, sX, sY, rho, scaler)
@@ -17,6 +22,19 @@ function biGauss(mX, mY, sX, sY, rho, scaler)
     this.updateRho(rho);
     this.scaler = (scaler ? scaler : 1);
 
+}
+
+// an example that for some reason gives zero probability in some areas
+// Note: fixed by increasing precision of PDF 
+function problematicModel()
+{
+    return new biGauss(
+        49.92320409701579,  // mX
+        114.30529278055033, // mY
+        9.922451547636202,  // sX
+        18.048631970673952, // sY
+        0.5141453953224931, // rho
+    );
 }
 
 biGauss.prototype.updateRho = function(_rho)
@@ -55,6 +73,8 @@ GaussMixBivariate.prototype.init = function()
     }
     this.updateModel();
 }
+
+
 GaussMixBivariate.prototype.copyTo = function(newModel, dontUpdate)
 {
     if (!newModel) {
@@ -149,6 +169,10 @@ GaussMixBivariate.prototype.randomPerturb = function()
 
 GaussMixBivariate.prototype.plotModelCurves = function()
 {
+    if (!this.svg) {
+        return;
+    }
+
     var ellipses = this.svg.selectAll('ellipse').data(this.models)
     ellipses.exit().remove();
 
@@ -297,7 +321,6 @@ GaussMixBivariate.prototype.updateModel = function()
     this.plotModelCurves();
 }
 
-
 GaussMixBivariate.prototype.computeCDFs = function()
 {
     var w = this.w;
@@ -305,13 +328,17 @@ GaussMixBivariate.prototype.computeCDFs = function()
     var models = this.models;
     var mCount = models.length;
 
+    // compute PDF / CDF
+    var cummP = 0, entropy = 0;
 
-    // clear out old PDF
+    // clear out
+    this.pdf.zero();
     this.cdf.zero();
+
+    var pdf = this.pdf.view;
     var cdf = this.cdf.view;
 
-    // loop through all pixels
-    var cummP = 0;
+    // loop through all rows / columns
     for (var r=0, I=0; r<h; r++)
     {
         for (var c=0; c<w; c++, I++)
@@ -323,20 +350,24 @@ GaussMixBivariate.prototype.computeCDFs = function()
                 var model = models[m];
                 P += model.eval(c, r);
             }
+
             cummP += P;
+            pdf[I] = P;
             cdf[I] = cummP;
+
+            // sigma[ log(Pi)*Pi ]
+            entropy += Math.log2(P)*P;
         }
     }
+    entropy = (entropy / cummP) - Math.log2(cummP);
+    this.entropy = -entropy;
+    this.maxDensity = cummP;
 
-    // CDF
-    if (this.cdfMap.length != w * h * BI_MAP_SIZE * BI_MAP_SIZE) {
-        this.cdfMap = new Float32Array(new ArrayBuffer(4 * w * h * BI_MAP_SIZE * BI_MAP_SIZE));
-    }
-
+    // construct map
     var cdfMap = this.cdfMap;
-    var cdfLen = this.cdfMap.length;
+    var cdfMapLen = this.cdfMap.length;
 
-    for (var i=0, last=0, p=0, step=cummP/cdfLen; i<cdfLen; i++, p+=step)
+    for (var i=0, last=0, p=0, step=cummP/cdfMapLen; i<cdfMapLen; i++, p+=step)
     {
         while (cdf[last] < p)
         {
@@ -344,6 +375,36 @@ GaussMixBivariate.prototype.computeCDFs = function()
         }
         cdfMap[i]=last;
     }
+}
+
+GaussMixBivariate.prototype.klDivergence = function(other)
+{
+    // implements a KL divergence of other from this KL(me||other)
+    var w = this.h, h = this.h;
+    var P = this.pdf.view;
+    var Q = other.pdf.view;
+
+    var maxP = this.maxDensity;
+    var maxQ = other.maxDensity;
+    var divergence = 0;
+    var entropy = 0;
+
+    //console.log('max densities: ' + maxP + ', ' + maxQ);
+    for (var i=0, len=this.w * this.h; i<len; i++)
+    {
+        var p = P[i]/maxP;
+        var q = Q[i]/maxQ;
+        var eTerm = Math.log2(p)*p;
+        var dTerm = Math.log2(p/q)*p;
+        if (!isFinite(eTerm) || !isFinite(dTerm)) {
+            console.log("Infinite at I " + i);
+        }
+
+        entropy += eTerm;
+        divergence += dTerm;
+    }
+    this.entropy = -entropy;
+    return divergence;
 }
 
 GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
@@ -371,7 +432,7 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
     for (var i=0; i<iterations; i++)
     {
         // find center of splat
-        var I = cdfMap[ Math.min(cdfLen-1, Math.floor(Math.random()*cdfLen)) ];
+        var I = cdfMap[ Math.floor(Math.random() * cdfLen) ];
 
         // convert to row, column coordinate
         var C = I % w;

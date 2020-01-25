@@ -166,7 +166,7 @@
 				lineup.sample();
 				lineup.layoutCanvases(d3.select("#lineupTable"));
 			}
-			console.log("lineup took: " + Math.floor(Date.now() - start) + " milliseconds");
+			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
 
 			// hide answer
 			d3.select("#answer").html('');
@@ -188,7 +188,11 @@
 			mainModel.init();
 			copyToDecoy();
 			refreshModel();
-			console.log('model took: ' + Math.floor(Date.now()-start) + ' milliseconds');
+
+			// compute KL klDivergence
+			var kld = mainModel.klDivergence(decoyModel);
+			var e = mainModel.entropy;
+			console.log('model took: ' + Math.floor(Date.now()-start) + ' m. seconds. D: ' + Math.floor(100*(kld/e)+.5) + "%");
 		}
 
 		function refreshModel()

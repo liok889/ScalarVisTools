@@ -355,6 +355,12 @@ GaussMix.prototype.remove = function(axis)
     }
 }
 
+GaussMix.prototype.klDivergence = function()
+{
+    // too lazy to implement (also, probably unneeded for now)
+    return 0;
+}
+
 // randomly perturbs the model a bit
 GaussMix.prototype.randomPerturb = function()
 {

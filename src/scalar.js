@@ -10,7 +10,7 @@ if (!ArrayBuffer.prototype.slice)
 	return result;
 }
 
-function ScalarField(width, height)
+function ScalarField(width, height, doublePrecision)
 {
 	if (width && height)
 	{
@@ -22,16 +22,22 @@ function ScalarField(width, height)
 		this.h = 0;
 	}
 
+	var bytesPerPixel = doublePrecision ? 8 : 4;
+
 	if (this.w && this.h)
 	{
 		// create a buffer
-		this.buffer = new ArrayBuffer(4 * this.w * this.h);
-		this.view = new Float32Array(this.buffer);
+
+		this.buffer = new ArrayBuffer(bytesPerPixel * this.w * this.h);
+		this.view = doublePrecision ? new Float64Array(this.buffer) : new Float32Array(this.buffer);
 	}
+	this.bytesPerPixel = bytesPerPixel;
+	this.doublePrecision = (doublePrecision ? true : false);
 	this.contour = -1;
 }
 
-ScalarField.prototype.copyView = function() {
+ScalarField.prototype.copyView = function()
+{
 	var newBuffer = this.buffer.slice(0);
 	return new Float32Array(newBuffer);
 }
