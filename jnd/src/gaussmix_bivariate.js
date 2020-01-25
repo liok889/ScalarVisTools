@@ -25,7 +25,7 @@ function biGauss(mX, mY, sX, sY, rho, scaler)
 }
 
 // an example that for some reason gives zero probability in some areas
-// Note: fixed by increasing precision of PDF 
+// Note: fixed by increasing precision of PDF
 function problematicModel()
 {
     return new biGauss(
@@ -407,6 +407,23 @@ GaussMixBivariate.prototype.klDivergence = function(other)
     return divergence;
 }
 
+var BI_SPLAT = [];
+var splatGauss = new biGauss(0, 0, SPLAT_SIZE/3, SPLAT_SIZE/3, 0);
+var cummSplat=0.0;
+for (var I=0,r=-SPLAT_SIZE; r<=SPLAT_SIZE; r++)
+{
+    for (var c=-SPLAT_SIZE; c<=SPLAT_SIZE; c++, I++)
+    {
+        var s = splatGauss.eval(c, r);
+        BI_SPLAT.push(s);
+        cummSplat += s;
+    }
+}
+
+for (var i=0; i<BI_SPLAT.length; i++) {
+    BI_SPLAT[i] /= cummSplat;
+}
+
 GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
 {
     var SPLAT_AREA=(SPLAT_SIZE*2+1)*(SPLAT_SIZE*2+1);
@@ -439,6 +456,7 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
         var R = Math.floor(I/h);
 
         // find splat boundary
+
         var R0 = Math.max(0, R-SPLAT_SIZE), R1 = Math.min(h_1, R+SPLAT_SIZE);
         var C0 = Math.max(0, C-SPLAT_SIZE), C1 = Math.min(w_1, C+SPLAT_SIZE);
         var cummP=0;
@@ -463,6 +481,29 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
                 view[ r*w + c ] += splat[k] * cummP;
             }
         }
+
+
+        /*
+        for (var S=0, r=-SPLAT_SIZE; r<=SPLAT_SIZE; r++)
+        {
+            var _R = R+r;
+            if (_R<0 && _R>=h) {
+                S+=SPLAT_SIZE*2+1;
+                continue;
+            }
+            else
+            {
+                _R*=w;
+                for (var c=-SPLAT_SIZE; c<=SPLAT_SIZE; c++, S++)
+                {
+                    var _C = C+c;
+                    if (_C>=0 && _C<w) {
+                        view[ _R + _C ] += BI_SPLAT[S];
+                    }
+                }
+            }
+        }
+        */
 
         //view[ R*w + C ] += 1.0;
     }

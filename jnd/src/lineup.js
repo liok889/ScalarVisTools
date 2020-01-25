@@ -39,7 +39,15 @@ Lineup.prototype.layoutCanvases = function(table)
     if (!table) {
         table = this.table;
     }
-    var randomCanvases = this.canvases.slice().shuffle();
+    var randomCanvases = this.canvases.slice();
+    var decoyCanvas = randomCanvases.pop();
+
+    // reinsert
+    var insertPos = Math.floor( Math.random() * (randomCanvases.length+1) );
+    randomCanvases.splice(insertPos, 0, decoyCanvas);
+
+
+    // remove everything in the table
     table.selectAll('*').remove();
 
     // how many rows
@@ -65,17 +73,4 @@ Lineup.prototype.layoutCanvases = function(table)
     })(table, rows, cols, this.n, randomCanvases);
     this.table;
 
-}
-
-Array.prototype.shuffle = function()
-{
-    var i = this.length, j, temp;
-    if ( i == 0 ) return this;
-    while ( --i ) {
-        j = Math.floor( Math.random() * ( i + 1 ) );
-        temp = this[i];
-        this[i] = this[j];
-        this[j] = temp;
-    }
-    return this;
 }
