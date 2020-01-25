@@ -10,6 +10,41 @@ if (!ArrayBuffer.prototype.slice)
 	return result;
 }
 
+function checkWebGL()
+{
+	var canvas;
+	var ctx;
+	var exts;
+
+	try {
+	  canvas = document.createElement('canvas');
+	  ctx = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+	  exts = ctx.getSupportedExtensions();
+	}
+	catch (e) {
+	  return false;
+	}
+	return exts;
+}
+function checkFLoatingTexture(ext)
+{
+	if (!ext) {
+		ext = checkWebGL();
+	}
+	if (!ext) {
+		return false;
+	}
+	else {
+		for (var i=0, len=ext.length; i<len; i++) {
+			var e = ext[i];
+			if (e.search('texture_float') >= 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 function ScalarField(width, height, doublePrecision)
 {
 	if (width && height)
@@ -39,7 +74,8 @@ function ScalarField(width, height, doublePrecision)
 ScalarField.prototype.copyView = function()
 {
 	var newBuffer = this.buffer.slice(0);
-	return new Float32Array(newBuffer);
+	return this.doublePrecision ?
+		new Float64Array(newBuffer) : new Float32Array(newBuffer);
 }
 
 ScalarField.prototype.setMask = function(theMask)
@@ -111,8 +147,9 @@ ScalarField.prototype.crop = function(x, y, w, h)
 	x1 = Math.min(this.w, x0+w);
 	y1 = Math.min(this.h, y0+h);
 
-	var newBuffer = new ArrayBuffer(4 * (x1-x0) * (y1-y0));
-	var newView = new Float32Array(newBuffer);
+	var newBuffer = new ArrayBuffer(this.bytesPerPixel * (x1-x0) * (y1-y0));
+	var newView = this.doublePrecision ?
+		new Float64Array(newBuffer) : new Float32Array(newBuffer);
 	var view = this.view;
 
 	for (var y=y0, I=0; y<y1; y++)
@@ -224,8 +261,9 @@ ScalarField.prototype.scale = function(newW, newH, cropW, cropH)
 	// create a new image
 	var stopH = cropH ? cropH : newH;
 	var w = this.w, h=this.h, view = this.view;
-	var newBuffer = new ArrayBuffer(4 * newW * stopH);
-	var newView = new Float32Array(newBuffer);
+	var newBuffer = new ArrayBuffer(this.bytesPerPixel * newW * stopH);
+	var newView = this.doublePrecision ?
+		new Float64Array(newBuffer) : new Float32Array(newBuffer);
 
     for (var i=0, r=0; r<stopH; r++) {
     	for (var c=0; c<newW; c++, i++) {
@@ -529,6 +567,7 @@ ScalarField.prototype.generatePicture = function()
 
 	var colorMap = this.colorMap;
 	var view = this.view;
+
 	for (var i=0, j=0, len=this.w * this.h; i<len; i++, j+=4)
 	{
 		var c = colorMap.mapValue(view[i]);
@@ -543,6 +582,10 @@ ScalarField.prototype.generatePicture = function()
 
 ScalarField.prototype.createGPUTexture = function(colorDif)
 {
+	if (this.doublePrecision || this.bytesPerPixel!=4)
+	{
+		console.warn("ScalarField.createGPUTexture: double precision detected, which generally can't be GL texturized.")
+	}
 	var texture = new THREE.DataTexture(
 		this.view,
 		this.w, this.h,
@@ -965,8 +1008,9 @@ ScalarField.prototype.blur = function(kernelSize)
 	var h = this.h;
 
 	var field = this.view;
-	var newBuffer = new ArrayBuffer(4 * this.w * this.h);
-	var newField = new Float32Array(newBuffer);
+	var newBuffer = new ArrayBuffer(this.bytesPerPixel * this.w * this.h);
+	var newField = this.doublePrecision ?
+		new Float64Array : new Float32Array(newBuffer);
 
 	var maxP = -Number.MAX_VALUE, minP = Number.MAX_VALUE;
 
