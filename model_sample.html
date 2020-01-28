@@ -43,31 +43,68 @@
 			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup</button> &nbsp;
 			<button onclick="randomModel()" style="background-color: #ffe0b3">random model (or press ENTER)</button>
 
-		<p><table>
-			<tr>
-				<td>lineup sampling fidelity</td>
-				<td><div class="uiDiv sliderDiv" id="sliderN"></div></td>
-				<td><span id="sliderNValue"></span></td>
-			</tr>
-			<tr>
-				<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; lineup.sample();" checked></input>blur
-			</tr>
+		<div>
+		<div>
+			<table>
+				<tr>
+					<td>lineup sampling fidelity</td>
+					<td><div class="uiDiv sliderDiv" id="sliderN"></div></td>
+					<td><span id="sliderNValue"></span></td>
+				</tr>
+				<tr>
+					<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; lineup.sample();" checked></input>blur
+				</tr>
 
-			<tr>
-				<td colspan="3"><input type="checkbox" id="checkDecoy" onclick="toggleHighlightDecoy()"></input>highlight decoy position in lineup
-			</tr>
+				<tr>
+					<td colspan="3"><input type="checkbox" id="checkDecoy" onclick="toggleHighlightDecoy()"></input>highlight decoy position in lineup
+				</tr>
 
-			<tr>
-				<td colspan="3"><input type="checkbox" id="checkPerturbDecoy" checked></input>randomly pertub decoy model a bit
-			</tr>
+				<tr>
+					<td colspan="3"><input type="checkbox" id="checkPerturbDecoy" checked></input>randomly pertub decoy model a bit
+				</tr>
 
-			<tr>
-				<td colspan="3">
-					<input type="checkbox" id="checkDontShow" onclick="hideOverlay()" />
-					don't show model
-			</tr>
+				<tr>
+					<td colspan="3">
+						<input type="checkbox" id="checkDontShow" onclick="hideOverlay()" />
+						don't show model
+				</tr>
 
-		</table>
+			</table>
+		</div>
+		<div>
+			<table>
+				<tr>
+					<td colspan="2"><b>model peturbation</b></td>
+				</tr>
+
+				<tr>
+					<td width="100">centers</td>
+					<td width="100"><div class="uiDiv sliderDiv" id="sliderGCenter"></div></td>
+					<td width="100"><span id="labelGCenter"></span></td>
+
+				</tr>
+
+				<tr>
+					<td>variation</td>
+					<td><div class="uiDiv sliderDiv" id="sliderGSTD"></div></td>
+					<td><span id="labelGSTD"></span></td>
+
+				</tr>
+
+				<tr>
+					<td>correlation</td>
+					<td><div class="uiDiv sliderDiv" id="sliderGCorrelation"></div></td>
+					<td><span id="labelGCorrelation"></span></td>
+				</tr>
+
+				<tr>
+					<td colspan="3"><span id="labelKLD"></span></td>
+				</tr>
+
+
+			</table>
+		</div>
+
 
 	</div>
 	<div style="margin-top: 10px; height: 230px">
@@ -155,6 +192,14 @@
 			decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
 			decoySample.setSamplingFidelity(goodN);
 			decoySample.setModel(decoyModel);
+
+			function computeDivergence() {
+				var nkld = 100*mainModel.normalizedDivergence(decoyModel);
+				var out = "normalized KLD: " + nkld.toFixed(2) + "%, entropy: " + mainModel.entropy.toFixed(2) + " bits";
+				d3.select("#labelKLD").html(out);
+			}
+			decoyModel.addCallback(computeDivergence);
+			mainModel.addCallback(computeDivergence);
 		}
 
 		function randomLineup()
@@ -189,10 +234,7 @@
 			copyToDecoy();
 			refreshModel();
 
-			// compute KL klDivergence
-			var kld = mainModel.klDivergence(decoyModel);
-			var e = mainModel.entropy;
-			console.log('model took: ' + Math.floor(Date.now()-start) + ' m. seconds. D: ' + Math.floor(100*(kld/e)+.5) + "%");
+			console.log('model took: ' + Math.floor(Date.now()-start) + ' m. seconds.');
 		}
 
 		function refreshModel()
@@ -206,6 +248,16 @@
 		{
 			N = +$('#sliderN').slider('value');
 			randomLineup();
+		}
+
+		function modelGeneration()
+		{
+			M_PERTURB = +$('#sliderGCenter').slider('value');
+			S_PERTURB = +$('#sliderGSTD').slider('value');
+			R_PERTURB = +$('#sliderGCorrelation').slider('value');
+
+			// copy and perturb
+			copyToDecoy();
 		}
 
 		function toggleHighlightDecoy() {
@@ -289,6 +341,11 @@
 
 			// sliders
 			$('#sliderN').slider({ step: 10, min: 300, max: goodN/10, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
+
+			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
+			$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
+			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .2, value: R_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+
 
 			showColormaps();
 		}

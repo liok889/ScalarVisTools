@@ -1,15 +1,16 @@
 // somewhere between 2 and 5 seems (visually) like a reasonable tradeoff
 var BI_MAP_SIZE=2;
+var DOUBLE_PRECISION=true;
 
 function GaussMixBivariate(w, h, svg)
 {
     GaussMix.call(this, w, h, svg);
 
     // double precision for pdf
-    this.pdf = new ScalarField(w, h, true);
+    this.pdf = new ScalarField(w, h, DOUBLE_PRECISION);
     this.cdf = new ScalarField(w, h);
 
-    var cdfMapSize = 4 * w * h * BI_MAP_SIZE * BI_MAP_SIZE;
+    var cdfMapSize = 4 * w * h * (BI_MAP_SIZE * BI_MAP_SIZE);
     this.cdfMap = new Float32Array(new ArrayBuffer(cdfMapSize));
 }
 
@@ -55,7 +56,7 @@ biGauss.prototype.eval = function(x, y)
     var e = this.rhoExpConst * (stX*stX -2 * this.rho * stXY + stY*stY);
     var a = this.rhoSqrConst * (1/(this.sX * this.sY))
 
-    return a * Math.exp( e );
+    return 10.0 * a * Math.exp( e );
 }
 
 GaussMixBivariate.prototype = new GaussMix();
@@ -131,6 +132,10 @@ GaussMixBivariate.prototype.remove = function() {
     }
 }
 
+var M_PERTURB = .075;
+var S_PERTURB = 0;
+var R_PERTURB = 0.1;
+
 GaussMixBivariate.prototype.randomPerturb = function()
 {
     var MAX_M_PERTURB = Math.min(this.w * .1, this.h *.1);
@@ -149,14 +154,14 @@ GaussMixBivariate.prototype.randomPerturb = function()
             l = r[0]*r[0]+r[1]*r[1];
         } while (l==0);
 
-        var p = Math.random() * (MAX_M_PERTURB-MIN_M_PERTURB) + MIN_M_PERTURB;
-        l = p/Math.sqrt(l);
+        //var p = Math.random() * (MAX_M_PERTURB-MIN_M_PERTURB) + MIN_M_PERTURB;
+        l = (M_PERTURB * Math.min(this.w, this.h)) / Math.sqrt(l);
 
         var m = this.models[i];
         m.mX += r[0] * l;
         m.mY += r[1] * l;
 
-        var rhoP = (Math.random() > .5 ? 1 : -1) * (Math.random() * (MAX_RHO-MIN_RHO)+MIN_RHO);
+        var rhoP = (Math.random() > .5 ? 1 : -1) * (Math.random() * (R_PERTURB/2) + R_PERTURB/2);
         var newRho = m.rho + rhoP;
         if (newRho > 1 || newRho < -1) {
             rhoP*=-1;
@@ -165,6 +170,109 @@ GaussMixBivariate.prototype.randomPerturb = function()
         m.updateRho(newRho);
     }
     this.updateModel();
+}
+
+GaussMixBivariate.prototype.deldensity = function()
+{
+    var RESOLUTION=30;
+    var HIST_ROW = RESOLUTION*2+1;
+
+    var w = this.w;
+    var h = this.h;
+    var histSize = HIST_ROW * HIST_ROW;
+    var histogram = DOUBLE_PRECISION ?
+        new Float64Array(histSize) :
+        new Float32Array(histSize);
+    /*
+    var histogram = w*h < 65000 ?
+        new Uint16Array(histSize) :
+        new Uint32Array(histSize);
+    */
+
+    var histMax = 0;
+
+    // get the pdf and its range
+    var pdf = this.pdf.view;
+
+    var minDensity = this.minDensity;
+    var maxDensity = this.maxDensity;
+    var densityRange_1 = RESOLUTION / (maxDensity-minDensity);
+
+    var totalDensity=0;
+    var R0=1, R1=h-1, C0=1, C1=w-1;
+
+    for (var r=R0, R=w; r<R1; r++, R+=w)
+    {
+        for (var c=C0; c<C1; c++)
+        {
+            var RC = R+c;
+            var P = pdf[RC];
+
+            var fx =  (P-pdf[RC-1]) * densityRange_1;
+            var fy =  (P-pdf[RC-w]) * densityRange_1;
+
+            //console.log("num: " + fx + ',' + fy);
+            var fj = Math.floor(.49999999 + Math.abs(fx));
+            var fi = Math.floor(.49999999 + Math.abs(fy));
+
+            if (fx<0) fj = RESOLUTION-fj; else fj += RESOLUTION;
+            if (fy<0) fi = RESOLUTION-fi; else fi += RESOLUTION;
+
+
+            var hI = fi*HIST_ROW + fj;
+            var hV = histogram[ hI ] + 1;
+            if (hV > histMax) {
+                histMax = hV;
+            }
+            histogram[ hI ] = hV;
+        }
+    }
+
+    // scan histogram again, and ensuring no non-zero elements within
+    var cummDeldensity = (R1-R0) * (C1-C0);
+    for (var i=0; i<histSize; i++)
+    {
+        if (histogram[i] == 0.0) {
+            histogram[i] = 1e-40;
+            cummDeldensity += 1e-40;
+        }
+    }
+
+
+    this.deldensityResult = {
+        deldensity: histogram,
+        maxDeldensity: histMax,
+        cummDeldensity: cummDeldensity,
+        histW: HIST_ROW,
+        histH: HIST_ROW
+    };
+
+    return this.deldensityResult;
+}
+
+// for debugging
+GaussMixBivariate.prototype.plotDeldensity = function()
+{
+    var results = this.deldensityResult;
+    if (!results) {
+        results = this.deldensity();
+    }
+    var histogram = results.deldensity;
+
+    var w=results.histW, h=results.histH;
+    var scalar = new ScalarField(w, h);
+    var view = scalar.view;
+    for (var i=0, len=w*h; i<len; i++)
+    {
+        var t = histogram[i]
+        view[i] = t;
+    }
+    scalar.normalize();
+    scalar.setColorMap(getColorPreset('spectral'));
+    var canvas = scalar.generatePicture();
+    d3.selectAll('#plotDeldensity').remove();
+    d3.select(canvas).attr('id', 'plotDeldensity');
+    d3.select('body').node().appendChild(canvas);
 }
 
 GaussMixBivariate.prototype.plotModelCurves = function()
@@ -329,7 +437,7 @@ GaussMixBivariate.prototype.computeCDFs = function()
     var mCount = models.length;
 
     // compute PDF / CDF
-    var cummP = 0, entropy = 0;
+    var cummDensity = 0, maxDensity = 0, minDensity=Number.MAX_VALUE;
 
     // clear out
     this.pdf.zero();
@@ -350,24 +458,32 @@ GaussMixBivariate.prototype.computeCDFs = function()
                 var model = models[m];
                 P += model.eval(c, r);
             }
+            // To force a uniform distribution (for testing):
+            //P = Math.random();//1/(w*h);
 
-            cummP += P;
+            if (P > maxDensity) {
+                maxDensity = P;
+            }
+            if (P < minDensity) {
+                minDensity = P;
+            }
+
+
+            cummDensity += P;
             pdf[I] = P;
-            cdf[I] = cummP;
-
-            // sigma[ log(Pi)*Pi ]
-            entropy += Math.log2(P)*P;
+            cdf[I] = cummDensity;
         }
     }
-    entropy = (entropy / cummP) - Math.log2(cummP);
-    this.entropy = -entropy;
-    this.maxDensity = cummP;
+
+    this.maxDensity = maxDensity;
+    this.minDensity = minDensity;
+    this.cummDensity = cummDensity;
 
     // construct map
     var cdfMap = this.cdfMap;
     var cdfMapLen = this.cdfMap.length;
 
-    for (var i=0, last=0, p=0, step=cummP/cdfMapLen; i<cdfMapLen; i++, p+=step)
+    for (var i=0, last=0, p=0, step=cummDensity/cdfMapLen; i<cdfMapLen; i++, p+=step)
     {
         while (cdf[last] < p)
         {
@@ -377,34 +493,96 @@ GaussMixBivariate.prototype.computeCDFs = function()
     }
 }
 
+GaussMixBivariate.prototype.normalizedDivergence = function(other)
+{
+    var kld = this.klDivergence(other);
+    return kld;
+    //return kld / (.5 * (this.entropy + other.entropy));
+}
+
 GaussMixBivariate.prototype.klDivergence = function(other)
 {
-    // implements a KL divergence of other from this KL(me||other)
-    var w = this.h, h = this.h;
-    var P = this.pdf.view;
-    var Q = other.pdf.view;
+    var DELENTROPY = false;
+    var delMe = null, delOt = null;
+    var LOG_C_1 = 1.0 / (Math.log10(1.01) + 2.0);
 
-    var maxP = this.maxDensity;
-    var maxQ = other.maxDensity;
-    var divergence = 0;
-    var entropy = 0;
+    if (DELENTROPY)
+    {
+        delMe = this.deldensity();
+        delOt = other.deldensity();
+    }
+
+    // implements a KL divergence of other from this KL(me||other)
+    var P = DELENTROPY ? delMe.deldensity : this.pdf.view;
+    var Q = DELENTROPY ? delOt.deldensity : other.pdf.view;
+
+    if (P.length != Q.length) {
+        console.error("Can't compute divergence: probability distributions of different sizes");
+        return null;
+    }
+
+    var maxP = DELENTROPY ? delMe.cummDeldensity : this.cummDensity;
+    var maxQ = DELENTROPY ? delOt.cummDeldensity : other.cummDensity;
+
+    var maxP_1 = 1.0/maxP;
+    var maxQ_1 = 1.0/maxQ;
+
+    var divergence = 0, divergence2 = 0;
+    var entropyMe = 0, entropyOther = 0;
+    var distDistance = 0;
 
     //console.log('max densities: ' + maxP + ', ' + maxQ);
-    for (var i=0, len=this.w * this.h; i<len; i++)
+    for (var i=0, len=P.length; i<len; i++)
     {
-        var p = P[i]/maxP;
-        var q = Q[i]/maxQ;
-        var eTerm = Math.log2(p)*p;
-        var dTerm = Math.log2(p/q)*p;
-        if (!isFinite(eTerm) || !isFinite(dTerm)) {
-            console.log("Infinite at I " + i);
-        }
+        var p = P[i];
+        p *= maxP_1;
 
-        entropy += eTerm;
-        divergence += dTerm;
+        var q = Q[i];
+        q *= maxQ_1;
+
+        var logP = Math.log2(p);
+        var logQ = Math.log2(q)
+
+        entropyMe    += logP * p;
+        entropyOther += logQ * q;
+
+        // divergence = p * log(p/q) = p * (log(p) - log(q))
+        divergence  += p * (logP - logQ);
+        divergence2 += q * (logQ - logP);
+
+        /*
+        var d = Math.abs(p-q);
+        var d1 = (Math.log10(d+0.01) + 2) * LOG_C_1;
+        */
+
+        distDistance += Math.abs(p-q);
+        //console.log("d: " + d + ", d1: " + d1 + ', ' + distDistance);
     }
-    this.entropy = -entropy;
-    return divergence;
+
+    function logDTransform(x)
+    {
+        var k =0.5;
+        var expK = Math.pow(10, -k);
+
+        return (Math.log10(x+expK) + k) / (Math.log10(1+expK)+k);
+    }
+
+    this.entropy = -entropyMe;
+    other.entropy = -entropyOther;
+
+    this.divergence = divergence;
+    other.divergence = divergence2;
+
+    return logDTransform(distDistance / 2);
+
+    /*
+    if (divergence > divergence2) {
+        return divergence / this.entropy;
+    } else {
+        return divergence2 / other.entropy;
+    }
+    //return Math.max(divergence, divergence2);
+    */
 }
 
 var BI_SPLAT = [];

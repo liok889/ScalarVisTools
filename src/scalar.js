@@ -571,6 +571,9 @@ ScalarField.prototype.generatePicture = function()
 	for (var i=0, j=0, len=this.w * this.h; i<len; i++, j+=4)
 	{
 		var c = colorMap.mapValue(view[i]);
+		if (typeof(c) == 'string') {
+			c = d3.color(c);
+		}
 		data[j] = c.r;
 		data[j+1] = c.g;
 		data[j+2] = c.b;
