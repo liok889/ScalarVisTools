@@ -17,8 +17,7 @@
 	<script src="lineup/scalar_sample.js"></script>
 	<script src="lineup/lineup.js"></script>
 	<script src="lineup/sim.js"></script>
-
-
+	<script src="lineup/lineup_experiment.js"></script>
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
@@ -45,13 +44,11 @@
 <body>
 
 	<div>
-		<p><button id="buttonModelType" onClick="switchModelType()">switch to</button>
+		<p>edit model<br><button id="buttonAddX" onclick="addX()">add X</button>&nbsp;&nbsp;<button id="buttonRemoveX" onclick="removeX()">remove X</button><br>
+			<button id="buttonAddY" onclick="addY()">add Y</button>&nbsp;&nbsp;<button id="buttonRemoveY" onclick="removeY()">remove Y</button>
 
-			<p>edit model&nbsp;<button id="buttonAddX" onclick="addX()">add X</button>&nbsp;&nbsp;<button id="buttonRemoveX" onclick="removeX()">remove X</button><br>
-		<button id="buttonAddY" onclick="addY()">add Y</button>&nbsp;&nbsp;<button id="buttonRemoveY" onclick="removeY()">remove Y</button><br>
-
-		<p>
-			<button onclick="copyToDecoy()">perturb decoy</button> &nbsp;
+		<br>
+			<button onclick="updateModelParameters()">perturb decoy</button> &nbsp;
 			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup</button> &nbsp;
 			<button onclick="randomModel()" style="background-color: #ffe0b3">random model (or press ENTER)</button> &nbsp;
 			<button onclick="runSimulation()">simulation</button>
@@ -133,11 +130,11 @@
 
 
 			<g transform="translate(50,50)">
-				<g id="models"></g>
+				<g id="mainModelSVG"></g>
 			</g>
 
 			<g transform="translate(300,50)"
-				<g id="decoyModel"></g>
+				<g id="decoyModelSVG"></g>
 			</g>
 
 			<g id="hideOverlay" style="visibility: hidden">
@@ -175,109 +172,94 @@
 		// number of samples per pixel
 		var goodN = 10*WIDTH*HEIGHT;
 		var N=12000;
-		var lineupN = 6;
-
-		function copyToDecoy()
-		{
-			// copy main model to decoy
-			mainModel.copyTo(decoyModel);
-
-			// perturb a bit?
-			var perturb = d3.select("#checkPerturbDecoy").node().checked;
-			if (perturb)
-			{
-				decoyModel.randomPerturb();
-			}
-			decoyModel.fireCallbacks();
-
-		}
+		var LINEUP_N = 6;
 
 		// one "main" and one decoy model
-		var mainModel, decoyModel, mainSample, decoySample;
-		function initModels()
+		var lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+			d3.select("#mainModelSVG"),
+			d3.select("#decoyModelSVG")
+		);
+
+		function computeDivergence()
 		{
-			mainModel = new ModelType(WIDTH, HEIGHT, d3.select("#models"));
-			mainModel.init();
+			var distance = lineupExp.computeDistance();
+			var out = "<br>combined distance: " + distance.toFixed(2) + "%";
+			d3.select("#labelKLD").html(out);
+		}
+		lineupExp.getMain().addCallback(computeDivergence);
+		lineupExp.getDecoy().addCallback(computeDivergence);
+
+
+		var mainSample, decoySample;
+		//var mainModel, decoyModel, mainSample, decoySample;
+
+		// these two give us a accurate picture of the model
+		// but they take a lot of time to compute, and we may don't want them
+		// (e.g., in the real experiment)
+		function addSamplers()
+		{
 			mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
 			mainSample.setSamplingFidelity(goodN);
-			mainSample.setModel(mainModel);
+			mainSample.setModel(lineupExp.getMain());
 
-			decoyModel = new ModelType(WIDTH, HEIGHT, d3.select("#decoyModel"));
-			copyToDecoy();
 			decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
 			decoySample.setSamplingFidelity(goodN);
-			decoySample.setModel(decoyModel);
-
-			function computeDivergence() {
-				var nkld = 100*mainModel.normalizedDivergence(decoyModel);
-				var comb = 100*mainModel.pdfDistance(decoyModel);
-
-				var out = "normalized KLD: " + nkld.toFixed(2) + "%, entropy: " + mainModel.entropy.toFixed(2) + " bits";
-				out += "<br>combined distance: " + comb.toFixed(2) + "%";
-				d3.select("#labelKLD").html(out);
-			}
-			decoyModel.addCallback(computeDivergence);
-			mainModel.addCallback(computeDivergence);
+			decoySample.setModel(lineupExp.getDecoy());
 		}
 
 		function randomLineup()
 		{
-			// new lineup
 			var start = Date.now();
-			if (lineup)
-			{
-				lineup.sample();
-				lineup.layoutCanvases(d3.select("#lineupTable"));
-			}
-			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
-
-			// hide answer
 			d3.select("#answer").html('');
-			d3.select('#lineupTable').selectAll('canvas').on('click', function()
-			{
-				console.log('clicked lineup canvas');
-				d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
-			})
 
-			d3.select('#sample' + (lineupN-1)).on('click', function()
-			{
-				d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
-			})
+			// arm feedbacks
+			lineupExp.setClickFeedback(
+				function() {
+					d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+				},
+				function() {
+					d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
+				}
+			);
+
+			lineupExp.randomLineup(N, d3.select('#lineupTable'));
+			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
 		}
-
-
 
 		function randomModel()
 		{
 			var start = Date.now();
-			mainModel.init();
-			copyToDecoy();
+			lineupExp.randomModel();
+			console.log('model took: ' + Math.floor(Date.now()-start) + ' m. seconds.');
 			refreshModel();
 
-			console.log('model took: ' + Math.floor(Date.now()-start) + ' m. seconds.');
 		}
 
 		function refreshModel()
 		{
-			mainSample.sampleAndVis();
-			decoySample.sampleAndVis();
+			if (mainSample) {
+				mainSample.sampleAndVis();
+			}
+			if (decoySample) {
+				decoySample.sampleAndVis();
+			}
 			refreshStimulus();
 		}
 
 		function refreshStimulus()
 		{
 			N = +$('#sliderN').slider('value');
-			randomLineup();
+			randomLineup(N);
 		}
 
-		function modelGeneration()
+		function updateModelParameters()
 		{
 			M_PERTURB = +$('#sliderGCenter').slider('value');
 			//S_PERTURB = +$('#sliderGSTD').slider('value');
 			R_PERTURB = +$('#sliderGCorrelation').slider('value');
 
 			// copy and perturb
-			copyToDecoy();
+			lineupExp.copyToDecoy();
 		}
 
 		function toggleHighlightDecoy() {
@@ -346,12 +328,6 @@
 				.attr('width', WIDTH)
 				.attr('height', HEIGHT);
 
-			function sampleAndPlotModel()
-			{
-				console.log("draw model");
-				mainModel.sampleModel(N, field);
-			}
-
 			// keyboard events
 			d3.select(document).on('keydown', function() {
 				if (d3.event.keyCode === 13) {
@@ -362,25 +338,25 @@
 			// sliders
 			$('#sliderN').slider({ step: 10, min: 300, max: goodN/10, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
-			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
-			//$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
-			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .3, value: R_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
+			//$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
+			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .3, value: R_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
 
 			d3.select("#labelGCenter").html(M_PERTURB);
 			d3.select("#labelGCorrelation").html(R_PERTURB);
 
-
-
-
 			showColormaps();
 		}
 
-		function addX() { mainModel.add('x'); refreshModel(); }
-		function addY() { mainModel.add('y'); refreshModel(); }
+		function addX() { lineupExp.getMain().add('x'); refreshModel(); }
+		function addY() { lineupExp.getMain().add('y'); refreshModel(); }
 
-		function removeX() { mainModel.remove('x');  refreshModel();}
-		function removeY() { mainModel.remove('y');  refreshModel();}
-		function switchModelType() {
+		function removeX() { lineupExp.getMain().remove('x');  refreshModel();}
+		function removeY() { lineupExp.getMain().remove('y');  refreshModel();}
+
+		/*
+		function switchModelType()
+		{
 			var href = window.location.href;
 			var qMark = href.search(/\?/);
 			if (qMark>-1) {
@@ -394,12 +370,11 @@
 				window.location.replace(href + "?model=bivariate");
 			}
 		}
+		*/
 
 		initInterface();
-		initModels();
 
 		// create lineup
-		var lineup = new Lineup(WIDTH, HEIGHT, lineupN, mainModel, decoyModel);
 		randomLineup();
 
 	</script>

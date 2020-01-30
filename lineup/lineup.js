@@ -26,7 +26,7 @@ function Lineup(w, h, n, realModel, decoyModel)
     }
 }
 
-Lineup.prototype.sample = function() {
+Lineup.prototype.sample = function(samplingRate) {
     for (var i=0; i<this.samplers.length; i++)
     {
         this.samplers[i].sampleModel();

@@ -477,6 +477,14 @@ GaussMixBivariate.prototype.computeCDFs = function()
     this.cummDensity = cummDensity;
 
     // construct map
+    this.updateCDFMap = true;
+}
+
+// construct map
+GaussMixBivariate.prototype.computeCDFMap = function()
+{
+    var cdf = this.cdf.view;
+    var cummDensity = this.cummDensity;
     var cdfMap = this.cdfMap;
     var cdfMapLen = this.cdfMap.length;
 
@@ -488,7 +496,9 @@ GaussMixBivariate.prototype.computeCDFs = function()
         }
         cdfMap[i]=last;
     }
+    this.updateCDFMap = false;
 }
+
 
 GaussMixBivariate.prototype.normalizedDivergence = function(other)
 {
@@ -654,6 +664,10 @@ for (var i=0; i<BI_SPLAT.length; i++) {
 
 GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
 {
+    if (this.updateCDFMap) {
+        this.computeCDFMap();
+    }
+
     var SPLAT_AREA=(SPLAT_SIZE*2+1)*(SPLAT_SIZE*2+1);
     var splat = [];
     for (var j=0;j<SPLAT_AREA; j++) {

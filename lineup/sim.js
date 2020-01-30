@@ -17,11 +17,10 @@ function runSimulation(itr) {
     var distances = [], avgDist = 0;;
     for (var i=0; i<itr; i++)
     {
-        mainModel.init();
-        copyToDecoy();
+        lineupExp.randomModel();
 
         // compute model distance
-        var d = mainModel.pdfDistance(decoyModel)
+        var d = lineupExp.computeDistance();
         distances.push(d);
         avgDist += d;
     }

@@ -74,8 +74,9 @@ ScalarSample.prototype.setSamplingFidelity = function(fidelity)
     this.localN = fidelity;
 }
 
-ScalarSample.prototype.sampleModel = function() {
-    var fidelity = this.localN;
+ScalarSample.prototype.sampleModel = function(_fidelity)
+{
+    var fidelity = !isNaN(_fidelity) ? _fidelity : this.localN;
     if (!fidelity || isNaN(fidelity)) {
         fidelity = N;
     }
