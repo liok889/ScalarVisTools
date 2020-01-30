@@ -12,10 +12,13 @@
 	<script src="design/src/gl_pipeline.js"></script>
 	<script src="design/src/coloranalysis.js"></script>
 	<script src="jnd/lib/three.min.js"></script>
-	<script src="jnd/src/gaussmix.js"></script>
-	<script src="jnd/src/gaussmix_bivariate.js"></script>
-	<script src="jnd/src/scalar_sample.js"></script>
-	<script src="jnd/src/lineup.js"></script>
+	<script src="lineup/gaussmix.js"></script>
+	<script src="lineup/gaussmix_bivariate.js"></script>
+	<script src="lineup/scalar_sample.js"></script>
+	<script src="lineup/lineup.js"></script>
+	<script src="linup/sim.js"></script>
+
+
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
@@ -26,6 +29,15 @@
 			width: 80px;
 			height: 5px;
 			font-size: 10px;
+		}
+
+		.histogram {
+			fill: #cccccc;
+			stroke: none;
+		}
+		.histogramNew {
+			fill: #f5d442;
+			stroke: none;
 		}
 
 	</style>
@@ -41,8 +53,8 @@
 		<p>
 			<button onclick="copyToDecoy()">perturb decoy</button> &nbsp;
 			<button onclick="randomLineup()" style="background-color: #d9ff66">new linup</button> &nbsp;
-			<button onclick="randomModel()" style="background-color: #ffe0b3">random model (or press ENTER)</button>
-
+			<button onclick="randomModel()" style="background-color: #ffe0b3">random model (or press ENTER)</button> &nbsp;
+			<button onclick="runSimulation()">simulation</button>
 		<div>
 		<div>
 			<table>
@@ -85,7 +97,7 @@
 				</tr>
 
 				<tr>
-					<td>variation</td>
+					<td><strike>variation</strike></td>
 					<td><div class="uiDiv sliderDiv" id="sliderGSTD"></div></td>
 					<td><span id="labelGSTD"></span></td>
 
@@ -107,9 +119,9 @@
 
 
 	</div>
-	<div style="margin-top: 10px; height: 230px">
+	<div style="margin-top: 10px; height: 260px">
 	<div style="position: relative;">
-		<svg width="550" height="200" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
+		<svg width="550" id="svgModel" height="250" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
 			<!-- a transparent grey drop-shadow that blends with the background colour -->
 			<defs>
 			<filter id="dropshadow" x="0" y="0" width="200%" height="200%">
@@ -129,10 +141,13 @@
 			</g>
 
 			<g id="hideOverlay" style="visibility: hidden">
-				<rect width="550" height="220" fill="white"></rect>
+				<rect width="550" height="250" fill="white"></rect>
 		</svg>
 
-		<svg width="200" height="300" id="svgColormaps" style="position: absolute; top: 0px; left: 550px;"></svg>
+		<svg width="230" height="500" id="svgColormaps" style="position: absolute; top: 0px; left: 610px;">
+			<g id="simulationResults" transform="translate(0,150)"></g>
+
+		</svg>
 
 		<canvas id="mainCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 50px; border: solid 1px black;">
 		</canvas>
@@ -150,8 +165,8 @@
 
 	<script>
 		// dimensions of samples
-		var WIDTH=150;
-		var HEIGHT=150;
+		var WIDTH=200;
+		var HEIGHT=200;
 		var ROTATE = false;
 
 		var BIVARIATE = window.location.href.search('univariate') >-1 ? false : true;
@@ -195,7 +210,10 @@
 
 			function computeDivergence() {
 				var nkld = 100*mainModel.normalizedDivergence(decoyModel);
+				var comb = 100*mainModel.pdfDistance(decoyModel);
+
 				var out = "normalized KLD: " + nkld.toFixed(2) + "%, entropy: " + mainModel.entropy.toFixed(2) + " bits";
+				out += "<br>combined distance: " + comb.toFixed(2) + "%";
 				d3.select("#labelKLD").html(out);
 			}
 			decoyModel.addCallback(computeDivergence);
@@ -227,6 +245,8 @@
 			})
 		}
 
+
+
 		function randomModel()
 		{
 			var start = Date.now();
@@ -253,7 +273,7 @@
 		function modelGeneration()
 		{
 			M_PERTURB = +$('#sliderGCenter').slider('value');
-			S_PERTURB = +$('#sliderGSTD').slider('value');
+			//S_PERTURB = +$('#sliderGSTD').slider('value');
 			R_PERTURB = +$('#sliderGCorrelation').slider('value');
 
 			// copy and perturb
@@ -343,8 +363,13 @@
 			$('#sliderN').slider({ step: 10, min: 300, max: goodN/10, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
 			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
-			$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
-			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .2, value: R_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+			//$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
+			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .3, value: R_PERTURB, change: modelGeneration, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+
+			d3.select("#labelGCenter").html(M_PERTURB);
+			d3.select("#labelGCorrelation").html(R_PERTURB);
+
+
 
 
 			showColormaps();

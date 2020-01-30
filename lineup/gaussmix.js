@@ -14,6 +14,9 @@ var P_HEIGHT = 40;
 // (higher resolution=less aliasing)
 var MAP_SIZE = 100;
 
+// activate callbacks on model update
+var UPDATE_CALLBACK = true;
+
 function gauss(x, p) {
     var mue = p[0]
     var delta = p[1];
@@ -86,6 +89,9 @@ GaussMix.prototype.unregisterCallback = function(callbackID) {
 }
 
 GaussMix.prototype.fireCallbacks = function() {
+    if (!UPDATE_CALLBACK) {
+        return;
+    }
     for (var i=0; i<this.callbacks.length; i++) {
         this.callbacks[i].callback(this);
     }

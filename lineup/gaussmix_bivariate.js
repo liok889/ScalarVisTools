@@ -25,23 +25,10 @@ function biGauss(mX, mY, sX, sY, rho, scaler)
 
 }
 
-// an example that for some reason gives zero probability in some areas
-// Note: fixed by increasing precision of PDF
-function problematicModel()
-{
-    return new biGauss(
-        49.92320409701579,  // mX
-        114.30529278055033, // mY
-        9.922451547636202,  // sX
-        18.048631970673952, // sY
-        0.5141453953224931, // rho
-    );
-}
-
 biGauss.prototype.updateRho = function(_rho)
 {
     // rescale row so that it's between -.7 and .7
-    this.rho = _rho * .7;
+    this.rho = _rho;
     this.rho2 = this.rho * this.rho;
     this.rhoExpConst = -1/(2 * (1-this.rho2));
     this.rhoSqrConst =  1/(2 * Math.PI * Math.sqrt(1-this.rho2));
@@ -64,12 +51,14 @@ GaussMixBivariate.prototype.constructor = GaussMixBivariate;
 
 GaussMixBivariate.prototype.init = function()
 {
-    var MAX_GUASS = 5;
+    var MIN_GAUSS = 3;
+    var MAX_GAUSS = 5;
 
+    var count = Math.floor(.5 + Math.random() * (MAX_GAUSS-MIN_GAUSS)) + MIN_GAUSS;
     this.models = [];
 
     // add a few random gausses
-    for (var i=0, count=1+Math.floor(.499 + Math.random()*MAX_GUASS); i<count; i++ ) {
+    for (var i=0; i<count; i++ ) {
         this.add();
     }
     this.updateModel();
@@ -87,7 +76,8 @@ GaussMixBivariate.prototype.copyTo = function(newModel, dontUpdate)
     }
 
     newModel.models = [];
-    for (var i=0; i<this.models.length; i++) {
+    for (var i=0; i<this.models.length; i++)
+    {
         var m = this.models[i];
         newModel.models.push(
             new biGauss(m.mX, m.mY, m.sX, m.sY, m.rho, m.scaler)
@@ -111,8 +101,8 @@ GaussMixBivariate.prototype.add = function()
     var sigmaX = (Math.random()*.5 + .2) * this.w * .3;
     var sigmaY = (Math.random()*.5 + .2) * this.h * .3;
 
-    // correlation
-    var rho = Math.random()*2-1;
+    // correlation (limit to -0.7 to 0.7)
+    var rho = (Math.random()*2-1) *.7;
 
     // scaler
     var scaler = 1.0; //0.7  + (Math.random()*2 - 1)*0.3;
@@ -132,9 +122,15 @@ GaussMixBivariate.prototype.remove = function() {
     }
 }
 
-var M_PERTURB = .075;
+var MIN_M_PERTURB = 0.0;
+var MAX_M_PERTURB = 0.2
+
+var MIN_R_PERTURB = 0.0;
+var MAX_R_PERTURB = 0.3;
+
+var M_PERTURB = .015;
 var S_PERTURB = 0;
-var R_PERTURB = 0.1;
+var R_PERTURB = 0.07;
 
 GaussMixBivariate.prototype.randomPerturb = function()
 {
@@ -161,7 +157,7 @@ GaussMixBivariate.prototype.randomPerturb = function()
         m.mX += r[0] * l;
         m.mY += r[1] * l;
 
-        var rhoP = (Math.random() > .5 ? 1 : -1) * (Math.random() * (R_PERTURB/2) + R_PERTURB/2);
+        var rhoP = (Math.random() > .5 ? 1 : -1) * (Math.random() * R_PERTURB);
         var newRho = m.rho + rhoP;
         if (newRho > 1 || newRho < -1) {
             rhoP*=-1;
@@ -172,7 +168,7 @@ GaussMixBivariate.prototype.randomPerturb = function()
     this.updateModel();
 }
 
-GaussMixBivariate.prototype.deldensity = function()
+GaussMixBivariate.prototype.deldensity = function(nonZeroOK)
 {
     var RESOLUTION=30;
     var HIST_ROW = RESOLUTION*2+1;
@@ -230,14 +226,15 @@ GaussMixBivariate.prototype.deldensity = function()
 
     // scan histogram again, and ensuring no non-zero elements within
     var cummDeldensity = (R1-R0) * (C1-C0);
-    for (var i=0; i<histSize; i++)
-    {
-        if (histogram[i] == 0.0) {
-            histogram[i] = 1e-40;
-            cummDeldensity += 1e-40;
+    if (!nonZeroOK) {
+        for (var i=0; i<histSize; i++)
+        {
+            if (histogram[i] == 0.0) {
+                histogram[i] = 1e-40;
+                cummDeldensity += 1e-40;
+            }
         }
     }
-
 
     this.deldensityResult = {
         deldensity: histogram,
@@ -500,6 +497,67 @@ GaussMixBivariate.prototype.normalizedDivergence = function(other)
     //return kld / (.5 * (this.entropy + other.entropy));
 }
 
+GaussMixBivariate.prototype.pdfDistance = function(other)
+{
+    var P = this.pdf.view;
+    var Q = other.pdf.view;
+
+    var maxP_1 = 1.0/this.cummDensity;
+    var maxQ_1 = 1.0/other.cummDensity;
+
+    var distance = 0;
+
+    // amplitude distance
+    // ==================
+    for (var i=0, len=P.length; i<len; i++)
+    {
+        var p = P[i];
+        p *= maxP_1;
+
+        var q = Q[i];
+        q *= maxQ_1;
+
+        distance += Math.abs(p-q);
+    }
+
+    // distance is between 0..2, so multiply between 0.5
+    var distDistance = logDTransform(distance*.5)
+
+    // frequency-based distance
+    // ==========================
+    var delP = this.deldensity(true /* don't bother zeroing out empty bins */);
+    var delQ = other.deldensity(true);
+
+    var fP = delP.deldensity;
+    var fQ = delQ.deldensity;
+
+    var maxfP = delP.cummDeldensity;
+    var maxfQ = delQ.cummDeldensity;
+
+    distance = 0;
+    for (var i=0, len=fP.length; i<len; i++) {
+        distance += Math.abs(fP[i]-fQ[i]);
+    }
+    var freqDistance = logDTransform(distance/maxfP) *.5;
+
+    // return weighted average of the two distances
+    var ALPHA = 0.5;
+    return ALPHA * distDistance + (1-ALPHA) * freqDistance;
+}
+
+function logDTransform(x)
+{
+    var k =0.7;
+    var expK = Math.pow(10, -k);
+    return (Math.log10(x+expK) + k) / (Math.log10(1+expK)+k);
+}
+
+function expDTransform(x)
+{
+    var b = 3;      // base
+    return (Math.pow(b, x-1) - 1/b) / (1-1/b);
+}
+
 GaussMixBivariate.prototype.klDivergence = function(other)
 {
     var DELENTROPY = false;
@@ -559,14 +617,6 @@ GaussMixBivariate.prototype.klDivergence = function(other)
         //console.log("d: " + d + ", d1: " + d1 + ', ' + distDistance);
     }
 
-    function logDTransform(x)
-    {
-        var k =0.5;
-        var expK = Math.pow(10, -k);
-
-        return (Math.log10(x+expK) + k) / (Math.log10(1+expK)+k);
-    }
-
     this.entropy = -entropyMe;
     other.entropy = -entropyOther;
 
@@ -586,7 +636,7 @@ GaussMixBivariate.prototype.klDivergence = function(other)
 }
 
 var BI_SPLAT = [];
-var splatGauss = new biGauss(0, 0, SPLAT_SIZE/3, SPLAT_SIZE/3, 0);
+var splatGauss = new biGauss(0, 0, SPLAT_SIZE/4, SPLAT_SIZE/4, 0);
 var cummSplat=0.0;
 for (var I=0,r=-SPLAT_SIZE; r<=SPLAT_SIZE; r++)
 {
