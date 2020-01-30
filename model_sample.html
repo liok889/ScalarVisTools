@@ -61,7 +61,7 @@
 					<td><span id="sliderNValue"></span></td>
 				</tr>
 				<tr>
-					<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; lineup.sample();" checked></input>blur
+					<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; randomLineup();" checked></input>blur
 				</tr>
 
 				<tr>
@@ -196,7 +196,7 @@
 		// these two give us a accurate picture of the model
 		// but they take a lot of time to compute, and we may don't want them
 		// (e.g., in the real experiment)
-		function addSamplers()
+		function setSamplers()
 		{
 			mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
 			mainSample.setSamplingFidelity(goodN);
@@ -206,6 +206,7 @@
 			decoySample.setSamplingFidelity(goodN);
 			decoySample.setModel(lineupExp.getDecoy());
 		}
+		setSamplers();
 
 		function randomLineup()
 		{
