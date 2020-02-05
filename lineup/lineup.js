@@ -49,7 +49,7 @@ Lineup.prototype.layoutCanvases = function(table)
 
     // remove everything in the table
     table.selectAll('*').remove();
-
+    table.attr('cellpadding', "6").attr("cellspacing", "0")
     // how many rows
     var rows = 2;
     var cols = Math.ceil(this.n/2);

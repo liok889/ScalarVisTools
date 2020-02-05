@@ -180,16 +180,6 @@
 			d3.select("#decoyModelSVG")
 		);
 
-		function computeDivergence()
-		{
-			var distance = lineupExp.computeDistance();
-			var out = "<br>combined distance: " + distance.toFixed(2) + "%";
-			d3.select("#labelKLD").html(out);
-		}
-		lineupExp.getMain().addCallback(computeDivergence);
-		lineupExp.getDecoy().addCallback(computeDivergence);
-
-
 		var mainSample, decoySample;
 		//var mainModel, decoyModel, mainSample, decoySample;
 
@@ -345,6 +335,17 @@
 
 			d3.select("#labelGCenter").html(M_PERTURB);
 			d3.select("#labelGCorrelation").html(R_PERTURB);
+
+			// show the divergence between the model and the decoy
+			function computeDivergence()
+			{
+				var distance = lineupExp.modelDecoyDistance();
+				var out = "<br>combined distance: " + distance.toFixed(2) + "%";
+				d3.select("#labelKLD").html(out);
+			}
+			lineupExp.getMain().addCallback(computeDivergence);
+			lineupExp.getDecoy().addCallback(computeDivergence);
+
 
 			showColormaps();
 		}

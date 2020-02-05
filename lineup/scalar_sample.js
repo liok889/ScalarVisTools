@@ -1,5 +1,13 @@
 var BLUR=true;
 ALL_SAMPLERS = [];
+
+
+var shaderList = [
+    {name: 'vis',		path: 'design/src/shaders/vis.frag'},
+    {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
+    {name: 'blur',		path: 'design/src/shaders/blur.frag'}
+];
+
 function ScalarSample(w, h, canvas, model, colormap)
 {
     this.w = w;
@@ -13,11 +21,6 @@ function ScalarSample(w, h, canvas, model, colormap)
         this.setModel(model);
     }
 
-    var shaderList = [
-        {name: 'vis',		path: 'design/src/shaders/vis.frag'},
-        {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
-        {name: 'blur',		path: 'design/src/shaders/blur.frag'}
-    ];
 
     if (this.canvas)
     {
