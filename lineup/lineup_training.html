@@ -58,7 +58,7 @@
 	<script>
 		var WIDTH=200;
 		var HEIGHT=200;
-		var TRAINING = false;
+		var TRAINING = true;
 
 		var SAMPLE_FIDELITY=14000;
 		var N = SAMPLE_FIDELITY;
@@ -77,13 +77,15 @@
 		var stimulusCount = 0;
 		var subjectid = Math.floor(Math.random()*10000);
 
-		var trialPerBlock = 10;
+		var trialPerBlock = 6;
 		var trialNum = -1, blockNum = -1;
 		var blocks = [
 			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
 			{ colormap: 'turbo', center: 0.12, correlation: 0.07, expectation: 0.28},
+			/*
 			{ colormap: 'viridis', center: 0.07, correlation: 0.07, expectation: 0.22},
 			{ colormap: 'turbo', center: 0.07, correlation: 0.07, expectation: 0.22}
+			*/
 		];
 		var currentColormap = null;
 		var distance = null;
