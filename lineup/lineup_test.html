@@ -26,6 +26,11 @@
 			font-family: Arial; sans-serif
 			font-size: 12px;
 		}
+
+		#divColorScale {
+			text-align: center;
+		}
+
 	</style>
 </head>
 <body>
@@ -34,8 +39,19 @@
 		<p>Click on the picture that <b>doesn't belong</b>
 	</div>
 
-	<table id="lineupTable">
-	</table>
+	<div style="width: 730px; height: 450px">
+		<div style="float: left;">
+			<table id="lineupTable"></table>
+		</div>
+		<div id="divColorScale" style="width: 90; height: 210px; float: right;">
+			<div style="margin-top: 140px; font-size: 16px">
+				high<br>values<br><canvas id="colorScaleCanvas" width="25" height="140"></canvas><br>low<br>values
+			</div>
+		</div>
+
+	</div>
+
+	<p id="incorrect" style="visibility: hidden">Incorrect choice. Real answer highlighted in green</p>
 	<p id="confirm" style="visibility: hidden">Press <b>ENTER</b> to confirm selection.</p>
 	<p><button id="downloadData" style="font-size: 17px; visibility: hidden" onclick="downloadCSV()">Download data</button></p>
 
@@ -61,7 +77,7 @@
 		var stimulusCount = 0;
 		var subjectid = Math.floor(Math.random()*10000);
 
-		var trialPerBlock = 3;
+		var trialPerBlock = 10;
 		var trialNum = -1, blockNum = -1;
 		var blocks = [
 			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
@@ -91,7 +107,18 @@
 
 				M_PERTURB = block.center;
 				R_PERTURB = block.correlation;
-				ScalarSample.setUniversalColormap(getColorPreset(block.colormap));
+
+				var colormap = getColorPreset(block.colormap)
+				ScalarSample.setUniversalColormap(colormap);
+
+				// draw the current currentColormap
+				var scaleCanvas = d3.select("#colorScaleCanvas");
+				colormap.drawColorScale(
+					+scaleCanvas.attr('width'),
+					+scaleCanvas.attr('height'),
+					+scaleCanvas.attr('height'), 'vertical',
+					scaleCanvas.node());
+
 				return false;
 			}
 		}
@@ -192,6 +219,12 @@
 					{
 						// do nothing
 					}
+					else if (lineup.answer == '0' && TRAINING)
+					{
+						d3.select("#incorrect").style('visibility', null);
+						d3.select("#confirm").style('visibility', 'hidden');
+						lineup.highlightCorrect();
+					}
 					else {
 						// register response
 						var b = blocks[blockNum];
@@ -208,6 +241,7 @@
 						});
 
 						d3.select("#confirm").style('visibility', 'hidden');
+						d3.select("#incorrect").style('visibility', 'hidden');
 						nextTrial();
 
 					}

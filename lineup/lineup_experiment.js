@@ -57,6 +57,17 @@ LineupExperiment.prototype.modelDecoyDistance = function()
     return this.main.pdfDistance(this.decoy);
 }
 
+LineupExperiment.prototype.getAnswer = function() {
+    return this.answer;
+}
+
+LineupExperiment.prototype.highlightCorrect = function()
+{
+    var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
+    this.domSelection.selectAll('td').style('background-color', null);
+    d3.select(td)
+        .style('background-color', '#00cc66');
+}
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
 {
     var SEL_BORDER = "#ff623b"//"solid 4px #fcbd00";
@@ -64,6 +75,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
     // new lineup
     this.lineup.sample(fidelity);
     this.lineup.layoutCanvases(domSelection);
+    this.domSelection = domSelection;
 
     // clear out old selection / answer
     this.answer = null;
