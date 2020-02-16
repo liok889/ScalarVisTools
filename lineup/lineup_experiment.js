@@ -61,12 +61,12 @@ LineupExperiment.prototype.getAnswer = function() {
     return this.answer;
 }
 
-LineupExperiment.prototype.highlightCorrect = function()
+LineupExperiment.prototype.highlightCorrect = function(show)
 {
     var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
     this.domSelection.selectAll('td').style('background-color', null);
     d3.select(td)
-        .style('background-color', '#00cc66');
+        .style('background-color', show ? '#00cc66' : null);
 }
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
 {

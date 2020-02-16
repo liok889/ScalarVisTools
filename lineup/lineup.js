@@ -34,6 +34,8 @@ Lineup.prototype.sample = function(samplingRate) {
     }
 }
 
+var LINEUP_PADDING = 6;
+
 Lineup.prototype.layoutCanvases = function(table)
 {
     if (!table) {
@@ -49,7 +51,7 @@ Lineup.prototype.layoutCanvases = function(table)
 
     // remove everything in the table
     table.selectAll('*').remove();
-    table.attr('cellpadding', "6").attr("cellspacing", "0")
+    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", "0")
     // how many rows
     var rows = 2;
     var cols = Math.ceil(this.n/2);
