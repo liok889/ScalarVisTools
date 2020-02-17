@@ -120,6 +120,8 @@ var LINEUP_MAX_TRIAL=100;
 
 LineupExperiment.prototype.modelWithExpectation = function(expectation)
 {
+    var range = expectation && typeof(expectation) == 'object';
+
     var trial = 0, distance = null;
     do
     {
@@ -131,8 +133,18 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
         }
         else
         {
-            var dToE = Math.abs(distance-expectation);
-            if (dToE < LINEUP_TOLERANCE) { break; }
+            if (range)
+            {
+                if (distance >= expectation[0] && distance <= expectation[1]) {
+                    break;
+                }
+            }
+            else {
+                var dToE = Math.abs(distance-expectation);
+                if (dToE < LINEUP_TOLERANCE) {
+                    break;
+                }
+            }
         }
 
     } while (true);

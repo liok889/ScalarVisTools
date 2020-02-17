@@ -159,6 +159,7 @@
 		    {name: 'blur',		path: '../../design/src/shaders/blur.frag'}
 		];
 
+
 		var lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N);
 		lineup.enableSelection(true);
 		var correct = false;
@@ -168,8 +169,8 @@
 
 		// experiment structure
 		// =====================
-		var trialPerBlock = 2;
-		var engagementPerBlock = 1;
+		var trialPerBlock = 5;
+		var engagementPerBlock = 2;
 
 		var blocks = [
 			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
@@ -177,6 +178,11 @@
 			{ colormap: 'viridis', center: 0.07, correlation: 0.07, expectation: 0.22},
 			{ colormap: 'turbo', center: 0.07, correlation: 0.07, expectation: 0.22}
 		];
+		var ENGAGEMENT = {
+			center: 0.24,
+			correlation: 0.08,
+			expectation: [0.36, 0.6]
+		}
 
 		// experiment stats
 		// ================
@@ -185,7 +191,7 @@
 
 		// current status
 		// ==============
-		var trialNum = -1, blockNum = -1;
+		var trialNum = -1, blockNum = -1, engagementNum = 0;
 		var currentColormap = null;
 		var distance = null;
 		BLUR = true;
@@ -199,6 +205,8 @@
 		function nextBlock()
 		{
 			blockNum++;
+			engagementNum = 0;
+
 			if (blockNum >= blocks.length)
 			{
 				complete = true;
@@ -245,7 +253,6 @@
 			d3.select("#downloadData")
 				.style("visibility", TRAINING ? 'hidden' : null);
 			*/
-
 		}
 
 		var stimulusReady = null, genTime;
@@ -258,7 +265,10 @@
 				return true;
 			}
 			else {
-				if (trialNum >= trialPerBlock-1)
+				// current block
+				var block = blocks[blockNum];
+
+				if (trialNum >= block.trialSequence.length-1)
 				{
 					if (nextBlock()) {
 						finish();
@@ -269,14 +279,27 @@
 					trialNum++;
 				}
 
-				// keep track of time needed to generate stimulus
 				genTime = Date.now();
-				lineup.modelWithExpectation(blocks[blockNum].expectation);
+
+				if (block.trialSequence[trialNum] == 'e')
+				{
+					console.log("engagement check");
+					M_PERTURB = ENGAGEMENT.center;
+					R_PERTURB = ENGAGEMENT.correlation;
+					lineup.modelWithExpectation(ENGAGEMENT.expectation);
+				}
+				else
+				{
+					M_PERTURB = block.center;
+					R_PERTURB = block.correlation;
+					lineup.modelWithExpectation(block.expectation);
+				}
+
+				// keep track of time needed to generate stimulus
 				distance = lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
 				genTime = Date.now() - genTime;
 
 				// keep track of time when stimulus is ultimately ready
-
 				stimulusReady = Date.now();
 
 				// update status label
@@ -316,9 +339,29 @@
 			//return output;
 		}
 
+		function createTrialSequence() {
+			for (var b=0; b<blocks.length; b++)
+			{
+				var block = blocks[b];
+				block.trialSequence = d3.range(trialPerBlock);
+				for (var i=0; i<trialPerBlock; i++) {
+					block.trialSequence[i] = 0;
+				}
+
+				for (var i=0; i<engagementPerBlock; i++) {
+					var r = Math.floor(Math.random()*trialPerBlock);
+					block.trialSequence.splice(r, 0, 'e');
+				}
+			}
+		}
+
 		function initExperiment()
 		{
+			// trial sequence
+			createTrialSequence();
+
 			function showConfirmPrompt() {
+				d3.select("#incorrect").style('visibility', 'hidden');
 				d3.select("#confirm").style('visibility', null);
 			}
 			lineup.setClickFeedback(showConfirmPrompt, showConfirmPrompt);
@@ -347,18 +390,33 @@
 					else {
 						// register response
 						var b = blocks[blockNum];
-						csv.push({
-							blockNum: blockNum+1,
-							trialNum: trialNum+1,
-							colormap: b.colormap,
-							distance: lineup.curDistance,
-							correct: +lineup.answer,
-							genTime: genTime,
-							responseTime: Date.now()-stimulusReady,
-							center: b.center,
-							correlation: b.correlation,
-							expdistance: b.expectation
-						});
+
+						if (b.trialSequence[trialNum] == 'e')
+						{
+							// an engagement check. don't store, just check correctness
+							engagementCorrect += +lineup.answer;
+							engagementNum++;
+						}
+						else {
+
+							var stimNum = csv.length+1
+							csv.push({
+								blockNum: blockNum+1,
+								trialNum: trialNum+1 - engagementNum,
+								stimulusNum: stimNum,
+								colormap: b.colormap,
+								distance: lineup.curDistance,
+								requestedDistance: b.expectation,
+								correct: +lineup.answer,
+								genTime: genTime,
+								responseTime: Date.now()-stimulusReady,
+								center: b.center,
+								correlation: b.correlation,
+								expdistance: b.expectation
+							});
+							stimulusCorrect += +lineup.answer;
+
+						}
 
 						d3.select("#confirm").style('visibility', 'hidden');
 						d3.select("#incorrect").style('visibility', 'hidden');
