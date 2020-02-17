@@ -115,7 +115,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
 
 // generates a lineup with an expected distance between the main and the decoy
 // ideally, set tolerance level to STD (from simulations)
-var LINEUP_TOLERANCE = 0.02;
+var LINEUP_TOLERANCE = 0.01;
 var LINEUP_MAX_TRIAL=100;
 
 LineupExperiment.prototype.modelWithExpectation = function(expectation)

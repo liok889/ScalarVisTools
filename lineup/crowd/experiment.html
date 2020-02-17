@@ -200,7 +200,7 @@
 		var complete = false;
 
 		var EXPERIMENT_URL = 'experiment.html';
-		var DATA_URL = 'data_process.php';
+		var DATA_URL = 'php/experimental_data.php';
 
 		function nextBlock()
 		{
@@ -303,9 +303,11 @@
 				stimulusReady = Date.now();
 
 				// update status label
-				var p = (trialNum + blockNum*trialPerBlock) /	(trialPerBlock*blocks.length)
-				var label = (trialNum+1 + blockNum*trialPerBlock) + " / " +
-					(trialPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
+				var stimPerBlock = trialPerBlock + engagementPerBlock;
+				
+				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
+				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
+					(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
 
 				d3.select('#stimulusNum').html(label);
 				return false;
@@ -408,7 +410,7 @@
 								distance: lineup.curDistance,
 								requestedDistance: b.expectation,
 								correct: +lineup.answer,
-								genTime: genTime,
+								generationTime: genTime,
 								responseTime: Date.now()-stimulusReady,
 								center: b.center,
 								correlation: b.correlation,
