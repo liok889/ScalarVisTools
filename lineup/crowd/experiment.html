@@ -222,7 +222,7 @@
 		var trialNum = -1, blockNum = -1, engagementNum = 0;
 		var currentColormap = null;
 		var distance = null;
-		BLUR = true;
+		BLUR = false;
 
 		// flag on whether experiment is complete
 		var complete = false;
@@ -309,44 +309,55 @@
 
 				genTime = Date.now();
 
-				if (block.trialSequence[trialNum] == 'e')
-				{
-					console.log("engagement check");
-					M_PERTURB = ENGAGEMENT.center;
-					R_PERTURB = ENGAGEMENT.correlation;
-					lineup.modelWithExpectation(ENGAGEMENT.expectation);
-				}
-				else if ( typeof block.trialSequence[trialNum] === "object" )
-				{
-					var subblock = block.trialSequence[trialNum]
-					M_PERTURB = subblock.center;
-					R_PERTURB = subblock.correlation;
-					lineup.modelWithExpectation(subblock.expectation);
-				}
-				else
-				{
-					M_PERTURB = block.center;
-					R_PERTURB = block.correlation;
-					lineup.modelWithExpectation(block.expectation);
-				}
-
-				// keep track of time needed to generate stimulus
-				distance = lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
-				genTime = Date.now() - genTime;
-
-				// keep track of time when stimulus is ultimately ready
-				stimulusReady = Date.now();
+				// hide lineup temporarily while model/samples are being created
+				d3.select("#lineupTable").style('visibility', 'hidden');
 
 				// update status label
 				var stimPerBlock = trialPerBlock + engagementPerBlock;
-
 				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
 				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
-					(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
-
+				(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
 				label = Math.floor(.5+100*p) + '% complete';
-
 				d3.select('#stimulusNum').html(label);
+
+				setTimeout(function()
+				{
+					if (block.trialSequence[trialNum] == 'e')
+					{
+						console.log("engagement check");
+						M_PERTURB = ENGAGEMENT.center;
+						R_PERTURB = ENGAGEMENT.correlation;
+						lineup.modelWithExpectation(ENGAGEMENT.expectation);
+					}
+					else if ( typeof block.trialSequence[trialNum] === "object" )
+					{
+						var subblock = block.trialSequence[trialNum]
+						M_PERTURB = subblock.center;
+						R_PERTURB = subblock.correlation;
+						lineup.modelWithExpectation(subblock.expectation);
+					}
+					else
+					{
+						M_PERTURB = block.center;
+						R_PERTURB = block.correlation;
+						lineup.modelWithExpectation(block.expectation);
+					}
+
+					// keep track of time needed to generate stimulus
+					distance = lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
+					genTime = Date.now() - genTime;
+
+					// force a min of 250 ms delay to clear our iconic memory
+					setTimeout(function()
+					{
+						// show lineup
+						d3.select("#lineupTable").style('visibility', null);
+
+						// keep track of time when stimulus is ultimately ready
+						stimulusReady = Date.now();
+					}, Math.max(0, 250-genTime));
+				}, 10);
+
 				return false;
 			}
 		}

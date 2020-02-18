@@ -156,6 +156,7 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
 
     console.log("[" + trial + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;
+
     return distance;
 }
 
