@@ -159,10 +159,37 @@
 		    {name: 'blur',		path: '../../design/src/shaders/blur.frag'}
 		];
 
+		var ALL_COLORMAPS = [
+			'singlehue',
+			'viridis',
+			'spectral',
+			'coolwarm',
+			'turbo',
+			'rainbowjet',
+		];
 
+		var COMBINATION = 'abc';
+		var RANDOMIZE_COLOR_ORDER = true;
+		var BLOCK_SEED = [
+			{ center: 0.05, correlation: 0.07, expectation: 0.160, std: 0.04},
+			{ center: 0.06, correlation: 0.07, expectation: 0.190, std: 0.04},
+			{ center: 0.07, correlation: 0.07, expectation: 0.210, std: 0.04},
+			{ center: 0.08, correlation: 0.07, expectation: 0.230, std: 0.04},
+			{ center: 0.09, correlation: 0.07, expectation: 0.240, std: 0.04},
+			{ center: 0.10, correlation: 0.07, expectation: 0.260, std: 0.04},
+			{ center: 0.11, correlation: 0.07, expectation: 0.270, std: 0.04},
+			{ center: 0.12, correlation: 0.07, expectation: 0.285, std: 0.05},
+			{ center: 0.13, correlation: 0.07, expectation: 0.300, std: 0.05},
+			{ center: 0.14, correlation: 0.07, expectation: 0.320, std: 0.05},
+		];
+		var trialPerSubblock = 2;
+
+		// create lineup experiment
 		var lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N);
 		lineup.enableSelection(true);
 		var correct = false;
+
+		// store results
 		var csv = [];
 		var stimulusCount = 0;
 		var subjectid = Math.floor(Math.random()*10000);
@@ -288,6 +315,13 @@
 					R_PERTURB = ENGAGEMENT.correlation;
 					lineup.modelWithExpectation(ENGAGEMENT.expectation);
 				}
+				else if ( typeof block.trialSequence[trialNum] === "object" )
+				{
+					var subblock = block.trialSequence[trialNum]
+					M_PERTURB = subblock.center;
+					R_PERTURB = subblock.correlation;
+					lineup.modelWithExpectation(subblock.expectation);
+				}
 				else
 				{
 					M_PERTURB = block.center;
@@ -304,7 +338,7 @@
 
 				// update status label
 				var stimPerBlock = trialPerBlock + engagementPerBlock;
-				
+
 				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
 				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
 					(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
@@ -341,13 +375,84 @@
 			//return output;
 		}
 
-		function createTrialSequence() {
+		String.prototype.replaceAt=function(index, replacement) {
+		    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
+		}
+
+		function createTrialSequence()
+		{
+			if (COMBINATION && COMBINATION.length > 0)
+			{
+				var combination = COMBINATION;
+				if (RANDOMIZE_COLOR_ORDER)
+				{
+					// randomize
+					for (var i=0; i<100; i++)
+					{
+						var r1 = Math.floor(Math.random() * combination.length);
+						var r2 = Math.floor(Math.random() * combination.length);
+						if (r1 != r2) {
+							var c1 = combination.charAt(r1);
+							var c2 = combination.charAt(r2);
+							combination = combination.replaceAt(r1, c2);
+							combination = combination.replaceAt(r2, c1);
+						}
+					}
+				}
+				COMBINATION = combination;
+
+				// create colorCombination
+				var colorscales = [];
+				for (var i=0; i<COMBINATION.length; i++) {
+					var index = COMBINATION.charCodeAt(i) - 'a'.charCodeAt(0);
+					colorscales.push(ALL_COLORMAPS[index]);
+				}
+
+				// construct blocks
+				var generatedBlocks = [];
+				for (var c=0; c<colorscales.length; c++)
+				{
+					var block = {
+						colormap: colorscales[c],
+						trialSequence: []
+					};
+					for (var i=0; i<BLOCK_SEED.length; i++)
+					{
+						var seed = BLOCK_SEED[i];
+						for (var t=0; t<trialPerSubblock; t++)
+						{
+							var subblock = {
+								center: seed.center,
+								correlation: seed.correlation,
+								std: seed.std,
+								expectation: seed.expectation
+							};
+							block.trialSequence.push(subblock);
+						}
+
+						// permutate randomize subblock?
+						for (var x=0; x<9000; x++) {
+							var r1 = Math.floor(Math.random() * block.trialSequence.length);
+							var r2 = Math.floor(Math.random() * block.trialSequence.length);
+							var t = block.trialSequence[r2];
+							block.trialSequence[r2] = block.trialSequence[r1];
+							block.trialSequence[r1] = t;
+						}
+					}
+					generatedBlocks.push(block);
+				}
+				blocks = generatedBlocks;
+				trialPerBlock = trialPerSubblock * BLOCK_SEED.length;
+			}
+
 			for (var b=0; b<blocks.length; b++)
 			{
 				var block = blocks[b];
-				block.trialSequence = d3.range(trialPerBlock);
-				for (var i=0; i<trialPerBlock; i++) {
-					block.trialSequence[i] = 0;
+				if (!block.trialSequence) {
+					block.trialSequence = d3.range(trialPerBlock);
+					for (var i=0; i<trialPerBlock; i++) {
+						block.trialSequence[i] = 0;
+					}
 				}
 
 				for (var i=0; i<engagementPerBlock; i++) {
@@ -400,14 +505,19 @@
 							engagementNum++;
 						}
 						else {
+							var colormap = b.colormap;
+							if (typeof b.trialSequence[trialNum] == 'object')
+							{
+								b = b.trialSequence[trialNum];
+							}
 
 							var stimNum = csv.length+1
 							csv.push({
 								blockNum: blockNum+1,
 								trialNum: trialNum+1 - engagementNum,
 								stimulusNum: stimNum,
-								colormap: b.colormap,
-								distance: lineup.curDistance,
+								colormap: colormap,
+								distance: lineup.getCurDistance(),
 								requestedDistance: b.expectation,
 								correct: +lineup.answer,
 								generationTime: genTime,

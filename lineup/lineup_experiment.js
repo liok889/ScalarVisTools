@@ -48,13 +48,15 @@ LineupExperiment.prototype.setClickFeedback = function(correct, incorrect)
 
 LineupExperiment.prototype.randomModel = function()
 {
+    this.curDistance = null;
     this.main.init();
     this.copyToDecoy();
 }
 
 LineupExperiment.prototype.modelDecoyDistance = function()
 {
-    return this.main.pdfDistance(this.decoy);
+    this.curDistance = this.main.pdfDistance(this.decoy);
+    return this.curDistance;
 }
 
 LineupExperiment.prototype.getAnswer = function() {
@@ -120,6 +122,7 @@ var LINEUP_MAX_TRIAL=100;
 
 LineupExperiment.prototype.modelWithExpectation = function(expectation)
 {
+    this.curDistance = null;
     var range = expectation && typeof(expectation) == 'object';
 
     var trial = 0, distance = null;
@@ -152,4 +155,8 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
     console.log("[" + trial + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;
     return distance;
+}
+
+LineupExperiment.prototype.getCurDistance = function() {
+    return this.curDistance;
 }

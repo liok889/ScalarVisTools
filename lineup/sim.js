@@ -20,7 +20,7 @@ function runSimulation(itr) {
         lineupExp.randomModel();
 
         // compute model distance
-        var d = lineupExp.computeDistance();
+        var d = lineupExp.modelDecoyDistance();
         distances.push(d);
         avgDist += d;
     }
