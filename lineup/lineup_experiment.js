@@ -68,7 +68,9 @@ LineupExperiment.prototype.highlightCorrect = function(show)
     var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
     this.domSelection.selectAll('td').style('background-color', null);
     d3.select(td)
-        .style('background-color', show ? '#00cc66' : null);
+        .style('background-color', show ? '#aaaaaa' : null);
+
+    // 00cc66
 }
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
 {

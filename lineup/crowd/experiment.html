@@ -75,13 +75,13 @@
 	<div style="width: 800px">
 
 		<div id="prompt">
-			<p>Stimulus <span id="stimulusNum"></span>.
+			<p>Progress: <span id="stimulusNum"></span>
 			<p>Click on the image that <b>doesn't belong</b>
 		</div>
 
-		<div style="width: 730px; height: 450px">
+		<div style="width: 730px; height: 450px; margin-top: 40px">
 			<div style="float: left;">
-				<table style="margin-left: 50px" id="lineupTable"></table>
+				<table style="margin-left: 120px" id="lineupTable"></table>
 			</div>
 			<div id="divColorScale" style="width: 90; height: 210px; float: right;">
 				<div style="margin-top: 140px; font-size: 16px">
@@ -199,6 +199,7 @@
 		var trialPerBlock = 5;
 		var engagementPerBlock = 2;
 
+		// preset blocks
 		var blocks = [
 			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
 			{ colormap: 'turbo', center: 0.12, correlation: 0.07, expectation: 0.28},
@@ -342,6 +343,8 @@
 				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
 				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
 					(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
+
+				label = Math.floor(.5+100*p) + '% complete';
 
 				d3.select('#stimulusNum').html(label);
 				return false;

@@ -79,9 +79,9 @@
 			<p>Click on the image that <b>doesn't belong</b>
 		</div>
 
-		<div style="width: 730px; height: 450px">
+		<div style="width: 730px; height: 450px; margin-top: 40px">
 			<div style="float: left;">
-				<table style="margin-left: 50px" id="lineupTable"></table>
+				<table style="margin-left: 120px" id="lineupTable"></table>
 			</div>
 			<div id="divColorScale" style="width: 90; height: 210px; float: right;">
 				<div style="margin-top: 140px; font-size: 16px">
@@ -93,7 +93,7 @@
 
 		<!--<p id="incorrect" style="visibility: hidden">Incorrect choice. Real answer highlighted in green</p><br>
 		-->
-		<span id="correct" style="visibility: hidden"><b>Nice! You were correct</b></span>
+		<div id="correct" style="visibility: hidden; font-size: 19px; margin-left: 300px">Correct!</div>
 		<p id="confirm" style="visibility: hidden">Press <b>ENTER</b> to confirm selection.</p>
 	</div>
 
@@ -354,7 +354,7 @@
 
 				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
 				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
-					(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
+					(stimPerBlock*blocks.length);
 
 				d3.select('#stimulusNum').html(label);
 				return false;
@@ -515,7 +515,7 @@
 							d3.select("#correct").style('visibility', null);
 							setTimeout(function() {
 								d3.select("#correct").style('visibility', 'hidden')
-							}, 2000);
+							}, 1200);
 						}
 
 						// register response
