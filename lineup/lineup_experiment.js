@@ -120,42 +120,53 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
 // generates a lineup with an expected distance between the main and the decoy
 // ideally, set tolerance level to STD (from simulations)
 var LINEUP_TOLERANCE = 0.01;
-var LINEUP_MAX_TRIAL=100;
+var LINEUP_MAX_TRIAL = 60;
+var LINEUP_MAX_ROUNDS = 3;
 
 LineupExperiment.prototype.modelWithExpectation = function(expectation)
 {
-    this.curDistance = null;
     var range = expectation && typeof(expectation) == 'object';
 
-    var trial = 0, distance = null;
-    do
+    var tolerance = LINEUP_TOLERANCE;
+    var converged = false;
+    var distance = null;
+    var iterations = 0;
+    
+    for (var round=0; !converged && round<LINEUP_MAX_ROUNDS; round++)
     {
-        this.randomModel();
-        distance = this.modelDecoyDistance();
-
-        if (!expectation || ++trial > LINEUP_MAX_TRIAL) {
-            break;
-        }
-        else
+        for (var trial=0; !converged && trial<LINEUP_MAX_TRIAL; trial++, iterations++)
         {
-            if (range)
+            this.randomModel();
+            distance = this.modelDecoyDistance();
+
+            if (!expectation) 
             {
-                if (distance >= expectation[0] && distance <= expectation[1]) {
-                    break;
-                }
+                converged = true;
             }
-            else {
-                var dToE = Math.abs(distance-expectation);
-                if (dToE < LINEUP_TOLERANCE) {
-                    break;
+            else
+            {
+                if (range && distance >= expectation[0] && distance <= expectation[1]) 
+                {
+                    converged = true;
+                }
+                if (Math.abs(distance-expectation) <= tolerance) 
+                {
+                    converged = true;
                 }
             }
         }
 
-    } while (true);
+        if (!converged) 
+        {
+            tolerance *= 2;
+        }
+    }
 
-    console.log("[" + trial + "]: requested: " + expectation + ", got: " + distance);
+
+    console.log("[" + iterations + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;
+    this.converged = converged;
+    this.iterations = iterations;
 
     return distance;
 }
