@@ -66,8 +66,11 @@ Lineup.prototype.layoutCanvases = function(table)
                     d3.select(thisRow).selectAll('td').data(d3.range(cols))
                         .enter().append('td').each(function(d, i) {
                             var index = i + rowNum*cols;
-                            if (index < n) {
+                            if (index < n) 
+                            {
                                 this.appendChild( randomCanvases[index] );
+                                d3.select(randomCanvases[index])
+                                    .attr('class', 'index' + index);
                             }
                         });
                 })(d, this);

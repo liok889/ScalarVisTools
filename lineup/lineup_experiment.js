@@ -98,6 +98,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
             lineup.answer = "0";
+            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         });
     })(this, domSelection);
 
@@ -113,6 +114,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
             lineup.answer = "1";
+            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         })
     })(this, domSelection);
 }
