@@ -172,7 +172,7 @@
 		// number of samples per pixel
 		var goodN = 10*WIDTH*HEIGHT;
 		var N=12000;
-		var LINEUP_N = 6;
+		var LINEUP_N = 4;
 
 		// one "main" and one decoy model
 		var lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
@@ -261,7 +261,7 @@
 
 		function showColormaps() {
 			var COLORMAPS = [
-				'viridis', 'rainbowjet', 'turbo', 'coolwarm', 'spectral'
+				'viridis', 'rainbowjet', 'turbo', 'redpurple', 'blues', 'plasma'
 			];
 			var MAP_W=100, MAP_H=15, MAP_PAD=5;
 			d3.select('#svgColormaps').selectAll('image').data(COLORMAPS)
@@ -356,6 +356,89 @@
 		function removeX() { lineupExp.getMain().remove('x');  refreshModel();}
 		function removeY() { lineupExp.getMain().remove('y');  refreshModel();}
 
+
+		function generateCombinations()
+		{
+			var COLORSCALES = [
+				'blues',
+				'purples',
+				'reds',
+
+				'redpurple',
+				'viridis',
+				'plasma',
+
+				'coolwarm',
+				'greyred',
+				'spectral',
+
+				'rainbowjet',
+				'turbo',
+				'rainbowcie'
+			];
+
+			var A = ['blues', 'purples', 'reds'];
+			var B = ['redpurple','viridis','plasma'];
+			var C = ['coolwarm', 'greyred','spectral'];
+			var D = ['rainbowjet', 'turbo', 'rainbowcie'];
+
+			var outs = [];
+			for (var a=0; a<A.length; a++)
+			{
+				var roundA = [A[a]];
+				for (var b=0; b<B.length; b++)
+				{
+					var roundB = roundA.slice(); roundB.push(B[b]);
+					for (var c=0; c<C.length; c++)
+					{
+						var roundC = roundB.slice(); roundC.push(C[c]);
+						for (var d=0; d<D.length; d++)
+						{
+							var roundD = roundC.slice(); roundD.push(D[d]);
+							outs.push(roundD);
+						}
+					}
+				}
+			}
+
+			var indices = [];
+			console.log('condition');
+			for (var i=0; i<outs.length; i++)
+			{
+				var I=[];
+				for (var k=0; k<outs[i].length; k++)
+				{
+					var c = outs[i][k]
+					for (var j=0; j<COLORSCALES.length; j++)
+					{
+						if (c == COLORSCALES[j])
+						{
+							var str = String.fromCharCode('a'.charCodeAt(0)+j);
+							I.push(str);
+							break;
+						}
+					}
+				}
+				indices.push(I);
+				console.log(I[0] + I[1] + I[2] + I[3]);
+			}
+
+			return indices;
+
+		}
+
+		function countInstance(ar, instance)
+		{
+			var count=0;
+			for (var i=0; i<ar.length; i++)
+			{
+				var v = ar[i];
+				for (var j=0; j<v.length; j++) {
+					if (v[j]==instance) count++;
+				}
+			}
+			return count;
+		}
 		/*
 		function switchModelType()
 		{
