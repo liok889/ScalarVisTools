@@ -302,6 +302,8 @@
 						finish();
 						return true;
 					}
+					block = blocks[blockNum];
+
 				}
 				else {
 					trialNum++;
@@ -580,10 +582,65 @@
 			setTimeout(flashTimeout, FLASH_RATE);
 		}
 
+		function checkData()
+		{
+			var b = 0; t=0; tMap = {};
+			for (var i=0; i<csv.length; i++)
+			{
+				var record = csv[i];
+				if (typeof record.requestedDistance == 'object')
+				{
+					console.log("[" + i + "]: expD: " + record.requestedDistance);
+				}
+				else
+				{
+					var d = Math.abs(record.distance - record.requestedDistance)
+					if (d > LINEUP_TOLERANCE) {
+						console.log("[" + i + "]: gap exceeds limit. expD: " + record.requestedDistance + ", gap: " + Math.abs(record.distance - record.requestedDistance));
+					
+					}
+					
+					// test and compare against the block seeds
+					var seq = blocks[b].trialSequence;
+					while (seq[t]=='e') 
+					{
+						// skip over engagement checks
+						t++;
+					}
+					
+					if (seq[t].expectation != record.requestedDistance)
+					{
+						console.log("[" + i + "]: inconsistent, seq: " + seq[t].expectation + ', data: ' + record.requestedDistance);
+					}
+
+					var strMap = "" + record.requestedDistance;
+					var rMap = tMap[strMap];
+					if (!rMap) 
+					{
+						tMap[strMap] = 1;
+					}
+					else
+					{
+						tMap[strMap] = rMap + 1;
+					}
+					record.trialNum = tMap[strMap];
+				}
+
+				t++;
+				if (t >= blocks[b].trialSequence.length) 
+				{
+					b++; 
+					t=0; 
+					tMap = {};
+				}
+			}
+		}
+
 		function sendData(TRIALS, callback)
 		{
 			var blockCount = blocks.length;
 
+			checkData();
 			var data2send = JSON.stringify(
 			{
 				experimentalData: csv,

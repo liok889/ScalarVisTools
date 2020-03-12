@@ -134,6 +134,8 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
     var distance = null;
     var iterations = 0;
     
+    this.answer = null;
+  
     for (var round=0; !converged && round<LINEUP_MAX_ROUNDS; round++)
     {
         for (var trial=0; !converged && trial<LINEUP_MAX_TRIAL; trial++, iterations++)
@@ -143,6 +145,7 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
 
             if (!expectation) 
             {
+                console.log("no expectaiton. Converged");
                 converged = true;
             }
             else
@@ -165,8 +168,9 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
     }
 
 
-    console.log("[" + iterations + "]: requested: " + expectation + ", got: " + distance);
+    //console.log("[" + iterations + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;
+    this.curExpectation = expectation;
     this.converged = converged;
     this.iterations = iterations;
 
@@ -175,4 +179,8 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
 
 LineupExperiment.prototype.getCurDistance = function() {
     return this.curDistance;
+}
+
+LineupExperiment.prototype.getCurExpectation = function() {
+    return this.curExpectation;
 }
