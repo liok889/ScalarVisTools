@@ -77,13 +77,16 @@ ScalarSample.prototype.setSamplingFidelity = function(fidelity)
     this.localN = fidelity;
 }
 
-ScalarSample.prototype.sampleModel = function(_fidelity)
+ScalarSample.prototype.sampleModel = function(_fidelity, model)
 {
     var fidelity = !isNaN(_fidelity) ? _fidelity : this.localN;
     if (!fidelity || isNaN(fidelity)) {
         fidelity = N;
     }
-    this.model.sampleModel(fidelity, this.field);
+    if (!model) {
+        model = this.model;
+    }
+    model.sampleModel(fidelity, this.field);
 }
 
 ScalarSample.prototype.sampleAndVis = function()

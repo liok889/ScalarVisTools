@@ -1,4 +1,4 @@
-function LineupExperiment(w, h, _lineupN, gMain, gDecoy)
+function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption)
 {
     // width / height of the model
     this.w = w;
@@ -14,9 +14,10 @@ function LineupExperiment(w, h, _lineupN, gMain, gDecoy)
 
     // lineup
     this.lineupN = _lineupN;
-    this.lineup = new Lineup(w, h, _lineupN, this.main, this.decoy);
+    this.lineup = new Lineup(w, h, _lineupN, this.main, this.decoy, nullOption);
 
     this.canMakeSelection = false;
+    this.nullOption = nullOption;
 }
 
 LineupExperiment.prototype.enableSelection = function(t) {
@@ -65,19 +66,29 @@ LineupExperiment.prototype.getAnswer = function() {
 
 LineupExperiment.prototype.highlightCorrect = function(show)
 {
-    var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
     this.domSelection.selectAll('td').style('background-color', null);
-    d3.select(td)
-        .style('background-color', show ? '#aaaaaa' : null);
+    d3.select('div.nullOption').style('border', 'solid 1px black');
 
+    var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
+    if (this.trialHasDecoy) {
+
+        d3.select(td)
+            .style('background-color', show ? '#aaaaaa' : null);
+    }
+    else
+    {
+        d3.select('div.nullOption')
+            .style('border', show ? 'solid 10px #aaaaaa' : 'solid 1px black');
+    }
     // 00cc66
 }
-LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
+LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDecoy)
 {
     var SEL_BORDER = "#ff623b"//"solid 4px #fcbd00";
 
     // new lineup
-    this.lineup.sample(fidelity);
+    this.trialHasDecoy = noDecoy ? false : true;
+    this.lineup.sample(fidelity, noDecoy);
     this.lineup.layoutCanvases(domSelection);
     this.domSelection = domSelection;
 
@@ -86,7 +97,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
     domSelection.selectAll('td').style('background-color', null);
 
     // setup callbacks
-    (function(lineup, dom)
+    (function(lineup, dom, noDecoy)
     {
         dom.selectAll('canvas').on('click', function()
         {
@@ -95,15 +106,28 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
             {
                 //dom.style('border', null);
                 dom.selectAll('td').style('background-color', null);
+                dom.selectAll('div.nullOption').style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
             lineup.answer = "0";
             lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         });
-    })(this, domSelection);
+        
+        dom.selectAll('div.nullOption').on('click', function()
+        {
+            if (noDecoy && lineup.correct) lineup.correct();
+            else if (!noDecoy && lineup.incorrect) lineup.incorrect();
+
+            lineup.answer = noDecoy ? '1' : '0';
+            d3.select(this).style('border', 'solid 10px ' + SEL_BORDER)
+            dom.selectAll('td').style('background-color', null);
+            lineup.canvasIndex = '98';
+        });
+
+    })(this, domSelection, noDecoy);
 
 
-    (function(lineup, dom, lineupN)
+    (function(lineup, dom, noDecoy)
     {
         d3.select('#sample' + (lineup.lineupN-1)).on('click', function()
         {
@@ -111,12 +135,13 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection)
             if (lineup.canMakeSelection)
             {
                 dom.selectAll('td').style('background-color', null);
+                dom.selectAll('div.nullOption').style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
-            lineup.answer = "1";
+            lineup.answer = noDecoy ? '0' : '1';
             lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         })
-    })(this, domSelection);
+    })(this, domSelection, noDecoy);
 }
 
 // generates a lineup with an expected distance between the main and the decoy
