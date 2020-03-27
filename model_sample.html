@@ -255,7 +255,7 @@
 
 		function toggleHighlightDecoy() {
 			var check = d3.select("#checkDecoy").node().checked;
-			d3.select("#sample" + (lineupN-1))
+			d3.select("#sample" + (LINEUP_N-1))
 				.style("border", check ? 'solid 3px red' : null);
 		}
 
@@ -327,7 +327,7 @@
 			});
 
 			// sliders
-			$('#sliderN').slider({ step: 10, min: 300, max: goodN/10, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
+			$('#sliderN').slider({ step: 10, min: 300, max: goodN/6, value: N, change: refreshStimulus, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
 
 			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
 			//$('#sliderGSTD').slider({ step: 0.005, min: 0, max: .1, value: S_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGSTD").html(ui.value);} });
@@ -356,27 +356,26 @@
 		function removeX() { lineupExp.getMain().remove('x');  refreshModel();}
 		function removeY() { lineupExp.getMain().remove('y');  refreshModel();}
 
+		var COLORSCALES = [
+			'blues',
+			'purples',
+			'reds',
+
+			'redpurple',
+			'viridis',
+			'plasma',
+
+			'coolwarm',
+			'greyred',
+			'spectral',
+
+			'rainbowjet',
+			'turbo',
+			'rainbowcie'
+		];
 
 		function generateCombinations()
 		{
-			var COLORSCALES = [
-				'blues',
-				'purples',
-				'reds',
-
-				'redpurple',
-				'viridis',
-				'plasma',
-
-				'coolwarm',
-				'greyred',
-				'spectral',
-
-				'rainbowjet',
-				'turbo',
-				'rainbowcie'
-			];
-
 			var A = ['blues', 'purples', 'reds'];
 			var B = ['redpurple','viridis','plasma'];
 			var C = ['coolwarm', 'greyred','spectral'];
@@ -438,6 +437,40 @@
 				}
 			}
 			return count;
+		}
+
+		function sampleColorMaps(samples)
+		{
+			var json = {}, str="ramp,1,2,3,4,5,6,7,8,9\n";
+			for (var i=0; i<COLORSCALES.length; i++)
+			{
+				var row = [];
+				var colorSamples = [];
+				var colormap = getColorPreset(COLORSCALES[i]);
+				row.push(COLORSCALES[i]);
+				str += COLORSCALES[i] + ',';
+				for (var j=0; j<samples; j++)
+				{
+					var c = colormap.mapValue(j/(samples-1));
+					var color = d3.color(c);
+					var hex = color.hex();
+					colorSamples.push(hex);
+					row.push(hex);
+					str += hex;
+					if (j < samples-1) {
+						str += ',';
+					}
+					else {
+						str += '\n';
+					}
+				}
+				json[COLORSCALES[i]] = colorSamples;
+			}
+			d3.select('body').append('pre').html(str);
+			d3.select('body').append('pre').html(JSON.stringify(json, null, 2));
+
+
+			return json;
 		}
 		/*
 		function switchModelType()
