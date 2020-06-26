@@ -10,7 +10,7 @@
   d3.interpolateCubehelix = d3_interpolateCubehelix(1);
   d3.interpolateCubehelix.gamma = d3_interpolateCubehelix;
 
-  function d3_interpolateCubehelix(γ) {
+  function d3_interpolateCubehelix(xx) {
     return function(a, b) {
       a = d3.hsl(a);
       b = d3.hsl(b);
@@ -27,7 +27,7 @@
 
       return function(t) {
         var h = ah + bh * t,
-            l = Math.pow(al + bl * t, γ),
+            l = Math.pow(al + bl * t, xx),
             a = (as + bs * t) * l * (1 - l);
         return "#"
             + hex(l + a * (-0.14861 * Math.cos(h) + 1.78277 * Math.sin(h)))
