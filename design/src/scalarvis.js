@@ -33,6 +33,13 @@ function ScalarVis(field, canvas, colormap)
     ALL_SCALAR_VIS.push(this);
 }
 
+ScalarVis.prototype.setContour = function(contour)
+{
+    var visUniforms = this.visualizer.getUniforms('vis', 0);
+    visUniforms.contour.value = contour;
+    this.vis();
+}
+
 ScalarVis.setUniversalColormap = function(colormap) {
     for (var i=0; i<ALL_SCALAR_VIS.length; i++)
     {

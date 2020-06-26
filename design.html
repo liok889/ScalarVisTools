@@ -384,7 +384,18 @@
 			d3.select("#threeDCanvas").node()
 		);
 
-		// create color ramp
+		// create color ramp (by default, from a rainbow variant)
+		var preset = getColorPreset('rainbowjet')
+		var colors = [];
+		for (var i=0, len=20; i<len; i++) {
+			var c = preset.mapValue(i/(len-1));
+			colors.push({
+				value: i/(len-1),
+				lab: d3.lab(c)
+			});
+		}
+
+
 		var ramp = new ColorRamp(null, d3.select("#svgColorRamp"), picker);
 		ramp.registerCallback('update', function() {
 			visualizeScalarField(field);
