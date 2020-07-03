@@ -114,7 +114,13 @@
 		</svg>
 
 
+		<!-- training labels -->
+		<img id="upArrow" style="position: absolute; top: 70px; left: 530px; visibility: hidden" src="up.png" width="50" height="50">
+		<img id="downArrow" style="position: absolute; top: 70px; left: 530px; visibility: hidden" src="down.png" width="50" height="50">
 
+		<div id="trainingLabel" style="visibility: hidden; position: absolute; top: 80px; left: 580px; font-size: 17px">go down</div>
+
+		<!-- color scales -->
 		<canvas width="50" height="290" id="colorScaleCanvas" style="pointer-events: none"></canvas>
 		<svg width="130" height="310" id="colorScaleSVG"></svg>
 		<button style="visibility: hidden" id="submitButton">Submit</button>
@@ -123,7 +129,10 @@
 
 	<script>
 
+		var TRAINING = true;
+		var TRAINING_TOLERANCE = 0.04 * .75;
 		var COLORMAP_PADDING = 0.1;
+
 		var BLOCK_SEED = [
 			{
 				colormap: 'cubehelix',
@@ -152,7 +161,7 @@
 				colormap: 'viridis'
 			}
 		];
-		var VALUES_IN_BLOCK = 2;
+		var VALUES_IN_BLOCK = 5;
 		var TRIALS_PER_VALUE = 1;
 		var blocks = [];
 

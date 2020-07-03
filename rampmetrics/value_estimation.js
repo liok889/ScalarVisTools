@@ -190,6 +190,18 @@ ValueEstimation.prototype.getCurColormap = function()
 
 ValueEstimation.prototype.nextTrial = function()
 {
+	if (TRAINING) {
+		d3.select("#trainingLabel")
+			.html('')
+			.style('visibility', 'hidden');
+
+
+		d3.select('#downArrow')
+			.style('visibility', 'hidden');
+		d3.select('#upArrow')
+			.style('visibility', 'hidden');
+	}
+
 	if (this.finished) {
 		return true;
 	}
@@ -366,12 +378,14 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 
 			// add to data
 			data.push({
-				block: b+1,
-				trial: t+1,
+				blockNum: b+1,
+				trialNum: t+1,
 				rep: vRecord.reps,
-				stimulusNo: stimulusNo,
-				requested: trial.value,
+				stimulusNum: stimulusNo,
+				requestedValue: trial.value,
+				value: trial.valueAtLocation,
 				response: trial.response,
+				responseTime: trial.responseTime,
 				error: trial.responseDiff,
 				absError: Math.abs(trial.responseDiff),
 				colormap: block.colormap,
@@ -393,7 +407,7 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 		stimulusAccuracy: actualCorrect / this.totalTrials
 	});
 
-	var DATA_URL = "store_data.php";
+	var DATA_URL = "php/store_data.php";
 
 	(function(experiment, trial, _data2send, _callback) {
 		$.ajax({
@@ -475,10 +489,63 @@ ValueEstimation.prototype.addInputEvents = function()
 				var m = d3.mouse(this);
 				createTriangles(d3.select(this), m);
 
-				d3.select("#submitButton")
-					.style('visibility', null);
 				var n = Math.min(1, Math.max(0, 1-(m[1]-SVG_Y_OFFSET)/scaleCanvasHeight));
 				exp.selectedValue = n;
+
+				if (TRAINING)
+				{
+					var thisTrial = exp.blocks[exp.curBlock].trials[exp.curTrial];
+					var diff = thisTrial.responseDiff = n-thisTrial.value;
+					if (Math.abs(diff) <= TRAINING_TOLERANCE)
+					{
+						d3.select("#trainingLabel")
+							.html('good selection!')
+							.style('visibility', 'visible');
+
+
+						d3.select('#downArrow')
+							.style('visibility', 'hidden');
+						d3.select('#upArrow')
+							.style('visibility', 'hidden');
+						d3.select("#submitButton")
+							.style('visibility', 'visible');
+					}
+					else if (diff > 0)
+					{
+						d3.select("#trainingLabel")
+							.html('go down')
+							.style('visibility', 'visible');
+						d3.select('#downArrow')
+							.style('visibility', 'visible');
+						d3.select('#upArrow')
+							.style('visibility', 'hidden');
+						d3.select("#submitButton")
+							.style('visibility', 'hidden');
+
+
+					}
+					else // diff < 0
+					{
+						d3.select("#trainingLabel")
+							.html('go up')
+							.style('visibility', 'visible');
+						d3.select('#upArrow')
+							.style('visibility', 'visible');
+						d3.select('#downArrow')
+							.style('visibility', 'hidden');
+
+						d3.select("#submitButton")
+							.style('visibility', 'hidden');
+
+					}
+
+				}
+				else
+				{
+					d3.select("#submitButton")
+						.style('visibility', null);
+				}
+
 
 			})
 			.on('mousemove', function() 
@@ -493,6 +560,55 @@ ValueEstimation.prototype.addInputEvents = function()
 					createTriangles(d3.select(this), m);
 					var n = Math.min(1, Math.max(0, 1-(m[1]-SVG_Y_OFFSET)/scaleCanvasHeight));
 					exp.selectedValue = n;
+
+					if (TRAINING)
+					{
+						var thisTrial = exp.blocks[exp.curBlock].trials[exp.curTrial];
+						var diff = thisTrial.responseDiff = n-thisTrial.value;
+						if (Math.abs(diff) <= TRAINING_TOLERANCE)
+						{
+							d3.select("#trainingLabel")
+								.html('good selection!')
+								.style('visibility', 'visible');
+
+
+							d3.select('#downArrow')
+								.style('visibility', 'hidden');
+							d3.select('#upArrow')
+								.style('visibility', 'hidden');
+							d3.select("#submitButton")
+								.style('visibility', 'visible');
+						}
+						else if (diff > 0)
+						{
+							d3.select("#trainingLabel")
+								.html('go down')
+								.style('visibility', 'visible');
+							d3.select('#downArrow')
+								.style('visibility', 'visible');
+							d3.select('#upArrow')
+								.style('visibility', 'hidden');
+							d3.select("#submitButton")
+								.style('visibility', 'hidden');
+
+
+						}
+						else // diff < 0
+						{
+							d3.select("#trainingLabel")
+								.html('go up')
+								.style('visibility', 'visible');
+							d3.select('#upArrow')
+								.style('visibility', 'visible');
+							d3.select('#downArrow')
+								.style('visibility', 'hidden');
+
+							d3.select("#submitButton")
+								.style('visibility', 'hidden');
+
+						}
+
+					}
 				}
 
 				// test if we're within canvas boundary
@@ -543,10 +659,16 @@ ValueEstimation.prototype.addInputEvents = function()
 					d3.select(exp.canvas).style('visibility', 'hidden');
 					d3.select('#crosshair').style('visibility', 'hidden');
 					d3.select("#prompt").html("Experiment complete. Saving data...");
-
-					exp.sendData(function(status) {
-						d3.select("#prompt").html('send status: ' + status);
-					});
+					if (TRAINING)
+					{
+						window.location.href = "debrief.html";
+					}
+					else
+					{
+						exp.sendData(function(status) {
+							d3.select("#prompt").html('send status: ' + status);
+						});
+					}
 
 				}
 			})
