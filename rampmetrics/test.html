@@ -174,7 +174,29 @@
 					count++;
 				}
 			}
-			return distances/count;
+			return (distances / count);
+		}
+
+		function computeNameVariationAtValue(v, _colormap)
+		{
+			var cMap = _colormap ? getColorPreset(_colormap) : colormap;
+			var localNVar = 0, samples = 0, localLabDiff = 0;
+			for (var k=0, s=STEP_START; k<STEP_SAMPLES; s+= STEP_S, samples++, k++)
+			{
+				var l = (STEP - STEP_START) * (k/(STEP_SAMPLES-1)) + STEP_START;
+				s = l;
+				var n = v;
+				var c0= cMap.mapValue(n);
+				var c_1 = cMap.mapValue(n-s);
+				var c_2 = cMap.mapValue(n+s);
+
+				var l0 = d3.lab(c0);
+				var l1 = d3.lab(c_1);
+				var l2 = d3.lab(c_2);
+
+				localNVar += getLocalNameVariation([c_1, c0, c_2]);
+			}
+			return localNVar / samples;
 		}
 
 		function getLocalNameVariation(rampSample)
@@ -211,6 +233,7 @@
 				allRamps[i].LABLength = getLABLength(samples);
 
 				var nameUniqueness = getNameUniqueness(samples)
+				console.log("name uniqueness: " + allRamps[i].name + ", " + nameUniqueness + ', bands: ' + samples.colors.length);
 				allRamps[i].nameUniqueness = nameUniqueness;
 			}
 			return allRamps;
@@ -351,14 +374,20 @@
 				.enter().append('text')
 				.attr('x', function(d) { return xLogScale(d.LABLength)+5; })
 				.attr('y', function(d) { return yScale(d.maxNameLength); })
-				.html(function(d) { return d.name})
+				.html(function(d) { 
+					console.log("maxNLength: (" + d.name + "): " + d.maxNameLength + ', ' + d.nameUniqueness);
+
+					return d.name
+				})
 				.style('fill', "#aaaaaa")
 				.style('font-size', '10px')
 
 			g.append('text.lab')
 				.attr('y',CHART_H+40)
 				.attr('x', CHART_W/2)
-				.html('log LAB length')
+				.html('log LAB length');
+
+
 		}
 
 		function plotNameVariationUniqueness(allRamps)
@@ -544,7 +573,8 @@
 
 					// compute name variation
 					localLabDiff += labDiff;
-					localNVar = Math.max(localNVar, getLocalNameVariation([c_1, c0, c_2]));
+					localNVar += getLocalNameVariation([c_1, c0, c_2]);
+						//= Math.max(localNVar, getLocalNameVariation([c_1, c0, c_2]));
 				}
 				console.log("samples: " + samples);
 				localNVar /= samples;
