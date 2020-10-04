@@ -27,8 +27,11 @@
 	<style>
 		.county {
 			fill: none;
-			stroke: black;
-			stroke-width: 0.5px;
+			stroke: none;
+			stroke-width: 0.0px;
+		}
+		.choroplethBin {
+
 		}
 	</style>
 </head>
@@ -37,86 +40,69 @@
 
 	<canvas width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
 	</canvas>	
-	<svg width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	<svg id="svgChoropleth" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
 	</svg>
+
+
+	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 2px black"></canvas>
+
+	<svg id="svgModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 2px black"></svg>
+
 
 <script>
 
-	function SVGPathParser(pathToParse)
-	{
-		var length = {a: 7, c: 6, h: 1, l: 2, m: 2, q: 4, s: 4, t: 2, v: 1, z: 0}
-
-		var segment = /([astvzqmhlc])([^astvzqmhlc]*)/ig
-
-		/**
-		 * parse an svg path data string. Generates an Array
-		 * of commands where each command is an Array of the
-		 * form `[command, arg1, arg2, ...]`
-		 *
-		 * @param {String} path
-		 * @return {Array}
-		 */
-
-		function parse(path) {
-			var data = []
-			path.replace(segment, function(_, command, args){
-				var type = command.toLowerCase()
-				args = parseValues(args)
-
-				// overloaded moveTo
-				if (type == 'm' && args.length > 2) {
-					data.push([command].concat(args.splice(0, 2)))
-					type = 'l'
-					command = command == 'm' ? 'l' : 'L'
-				}
-
-				while (true) {
-					if (args.length == length[type]) {
-						args.unshift(command)
-						return data.push(args)
-					}
-					if (args.length < length[type]) throw new Error('malformed path data')
-					data.push([command].concat(args.splice(0, length[type])))
-				}
-			})
-			return data
-		}
-
-		var number = /-?[0-9]*\.?[0-9]+(?:e[-+]?\d+)?/ig
-
-		function parseValues(args) {
-			var numbers = args.match(number)
-			return numbers ? numbers.map(Number) : []
-		}
-		var stream = parse(pathToParse);
-		var polygons = [], curPolygon = [];
-		for (var i=0; i<stream.length; i++) {
-			v = stream[i];
-			if (v[0] == 'Z') {
-				if (curPolygon.length >= 3) {
-					polygons.push(curPolygon);
-				}
-				curPolygon = [];
-			}
-			else {
-				curPolygon.push({x: v[1], y: v[2]});
-			}
-		}
-		return polygons;
-	}
-
+	
 </script>
 	<script type="text/javascript">
 
 		var WIDTH = 350;
 		var HEIGHT = 250;
+		var ITER = 50000*5;
+		var N = ITER * 3;
 
 		var theCounties = null;
 		var theStates = null;
-		var theProjection = null;
+		var theProjection = null, thePath = null;
+
+		var testModel, field = new ScalarField(WIDTH, HEIGHT), colormap = null;
+		var discreteMap = null, scalarSample = null;
 
 		d3.json("lineup/maps/us.json").then(drawChoropleth);
 
+		function changeColormap(_colormapName) {
+			colormap = getColorPreset(_colormapName);
+			ScalarSample.setUniversalColormap(colormap);
+
+		}
+		function sampleModel()
+		{
+			if (!colormap) {
+				colormap = getColorPreset('rainbowjet');
+			}
+			testModel.sampleModel(ITER, field);
+			discreteMap.plotChoropleth(d3.select('#svgChoropleth'), colormap);
+
+			if (!scalarSample) {
+				scalarSample = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasModel").node(), testModel, colormap);
+				scalarSample.setSamplingFidelity(N);
+				scalarSample.sampleAndVis();
+			}
+		}
+		function initModel()
+		{
+			d3.json('lineup/maps/us_countymap.json').then(function(data) {
+				discreteMap = new DiscreteMap(data);
+				testModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgModel'), discreteMap);
+				testModel.init();
+				sampleModel();
+
+
+				testModel.addCallback(function() {
+					sampleModel();
+				});
+			});
+			
+		}
 
 		// filter out Alaska, Hawaii, and Puerto Rico	
 		function filterStates(d) 
@@ -172,20 +158,19 @@
 			var path = d3.geoPath()
 				.projection(projection);
 			theProjection = projection;
+			thePath = path;
 
-			console.log("appending...")
 			var svg = d3.select('svg');
 			var countyShapes = svg.selectAll(".county")
 				.data(theCounties.features)
 				.enter()
 				.append("path")
-					.attr("class", "county")
+					.attr("class", "county choroplethBin")
 					.attr("d", path)
 					.attr('id', function(d) {
-						return "county_" + d.id;
+						return "c" + d.id;
 					});
-			console.log("done appending");
-
+			initModel();
 
 
 		}
@@ -193,17 +178,58 @@
 		var pix2County = null;
 		var countyMap = null;
 
+		var binColors = {};
+		function lookupColor(id)
+		{
+			var c = binColors[id];
+			if (!c) {
+				c = [ 
+					Math.floor(Math.random() * 256),
+					Math.floor(Math.random() * 256),
+					Math.floor(Math.random() * 256)
+				];
+				binColors[id] = c;
+			}
+			return c;
+		}
+
+		function findCounty(id) 
+		{
+			var res = [];
+			for (var i=0; i<theCounties.features.length; i++) {
+				var c = theCounties.features[i];
+				if (c.id == id) {
+					res.push(c);
+				}
+			}
+			return res;
+		}
+		function countyArea(id) 
+		{
+			var features = findCounty(id);
+			if (features.length > 0) {
+				var area = 0;
+				for (var i=0; i<features.length; i++)
+				{
+					area += thePath.area(features[i]);
+				}
+				return area;
+			}
+			else {
+				return null;
+			}
+		}
+
 		function testContainment()
 		{
 			var canvas = d3.select('canvas');
-			var width = +canvas.attr('width');
-			var height = +canvas.attr('height');
+			var width = WIDTH;
+			var height = HEIGHT;
 			var totalPixels = width * height;
 			var curPixel = 0;
 
 			var mapSize = width * height * Int32Array.BYTES_PER_ELEMENT;
 			pix2County = new Int32Array(new ArrayBuffer(mapSize));
-
 
 			var counties = theCounties;
 			var context = canvas.node().getContext('2d');
@@ -221,6 +247,7 @@
 				{
 					var K = (r*width + c);
 					var I = K * 4;
+
 					pixels[I] = 255;
 					pixels[I+1] = 255;
 					pixels[I+2] = 255;
@@ -233,19 +260,18 @@
 					{
 						if (d3.geoContains(lastHit, theP)) {
 							inCount++;
-							pixels[I] = 255;
-							pixels[I+1] = 0;
-							pixels[I+2] = 0;
+							var color = lookupColor(lastHit.id);
+							pixels[I] = color[0];
+							pixels[I+1] = color[1];
+							pixels[I+2] = color[2];
 							pixels[I+3] = 255;
 							pix2County[K] = lastHit.id;
 							continue;
 						}
 					}
-					else {
-						lastHit = null;
-					}
-
-					for (var county = 0, len=counties.features.length; county < len; county++)
+					
+					// search all counties
+					for (var county = 0, clen=counties.features.length; county < clen; county++)
 					{
 						var theC = counties.features[county];
 						var test = d3.geoContains(theC, theP);
@@ -259,19 +285,21 @@
 						if (test) 
 						{
 							inCount++;
-							pixels[I] = 255;
-							pixels[I+1] = 0;
-							pixels[I+2] = 0;
+							var color = lookupColor(theC.id);
+
+							pixels[I] = color[0];
+							pixels[I+1] = color[1];
+							pixels[I+2] = color[2];
 							pixels[I+3] = 255;
 							lastHit = theC;
 							pix2County[K] = lastHit.id;
 							break;
 						}
-
-
 					}
+					
 				}
 			}
+
 			context.putImageData(imgd, 0, 0);
 			console.log("inCount: " + inCount);
 
@@ -279,7 +307,7 @@
 			var buffer = [], binMap = {}, listOfBins = [];
 			for (var i=0, len=pix2County.length; i<len; i++) 
 			{
-				var bin = pix2County[i]
+				var bin = pix2County[i];
 				buffer.push(bin);
 				if (bin > 0) {
 					if (!binMap[bin]) {
@@ -290,14 +318,31 @@
 			}
 
 			// sort list of bins
-			listOfBins.sort(function(a,b) { return a-b });
+			listOfBins.sort(function(a,b) { return a-b; });
+
+			// compute areas
+			var areas = {}, minArea = Number.MAX_VALUE, maxArea = Number.MIN_VALUE;
+			for (var i=0; i<listOfBins.length; i++)
+			{
+				var id = listOfBins[i];
+				var a = countyArea(id);
+				areas[id] = a;
+				minArea = Math.min(minArea, a);
+				maxArea = Math.max(maxArea, a);
+			};
 
 			countyMap = {
 				width: width,
 				height: height,
 				pixelMap: buffer,
 				listOfBins: listOfBins,
+				areas: areas,
+				minArea: minArea,
+				maxArea: maxArea
 			};
+
+			// add a lookup function by mouseover
+			
 		}
 
 console.save = function(data, filename){

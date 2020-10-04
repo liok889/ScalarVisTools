@@ -695,7 +695,7 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
 
         // convert to row, column coordinate
         var C = I % w;
-        var R = Math.floor(I/h);
+        var R = Math.floor(I/w);
 
         // find splat boundary
 

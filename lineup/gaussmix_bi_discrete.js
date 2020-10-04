@@ -6,12 +6,36 @@ function DiscreteMap(mapData)
 
 	this.pixelMap = mapData.pixelMap;
 	this.listOfBins = mapData.listOfBins;
+	this.areas = mapData.areas;
+	this.minArea = mapData.minArea;
+	this.maxArea = mapData.maxArea;
 
 	this.binMap = {};
-	for (var i=0; i<this.listOfBins.length; i++) 
+	this.zeroBinMap();
+
+	// adjust the area for some outliers
+	/*
+	this.areas[55003] *= Math.pow(2, 5);
+	this.areas[26029] *= Math.pow(2, 5);
+	this.areas[26061] *= Math.pow(2, 5);
+	*/
+
+	// set min area
+	/*
+	var MIN_AREA = 20;
+	
+	for (var i=0; i < this.listOfBins.length; i++) 
 	{
-		this.binMap[i] = 0.0;
+		var bin = this.listOfBins[i];
+		if (this.areas[bin] > 0 && this.areas[bin] < 2)
+		{
+			//this.areas[bin] = MIN_AREA;
+			this.areas[bin] = Math.pow(2, 5);
+			this.minArea = Math.min(this.minArea, this.areas[bin]);
+			this.maxArea = Math.max(this.maxArea, this.areas[bin]);
+		}
 	}
+	*/
 }
 
 DiscreteMap.prototype.zeroBinMap = function() 
@@ -21,7 +45,8 @@ DiscreteMap.prototype.zeroBinMap = function()
 
 	for (var i=0, len=listOfBins.length; i<len; i++) 
 	{
-		binMap[i] = 0.0;
+		var I = listOfBins[i];
+		binMap[I] = 0.0;
 	}
 }
 
@@ -30,25 +55,76 @@ DiscreteMap.prototype.normalize = function()
 	var listOfBins = this.listOfBins;
 	var binMap = this.binMap;
 	var maxDensity = 0.0;
+	var areaSpan = this.maxArea - this.minArea;
 
 	for (var i=0, len=listOfBins.length; i<len; i++) 
 	{
-		maxDensity = Math.max(maxDensity, binMap[i]);
+		var I = listOfBins[i];
+		var areaRatio = this.areas[I]/this.maxArea;
+		//binMap[I] *= Math.pow(1/areaRatio,1/1.3);
+		binMap[I] *= 1/Math.pow(this.areas[I], 1/1.2);
+		
+		//var areaRatio = 1-((this.areas[I]-this.minArea) / areaSpan);
+
+		//var areaRatio = Math.pow((this.areas[I]-this.minArea) / areaSpan,1/2);
+		//binMap[I] *= 1/areaRatio;
+		maxDensity = Math.max(maxDensity, binMap[I]);
 	}
 
 	if (maxDensity > 0) 
 	{
-		var k = 1/maxDensity;
+		var k = 1 / maxDensity;
 		for (var i=0, len=listOfBins.length; i<len; i++) 
 		{
-			binMap[i] * k;
+			var I = listOfBins[i];
+			binMap[I] *= k;
 		}
 	}
 }
 
+DiscreteMap.prototype.plotChoropleth = function(_svg, _colormap)
+{
+	(function(svg, bins, binMap, pixelMap, colormap) 
+	{
+		/*
+		// test whether the map is correct
+		d3.select('#svgChoropleth')
+			.on('mousemove', function() {
+				var m = d3.mouse(this);
+				if (true) {
+					var id = pixelMap[m[0] + m[1]*WIDTH];
+					if (id)
+					{
+						d3.select("#c" + id).style('fill', 'white');
+					}
+				}
+			});
+		*/
+
+		svg.selectAll('.choroplethBin')
+			.each(function() 
+			{
+				var me = d3.select(this);
+				var id = me.attr('id').substr(1);
+				var element = binMap[id];
+				if (element === null || element === undefined) {
+					element = binMap[+id];
+				}
+				if (element != null && element != undefined) {
+					var color = colormap.mapValue(element);
+					me.style('fill', color);
+				}
+				else
+				{
+					var t=4;
+				}
+			});
+	})(_svg, this.listOfBins, this.binMap, this.pixelMap, _colormap)
+}
+
 function GaussMixBiDiscrete(w, h, svg, discreteMap)
 {
-	GaussMixBivariate.call(w, h, svg)
+	GaussMixBivariate.call(this, w, h, svg)
 	this.discreteMap = discreteMap;
 
 	// make sure the size of the discreteMap matches up
@@ -58,6 +134,8 @@ function GaussMixBiDiscrete(w, h, svg, discreteMap)
 	}
 }
 
+GaussMixBiDiscrete.prototype = Object.create(GaussMixBivariate.prototype);
+
 
 GaussMixBiDiscrete.prototype.computeCDFs = function()
 {
@@ -65,7 +143,7 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
     var h = this.h;
     var models = this.models;
     var mCount = models.length;
-    var theMap = this.discreteMap.theMap;
+    var pixelMap = this.discreteMap.pixelMap;
 
     // compute PDF / CDF
     var cummDensity = 0, maxDensity = 0, minDensity=Number.MAX_VALUE;
@@ -85,7 +163,7 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
 
             // evaluate density of all models
             var P=0;
-            if (theMap[I] > 0) {
+            if (pixelMap[I] > 0) {
 
 	            for (var m=0; m<mCount; m++)
 	            {
@@ -157,7 +235,7 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 
         // convert to row, column coordinate
         var C = I % w;
-        var R = Math.floor(I/h);
+        var R = Math.floor(I/w);
 
         // find splat boundary
 
@@ -192,7 +270,15 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
                 }
             }
         }
-
+        
+        /*
+        var bin = pixelMap[ R*w + C ];
+        if (bin > 0) {
+        	var p = cdf[R*w + C];
+        	view[R*w + C] += p;
+        	binMap[bin] += p
+        }
+        */
     }
 
     // normalize discrete map / field

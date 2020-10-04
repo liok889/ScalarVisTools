@@ -35,6 +35,9 @@ function ScalarSample(w, h, canvas, model, colormap)
     if (!colormap) {
         this.field.setColorMap(getColorPreset('viridis'));
     }
+    else {
+        this.field.setColorMap(colormap);
+    }
     ALL_SAMPLERS.push(this);
 }
 
