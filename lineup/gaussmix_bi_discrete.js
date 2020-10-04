@@ -36,6 +36,20 @@ function DiscreteMap(mapData)
 		}
 	}
 	*/
+
+	// scan
+	this.minArea = Number.MAX_VALUE;
+	this.maxArea = Number.MIN_VALUE;
+
+	for (var i=0; i< this.listOfBins.length; i++)
+	{
+		var bin = this.listOfBins[i]
+		var a = this.areas[bin];
+		if (a > 0) {
+			this.minArea = Math.min(a, this.minArea);
+			this.maxArea = Math.max(a, this.maxArea);
+		}
+	}
 }
 
 DiscreteMap.prototype.zeroBinMap = function() 
@@ -60,9 +74,16 @@ DiscreteMap.prototype.normalize = function()
 	for (var i=0, len=listOfBins.length; i<len; i++) 
 	{
 		var I = listOfBins[i];
+		var area = this.areas[I];
 		var areaRatio = this.areas[I]/this.maxArea;
-		//binMap[I] *= Math.pow(1/areaRatio,1/1.3);
-		binMap[I] *= 1/Math.pow(this.areas[I], 1/1.2);
+		
+		var areaN = (area - this.minArea) / (this.maxArea-this.minArea);
+		var P = 0.002 + areaN*(1-0.002*2);
+		//binMap[I] *= Math.pow(1-P, 1)
+		//Math.pow(1-(P, 1), 1);
+
+		//binMap[I] *= Math.pow(1/areaRatio,1/1.1);
+		binMap[I] *= 1/Math.pow(this.areas[I], 1/1.1);
 		
 		//var areaRatio = 1-((this.areas[I]-this.minArea) / areaSpan);
 
