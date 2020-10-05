@@ -1,3 +1,6 @@
+// empty cell
+var SCALAR_EMPTY = -99.0;
+
 if (!ArrayBuffer.prototype.slice)
 	ArrayBuffer.prototype.slice = function (start, end) {
 	var that = new Uint8Array(this);
@@ -128,11 +131,24 @@ ScalarField.prototype.duplicate = function()
 	return newScalar;
 }
 
-ScalarField.prototype.zero = function() {
+ScalarField.prototype.zero = function() 
+{
 	for (var i=0, len=this.w*this.h; i<len; i++) {
 		this.view[i] = 0;
 	}
 }
+
+ScalarField.prototype.zeroLeaveEmpty = function() 
+{
+	var view = this.view;
+	for (var i=0, len=this.w*this.h; i<len; i++) 
+	{
+		if (view[i] != SCALAR_EMPTY) {
+			view[i] = 0;
+		}
+	}
+}
+
 
 function lerp(s, e, t) {return s+(e-s)*t;}
 function blerp(c00, c10, c01, c11, tx, ty)
@@ -305,8 +321,10 @@ ScalarField.prototype.getMinMax = function()
 			var R = r * this.w;
 			for (var c=0, cLen=this.getMaskedW(); c<cLen; c++) {
 				var v = view[R + c];
-				m0 = Math.min(m0, v);
-				m1 = Math.max(m1, v);
+				if (v != SCALAR_EMPTY) {
+					m0 = Math.min(m0, v);
+					m1 = Math.max(m1, v);
+				}
 			}
 		}
 
@@ -426,6 +444,7 @@ ScalarField.prototype.flipH = function()
 	}
 }
 
+
 ScalarField.prototype.normalize = function()
 {
 	if (this.w > 0 && this.h > 0)
@@ -441,8 +460,12 @@ ScalarField.prototype.normalize = function()
 			var m1 = minmax[1];
 			var _len = 1.0 / len;
 
-			for (var i=0, len=this.w*this.h; i < len; i++) {
-				view[i] = (view[i]-m0) * _len;
+			for (var i=0, len=this.w*this.h; i < len; i++) 
+			{
+				var v = view[i];
+				if (v != SCALAR_EMPTY) {
+					view[i] = (v-m0) * _len;
+				}
 			}
 
 			this.originalMinMax = [m0, m1];

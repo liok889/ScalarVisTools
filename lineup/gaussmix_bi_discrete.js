@@ -13,30 +13,6 @@ function DiscreteMap(mapData)
 	this.binMap = {};
 	this.zeroBinMap();
 
-	// adjust the area for some outliers
-	/*
-	this.areas[55003] *= Math.pow(2, 5);
-	this.areas[26029] *= Math.pow(2, 5);
-	this.areas[26061] *= Math.pow(2, 5);
-	*/
-
-	// set min area
-	/*
-	var MIN_AREA = 20;
-	
-	for (var i=0; i < this.listOfBins.length; i++) 
-	{
-		var bin = this.listOfBins[i];
-		if (this.areas[bin] > 0 && this.areas[bin] < 2)
-		{
-			//this.areas[bin] = MIN_AREA;
-			this.areas[bin] = Math.pow(2, 5);
-			this.minArea = Math.min(this.minArea, this.areas[bin]);
-			this.maxArea = Math.max(this.maxArea, this.areas[bin]);
-		}
-	}
-	*/
-
 	// scan
 	this.minArea = Number.MAX_VALUE;
 	this.maxArea = Number.MIN_VALUE;
@@ -107,26 +83,11 @@ DiscreteMap.prototype.plotChoropleth = function(_svg, _colormap)
 {
 	(function(svg, bins, binMap, pixelMap, colormap) 
 	{
-		/*
-		// test whether the map is correct
-		d3.select('#svgChoropleth')
-			.on('mousemove', function() {
-				var m = d3.mouse(this);
-				if (true) {
-					var id = pixelMap[m[0] + m[1]*WIDTH];
-					if (id)
-					{
-						d3.select("#c" + id).style('fill', 'white');
-					}
-				}
-			});
-		*/
-
 		svg.selectAll('.choroplethBin')
-			.each(function() 
+			.each(function(d) 
 			{
 				var me = d3.select(this);
-				var id = me.attr('id').substr(1);
+				var id = d.id;
 				var element = binMap[id];
 				if (element === null || element === undefined) {
 					element = binMap[+id];
@@ -143,10 +104,11 @@ DiscreteMap.prototype.plotChoropleth = function(_svg, _colormap)
 	})(_svg, this.listOfBins, this.binMap, this.pixelMap, _colormap)
 }
 
-function GaussMixBiDiscrete(w, h, svg, discreteMap)
+function GaussMixBiDiscrete(w, h, svg, dMapData)
 {
+	this.discreteMap = new DiscreteMap(dMapData);
+
 	GaussMixBivariate.call(this, w, h, svg)
-	this.discreteMap = discreteMap;
 
 	// make sure the size of the discreteMap matches up
 	// with <w, h>
@@ -218,6 +180,9 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
 
 GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 {
+    var pixelMap = this.discreteMap.pixelMap;
+    var pdf = this.pdf.view;
+
     if (this.updateCDFMap) {
         this.computeCDFMap();
     }
@@ -245,8 +210,19 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 
 
     // reset scalar field with zeros
-    _field.zero();
+    //_field.zeroLeaveEmpty();
     var view = _field.view;
+    for (var i=0, len=view.length; i<len; i++) 
+    {
+    	if (pixelMap[i] == 0) 
+    	{
+    		view[i] = SCALAR_EMPTY;
+    	}
+    	else
+    	{
+    		view[i] = 0.0;
+    	}
+    }
 
     // iterate
     for (var i=0; i<iterations; i++)
@@ -308,5 +284,6 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
     _field.normalize();
     _field.updated();
 }
+
 
 

@@ -19,7 +19,8 @@ void main()
 		}
 		else
 		{
-			gl_FragColor = mix(texture2D(colormap, colormapCoord), vec4(1.0), 0.7);
+			gl_FragColor = vec4(1.0);
+			//gl_FragColor = mix(texture2D(colormap, colormapCoord), vec4(1.0), 0.7);
 		}
 	}
 }

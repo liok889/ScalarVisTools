@@ -41,10 +41,15 @@ function ScalarSample(w, h, canvas, model, colormap)
     ALL_SAMPLERS.push(this);
 }
 
+ScalarSample.prototype.setColorMap = function(colormap)
+{
+    this.field.setColorMap(colormap);
+}
+
 ScalarSample.setUniversalColormap = function(colormap) {
     for (var i=0; i<ALL_SAMPLERS.length; i++)
     {
-        ALL_SAMPLERS[i].field.setColorMap(colormap);
+        ALL_SAMPLERS[i].setColorMap(colormap);
 
         // render?
         ALL_SAMPLERS[i].vis();

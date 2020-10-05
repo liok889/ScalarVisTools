@@ -1,4 +1,4 @@
-function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption)
+function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption, mainModel, decoyModel)
 {
     // width / height of the model
     this.w = w;
@@ -7,8 +7,8 @@ function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption)
     // whether to randomly perturb decoy (subjec to perturbation parameters)
     this.perturb = true;
 
-    this.main = new GaussMixBivariate(w, h, gMain);
-    this.decoy = new GaussMixBivariate(w, h, gDecoy);
+    this.main = mainModel ? mainModel : new GaussMixBivariate(w, h, gMain);
+    this.decoy = decoyModel ? decoyModel : new GaussMixBivariate(w, h, gDecoy);
 
     this.randomModel();
 

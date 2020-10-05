@@ -38,70 +38,123 @@
 
 <body>
 
-	<canvas width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
-	</canvas>	
-	<svg id="svgChoropleth" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+
+	<!--
+	<canvas id="containmentTestCanvas" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	</canvas>
+	-->
+
+	<svg id="svgChoroplethTarget" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	</svg>
+	<svg id="svgChoroplethDecoy" width="350" height="250" style="position: absolute; top: 10px; left: 370px; border: solid 1px black">
 	</svg>
 
 
-	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 2px black"></canvas>
 
-	<svg id="svgModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 2px black"></svg>
+	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></canvas>
 
+	<svg id="svgModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></svg>
+
+	<canvas id="canvasDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></canvas>
+
+	<svg id="svgDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></svg>
+
+	<button style="position: absolute; top: 530px; left: 10px" onclick="randomModel()">Random model</button>
 
 <script>
 
-	
 </script>
 	<script type="text/javascript">
 
+		BLUR = false;
 		var WIDTH = 350;
 		var HEIGHT = 250;
-		var ITER = 50000*5;
+		var ITER = 16000*5;
 		var N = ITER * 3;
 
 		var theCounties = null;
 		var theStates = null;
 		var theProjection = null, thePath = null;
 
-		var testModel, field = new ScalarField(WIDTH, HEIGHT), colormap = null;
-		var discreteMap = null, scalarSample = null;
+		var targetModel, fieldTarget = new ScalarField(WIDTH, HEIGHT), colormap = null;
+		var decoyModel, fieldDecoy = new ScalarField(WIDTH, HEIGHT), colormap = null;
 
-		d3.json("lineup/maps/us.json").then(drawChoropleth);
+		var scalarSampleTarget = null, scalarSampleDecoy = null;
 
-		function changeColormap(_colormapName) {
+		d3.json("lineup/maps/us.json").then(function(data) 
+		{
+			drawChoropleth(data, d3.select("#svgChoroplethTarget"));
+			drawChoropleth(data, d3.select("#svgChoroplethDecoy"));
+
+			initModel();
+
+		});
+
+		function changeColormap(_colormapName) 
+		{
 			colormap = getColorPreset(_colormapName);
 			ScalarSample.setUniversalColormap(colormap);
-
 		}
+
+		function randomModel()
+		{
+			targetModel.init();
+			targetModel.copyTo(decoyModel);
+			decoyModel.randomPerturb();
+
+			sampleModel();
+		}
+
+		function initModel()
+		{
+			d3.json('lineup/maps/us_countymap.json').then(function(dMapData) 
+			{
+				// create discrete map and two models (a target and a decoy)
+				targetModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgModel'), dMapData);
+
+				decoyModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgDecoy'), dMapData)
+				
+				// create samplers
+				scalarSampleTarget = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasModel").node(), targetModel, colormap);
+				scalarSampleTarget.setSamplingFidelity(N);
+
+				scalarSampleDecoy = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasDecoy").node(), decoyModel, colormap);
+				scalarSampleDecoy.setSamplingFidelity(N);
+
+				
+   
+				// add a callback
+				targetModel.addCallback(function() {
+					sampleModel();
+				});
+
+				decoyModel.addCallback(function() {
+					sampleModel();
+				});
+
+				// get random target-decoy pairs
+				randomModel();
+			});
+			
+		}
+
 		function sampleModel()
 		{
 			if (!colormap) {
 				colormap = getColorPreset('rainbowjet');
+				//fieldTarget.setColorMap(colormap);
+				//fieldDecoy.setColorMap(colormap);
+				ScalarSample.setUniversalColormap(colormap);
 			}
-			testModel.sampleModel(ITER, field);
-			discreteMap.plotChoropleth(d3.select('#svgChoropleth'), colormap);
+			targetModel.sampleModel(ITER, fieldTarget);
+			decoyModel.sampleModel(ITER, fieldDecoy);
 
-			if (!scalarSample) {
-				scalarSample = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasModel").node(), testModel, colormap);
-				scalarSample.setSamplingFidelity(N);
-				scalarSample.sampleAndVis();
-			}
-		}
-		function initModel()
-		{
-			d3.json('lineup/maps/us_countymap.json').then(function(data) {
-				discreteMap = new DiscreteMap(data);
-				testModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgModel'), discreteMap);
-				testModel.init();
-				sampleModel();
+			targetModel.discreteMap.plotChoropleth(d3.select('#svgChoroplethTarget'), colormap);
+			decoyModel.discreteMap.plotChoropleth(d3.select('#svgChoroplethDecoy'), colormap)
 
 
-				testModel.addCallback(function() {
-					sampleModel();
-				});
-			});
-			
+			scalarSampleTarget.sampleAndVis();
+			scalarSampleDecoy.sampleAndVis();
 		}
 
 		// filter out Alaska, Hawaii, and Puerto Rico	
@@ -131,9 +184,10 @@
 			}
 		}
 
-		function drawChoropleth(us) {
+		function drawChoropleth(us, svg) {
 
 			// simplify the geometry 
+			/*
 			(topojson.presimplify(us));
 
 			var area = 70, simplify = d3.geoTransform({
@@ -141,13 +195,16 @@
 					if (z >= area) this.stream.point(x/2, y/2);
 				}
 			});
+			*/
+
 			var counties = topojson.feature(us, us.objects.counties);
 
 
-			// get list of counties. Also filter out AK, HI, and Puerto Rico (so that we only show)
+			// filter out AK, HI, and Puerto Rico (so that we only show)
 			counties.features = counties.features.filter(filterStates);
-
 			theCounties = counties;
+			
+			// states?
 			//theStates = topojson.feature(us, us.objects.states)
 			//theStates.features = theStates.features.filter(filterStates);
 
@@ -160,19 +217,17 @@
 			theProjection = projection;
 			thePath = path;
 
-			var svg = d3.select('svg');
 			var countyShapes = svg.selectAll(".county")
 				.data(theCounties.features)
 				.enter()
 				.append("path")
 					.attr("class", "county choroplethBin")
 					.attr("d", path)
+					/*
 					.attr('id', function(d) {
 						return "c" + d.id;
 					});
-			initModel();
-
-
+					*/
 		}
 
 		var pix2County = null;
