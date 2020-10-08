@@ -44,7 +44,10 @@
 			for (var i=0; i<SAMPLES; i++) {
 				var c = colormap.mapValue(i/(SAMPLES-1));
 				var cc = d3.color(c);
-				str = str + cc.formatHex() + '; ';
+				str = str + cc.formatHex()
+				if (i < SAMPLES-1) {
+					str += ', ';
+				}
 			}
 			d3.select('#colorsDiv').html(str);
 		}
