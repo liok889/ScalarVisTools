@@ -8,7 +8,10 @@
 	<script src="jnd/lib/d3.min.js"></script>
 
 	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
-	<script src="https://d3js.org/topojson.v1.min.js"></script>
+	<!--<script src="https://d3js.org/topojson.v1.min.js"></script>-->
+	<script src="https://unpkg.com/topojson-client@3"></script>
+	<script src="https://unpkg.com/topojson-simplify@3"></script>
+
 	<script src="https://d3js.org/d3-array.v1.min.js"></script>
 	<script src="https://d3js.org/d3-geo.v1.min.js"></script>
 
@@ -21,17 +24,27 @@
 	<script src="lineup/gaussmix_bivariate.js"></script>
 	<script src="lineup/gaussmix_bi_discrete.js"></script>
 	<script src="lineup/scalar_sample.js"></script>
+	<script src="lineup/choropleth_sample.js"></script>
 	<script src="lineup/lineup.js"></script>
 	<script src="lineup/sim.js"></script>
 	<script src="lineup/lineup_experiment.js"></script>
 	<style>
 		.county {
 			fill: none;
-			stroke: none;
+			stroke: black;
 			stroke-width: 0.0px;
 		}
 		.choroplethBin {
 
+		}
+
+		body {
+			font-family: arial;
+			font-size: 14px;
+		}
+
+		.lineupSVG {
+			border: solid 1px black;
 		}
 	</style>
 </head>
@@ -39,10 +52,10 @@
 <body>
 
 
-	<!--
+	
 	<canvas id="containmentTestCanvas" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
 	</canvas>
-	-->
+	
 
 	<svg id="svgChoroplethTarget" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
 	</svg>
@@ -50,7 +63,7 @@
 	</svg>
 
 
-
+	<!--
 	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></canvas>
 
 	<svg id="svgModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></svg>
@@ -58,8 +71,66 @@
 	<canvas id="canvasDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></canvas>
 
 	<svg id="svgDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></svg>
+	-->
 
-	<button style="position: absolute; top: 530px; left: 10px" onclick="randomModel()">Random model</button>
+	<div style="position: absolute; top: 270px; left: 10px">
+		<div>
+			<button style="" onclick="randomLineup()">Random model (or press ENTER)</button>
+		</div>
+
+		<div>
+			<table>
+				<tr>
+					<td colspan="2"><b>model peturbation</b></td>
+				</tr>
+
+				<tr>
+					<td width="100">centers</td>
+					<td width="100"><div class="uiDiv sliderDiv" id="sliderGCenter"></div></td>
+					<td width="100"><span id="labelGCenter"></span></td>
+
+				</tr>
+
+				<tr>
+					<td><strike>variation</strike></td>
+					<td><div class="uiDiv sliderDiv" id="sliderGSTD"></div></td>
+					<td><span id="labelGSTD"></span></td>
+
+				</tr>
+
+				<tr>
+					<td>correlation</td>
+					<td><div class="uiDiv sliderDiv" id="sliderGCorrelation"></div></td>
+					<td><span id="labelGCorrelation"></span></td>
+				</tr>
+
+				<tr>
+					<td colspan="3"><span id="labelKLD"></span></td>
+				</tr>
+			</table>
+		</div>
+
+		<div>
+			<p>&nbsp;
+			<p>
+			click on the picture below that doesn't belong. <span id="answer"></span>
+			<p>
+			<table cellspacing="10" cellpadding="3" id="lineupTable">
+				<tr>
+					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
+					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
+				</tr>
+				<tr>
+					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
+					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
+				</tr>
+
+			</table>
+		</div>
+
+		
+	</div>
+
 
 <script>
 
@@ -69,26 +140,81 @@
 		BLUR = false;
 		var WIDTH = 350;
 		var HEIGHT = 250;
-		var ITER = 16000*5;
-		var N = ITER * 3;
+		var ITER = 16000*4;
+		var N = ITER;
+		var GOOD_ITER = ITER * 1;
+		var CALLBACK_SAMPLE = false;
+
+		
+		// how many choices within the lineup
+		LINEUP_N = 4;
 
 		var theCounties = null;
 		var theStates = null;
 		var theProjection = null, thePath = null;
 
+		// two models
+		/*
 		var targetModel, fieldTarget = new ScalarField(WIDTH, HEIGHT), colormap = null;
 		var decoyModel, fieldDecoy = new ScalarField(WIDTH, HEIGHT), colormap = null;
+		*/
 
-		var scalarSampleTarget = null, scalarSampleDecoy = null;
+		// set type of canvases and samplers expected by the model
+		var MODEL_TYPE = GaussMixBiDiscrete;
+		var SAMPLER_TYPE = ChoroplethSampler;
+		var CANVAS_TYPE = 'svg';
 
-		d3.json("lineup/maps/us.json").then(function(data) 
+		// lineup
+		var svgTarget = d3.select("#svgChoroplethTarget");
+		var svgDecoy = d3.select("#svgChoroplethDecoy");
+
+		var lineupExp = null;
+
+		// samplers
+		var targetSampler = null, decoySampler = null;
+
+		// colormap
+		var colormap = null;
+
+		function setSamplers() 
 		{
-			drawChoropleth(data, d3.select("#svgChoroplethTarget"));
-			drawChoropleth(data, d3.select("#svgChoroplethDecoy"));
+			targetSampler = new SAMPLER_TYPE(WIDTH, HEIGHT, svgTarget);
+			decoySampler= new SAMPLER_TYPE(WIDTH, HEIGHT, svgDecoy);
 
-			initModel();
+			targetSampler.setSamplingFidelity(GOOD_ITER);
+			targetSampler.setModel(lineupExp.getMain())
 
-		});
+			decoySampler.setSamplingFidelity(GOOD_ITER);
+			decoySampler.setModel(lineupExp.getDecoy())
+
+			if (!colormap) {
+				colormap = getColorPreset('rainbowjet');
+				ScalarSample.setUniversalColormap(colormap);
+			}
+		}
+
+		function randomLineup()
+		{
+			var start = Date.now();
+			d3.select("#answer").html('');
+
+			// arm feedbacks
+			lineupExp.setClickFeedback(
+				function() {
+					d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+				},
+				function() {
+					d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
+				}
+			);
+
+			lineupExp.randomModel();
+			lineupExp.randomLineup(ITER, d3.select('#lineupTable'));
+			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
+			refreshModel();
+		}
+
+		
 
 		function changeColormap(_colormapName) 
 		{
@@ -96,65 +222,77 @@
 			ScalarSample.setUniversalColormap(colormap);
 		}
 
-		function randomModel()
-		{
-			targetModel.init();
-			targetModel.copyTo(decoyModel);
-			decoyModel.randomPerturb();
 
-			sampleModel();
+		function updateModelParameters()
+		{
+			M_PERTURB = +$('#sliderGCenter').slider('value');
+			R_PERTURB = +$('#sliderGCorrelation').slider('value');
+
+			// copy and perturb
+			lineupExp.copyToDecoy();
 		}
 
-		function initModel()
+		function initInterface()
 		{
-			d3.json('lineup/maps/us_countymap.json').then(function(dMapData) 
-			{
-				// create discrete map and two models (a target and a decoy)
-				targetModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgModel'), dMapData);
-
-				decoyModel = new GaussMixBiDiscrete(WIDTH, HEIGHT, d3.select('#svgDecoy'), dMapData)
-				
-				// create samplers
-				scalarSampleTarget = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasModel").node(), targetModel, colormap);
-				scalarSampleTarget.setSamplingFidelity(N);
-
-				scalarSampleDecoy = new ScalarSample(WIDTH, HEIGHT, d3.select("#canvasDecoy").node(), decoyModel, colormap);
-				scalarSampleDecoy.setSamplingFidelity(N);
-
-				
-   
-				// add a callback
-				targetModel.addCallback(function() {
-					sampleModel();
-				});
-
-				decoyModel.addCallback(function() {
-					sampleModel();
-				});
-
-				// get random target-decoy pairs
-				randomModel();
+			// keyboard events
+			d3.select(document).on('keydown', function() {
+				if (d3.event.keyCode === 13) {
+					randomLineup();
+				}
 			});
+
+			// sliders
+			$('#sliderN').slider({ step: 10, min: 670, max: GOOD_ITER, value: ITER, change: refreshModel, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
+
+			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
+
+			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .3, value: R_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+
+			d3.select("#labelGCenter").html(M_PERTURB);
+			d3.select("#labelGCorrelation").html(R_PERTURB);
+
+			//showColormaps();
 			
 		}
 
-		function sampleModel()
+		function computeDivergence()
 		{
-			if (!colormap) {
-				colormap = getColorPreset('rainbowjet');
-				//fieldTarget.setColorMap(colormap);
-				//fieldDecoy.setColorMap(colormap);
-				ScalarSample.setUniversalColormap(colormap);
-			}
-			targetModel.sampleModel(ITER, fieldTarget);
-			decoyModel.sampleModel(ITER, fieldDecoy);
+			var distance = lineupExp.modelDecoyDistance();
+			var out = "<br>distance: " + distance.toFixed(2) + "%";
+			d3.select("#labelKLD").html(out);
+		}
 
-			targetModel.discreteMap.plotChoropleth(d3.select('#svgChoroplethTarget'), colormap);
-			decoyModel.discreteMap.plotChoropleth(d3.select('#svgChoroplethDecoy'), colormap)
+		function qLoadJSON(url, callback)
+		{
+			d3.json(url).then(function(data) {
+				callback(null, data)
+			});
+		}
+
+		function initLineup(dMapData)
+		{
+			// load global discrete map data
+			loadGlobalMapData(dMapData);
+
+			lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+				svgTarget, svgDecoy, false, d3.select("#lineupTable"));
+
+			// show the divergence between the model and the decoy
+			lineupExp.getMain().addCallback(computeDivergence);
+			lineupExp.getDecoy().addCallback(computeDivergence);
+
+			// create samplers
+			setSamplers();				
+   
+			// get random target-decoy pairs
+			randomLineup();			
+		}
 
 
-			scalarSampleTarget.sampleAndVis();
-			scalarSampleDecoy.sampleAndVis();
+		function refreshModel()
+		{
+			targetSampler.sampleAndVis();
+			decoySampler.sampleAndVis();			
 		}
 
 		// filter out Alaska, Hawaii, and Puerto Rico	
@@ -184,7 +322,83 @@
 			}
 		}
 
-		function drawChoropleth(us, svg) {
+		function drawPaths(paths, svg)
+		{
+			svg.selectAll('.county')
+				.data(paths)
+				.enter()
+				.append('path')
+					.attr('class', 'county choroplethBin')
+					.attr('d', function(d) { return d.path })
+					.attr('id', function(d) { return d.id; });
+		}
+
+		function drawGeoSimplify(usTopo, svg) 
+		{
+			var albers = d3.geoAlbersUsa()
+				.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+
+			usTopo = topojson.presimplify(usTopo)
+			usTopo = topojson.simplify(usTopo, 5000);
+
+			/*
+			var area = 70; 
+			var simplify = d3.geoTransform({
+				point: function(x, y, z) 
+				{
+					if (z >= area) {
+						this.stream.point(x, y);
+					};
+				}
+			});
+
+			var simplify_then_project = d3.geoTransform(
+			{
+				point: function(x, y, z) { 
+					//simplify.stream(s)
+            		if (z >= area) {
+						return this.stream.point(albers([x, y]));
+					}
+            	}
+            });
+            */
+
+			/*
+            simplify_then_project
+            	.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+			*/
+
+            
+            var counties = topojson.feature(usTopo, usTopo.objects.counties);
+            counties.features = counties.features.filter(filterStates);
+            counties.features = counties.features.filter(function(d) { return d.id == 23003 ? false : true});
+
+            theCounties = counties;
+            var path = d3.geoPath()
+            	.projection(albers)
+            theProjection = albers;
+            thePath = path;
+
+            var g = svg.append('g');
+            var countyShapes = g.selectAll(".county")
+				.data(counties.features)
+				.enter()
+				.append("path")
+					.attr("class", function(d) { return 'county choroplethBin c' + d.id; })
+					.attr("d", path);
+        }
+        function drawTopoJson() {
+        	d3.select("#svgChoroplethTarget").selectAll('*').remove();
+        	d3.json('lineup/maps/us.json')
+        		.then(function(data) {
+        			drawGeoSimplify(data, d3.select("#svgChoroplethTarget"))
+        		})
+        }
+
+
+		function drawGeoCounties(counties, svg) {
 
 			// simplify the geometry 
 			/*
@@ -197,13 +411,6 @@
 			});
 			*/
 
-			var counties = topojson.feature(us, us.objects.counties);
-
-
-			// filter out AK, HI, and Puerto Rico (so that we only show)
-			counties.features = counties.features.filter(filterStates);
-			theCounties = counties;
-			
 			// states?
 			//theStates = topojson.feature(us, us.objects.states)
 			//theStates.features = theStates.features.filter(filterStates);
@@ -218,16 +425,11 @@
 			thePath = path;
 
 			var countyShapes = svg.selectAll(".county")
-				.data(theCounties.features)
+				.data(counties.features)
 				.enter()
 				.append("path")
 					.attr("class", "county choroplethBin")
 					.attr("d", path)
-					/*
-					.attr('id', function(d) {
-						return "c" + d.id;
-					});
-					*/
 		}
 
 		var pix2County = null;
@@ -400,29 +602,74 @@
 			
 		}
 
-console.save = function(data, filename){
+		console.save = function(data, filename){
 
-    if(!data) {
-        console.error('Console.save: No data')
-        return;
-    }
+		    if(!data) {
+		        console.error('Console.save: No data')
+		        return;
+		    }
 
-    if(!filename) filename = 'console.json'
+		    if(!filename) filename = 'console.json'
 
-    if(typeof data === "object"){
-        data = JSON.stringify(data, undefined, 4)
-    }
+		    if(typeof data === "object"){
+		        data = JSON.stringify(data, undefined, 4)
+		    }
 
-    var blob = new Blob([data], {type: 'text/json'}),
-        e    = document.createEvent('MouseEvents'),
-        a    = document.createElement('a')
+		    var blob = new Blob([data], {type: 'text/json'}),
+		        e    = document.createEvent('MouseEvents'),
+		        a    = document.createElement('a')
 
-    a.download = filename
-    a.href = window.URL.createObjectURL(blob)
-    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
-    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
-    a.dispatchEvent(e)
- }
+		    a.download = filename
+		    a.href = window.URL.createObjectURL(blob)
+		    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+		    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+		    a.dispatchEvent(e)
+		}
+
+		// load and fireup
+		initInterface();
+
+		// load jsons
+		var q = d3.queue();
+		q
+			.defer(qLoadJSON, 'lineup/maps/us_county_paths.json')
+			.defer(qLoadJSON, 'lineup/maps/us_countymap.json')
+			.awaitAll(function(error, results) 
+			{
+
+				var US = results[0];
+				var dMapData = results[1];
+
+				/*
+				// convert topoJSON to GeoJSON
+				var counties = topojson.feature(US, US.objects.counties);
+				
+				// filter out AK, HI, and Puerto Rico (so that we only show)
+				counties.features = counties.features.filter(filterStates);
+				theCounties = counties;
+				*/
+
+				// draw choropleth maps
+				//drawPaths(US, svgTarget);
+				//drawPaths(US, svgDecoy);
+
+				d3.select('#lineupTable').selectAll('svg')
+					.each(function() {
+						drawPaths(US, d3.select(this));
+					});
+
+				console.log('initializing model...');
+				var start = new Date();
+				// initialize lineup
+				initLineup(dMapData);
+
+				var e = ((new Date()) - start)/1000;
+				console.log("init time: " + e.toFixed(2) + ' sec');
+
+			});
+
+		
+
 
 	</script>
 </body>

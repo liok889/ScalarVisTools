@@ -141,9 +141,10 @@ ScalarField.prototype.zero = function()
 ScalarField.prototype.zeroLeaveEmpty = function() 
 {
 	var view = this.view;
+	var empty = SCALAR_EMPTY
 	for (var i=0, len=this.w*this.h; i<len; i++) 
 	{
-		if (view[i] != SCALAR_EMPTY) {
+		if (view[i] != empty) {
 			view[i] = 0;
 		}
 	}

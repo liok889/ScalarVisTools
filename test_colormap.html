@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<head>
+	<script src="jnd/lib/d3.min.js"></script>
+	<script src="design/src/colormap.js"></script>
+	<script src="https://d3js.org/d3-color.v2.min.js"></script>
+
+	<style>
+		body {
+			font-family: sans-serif;
+			font-size: 13px;
+		}
+	</style>
+</head>
+<body>
+	
+	<div>
+		<canvas width="250" height="40" id="scaleCanvas"></canvas stlye="border: solid 1px black">
+	</div>
+
+	<p><b>Color samples</b>
+	<p><div style="width: 400px; height: 50px" id="colorsDiv">
+	</div>
+
+	<script>
+		var SAMPLES = 10;
+		var colormap = null;
+		
+		function changeColormap(name)
+		{
+			colormap = getColorPreset(name);
+			
+			// render colormap
+			var canvas = d3.select("#scaleCanvas");
+			var w = +canvas.attr('width');
+			var h = +canvas.attr('height');
+
+			colormap.drawColorScale(
+				w, h,			// dimensions
+				w,				// # of steps
+				'horizontal',	// direction
+				canvas.node());
+
+			var str = "";
+			for (var i=0; i<SAMPLES; i++) {
+				var c = colormap.mapValue(i/(SAMPLES-1));
+				var cc = d3.color(c);
+				str = str + cc.formatHex() + '; ';
+			}
+			d3.select('#colorsDiv').html(str);
+		}
+
+		changeColormap('turbo');
+	</script>
+
+</body>
+</html>

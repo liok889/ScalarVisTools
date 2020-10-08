@@ -10,7 +10,7 @@ function GaussMixBivariate(w, h, svg)
     this.pdf = new ScalarField(w, h, DOUBLE_PRECISION);
     this.cdf = new ScalarField(w, h);
 
-    var cdfMapSize = 4 * w * h * (BI_MAP_SIZE * BI_MAP_SIZE);
+    var cdfMapSize = Float32Array.BYTES_PER_ELEMENT * w * h * (BI_MAP_SIZE * BI_MAP_SIZE);
     this.cdfMap = new Float32Array(new ArrayBuffer(cdfMapSize));
 }
 
@@ -52,14 +52,15 @@ GaussMixBivariate.prototype.constructor = GaussMixBivariate;
 GaussMixBivariate.prototype.init = function()
 {
     var MIN_GAUSS = 3;
-    var MAX_GAUSS = 5;
+    var MAX_GAUSS = 6;
 
     var count = Math.floor(.5 + Math.random() * (MAX_GAUSS-MIN_GAUSS)) + MIN_GAUSS;
     this.models = [];
 
     // add a few random gausses
+    var dontUpdate = true;
     for (var i=0; i<count; i++ ) {
-        this.add();
+        this.add(dontUpdate);
     }
     this.updateModel();
 }
@@ -91,15 +92,15 @@ GaussMixBivariate.prototype.copyTo = function(newModel, dontUpdate)
 
 var MIN_SIGMA = 10;
 
-GaussMixBivariate.prototype.add = function()
+GaussMixBivariate.prototype.add = function(dontUpdate)
 {
     // center
-    var mX = this.w/2 + (Math.random()*2-1) * (this.w*0.3);
-    var mY = this.h/2 + (Math.random()*2-1) * (this.h*0.3);
+    var mX = this.w/2 + (Math.random()*2-1) * (this.w*0.35);
+    var mY = this.h/2 + (Math.random()*2-1) * (this.h*0.35);
 
     // standard deviation
-    var sigmaX = (Math.random()*.5 + .2) * this.w * .3;
-    var sigmaY = (Math.random()*.5 + .2) * this.h * .3;
+    var sigmaX = (Math.random()*.5 + .2) * this.w * .32;
+    var sigmaY = (Math.random()*.5 + .2) * this.h * .32;
 
     // correlation (limit to -0.7 to 0.7)
     var rho = (Math.random()*2-1) *.7;
@@ -108,7 +109,9 @@ GaussMixBivariate.prototype.add = function()
     var scaler = 1.0; //0.7  + (Math.random()*2 - 1)*0.3;
 
     this.models.push(new biGauss(mX, mY, sigmaX, sigmaY, rho, scaler));
-    this.updateModel();
+    if (!dontUpdate) {
+        this.updateModel();
+    }
 
 }
 
@@ -353,9 +356,10 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                     ];
                     biG.mX = me.oldMX + dMouse[0];
                     biG.mY = me.oldMY + dMouse[1];
-                    me.updateModel();
+                    me.plotModelCurves();
                 })
                 .on('mouseup.moveCenter', function() {
+                    me.updateModel();
                     me.fireCallbacks();
                     d3.select(document)
                         .on('mousemove.moveCenter', null)
@@ -378,9 +382,10 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                     ];
                     biG.sX = Math.max(MIN_SIGMA, me.oldSX + dMouse[0]);
                     biG.sY = Math.max(MIN_SIGMA, me.oldSY + dMouse[1]);
-                    me.updateModel();
+                    me.plotModelCurves();
                 })
                 .on('mouseup.moveCenter', function() {
+                    me.updateModel();
                     me.fireCallbacks();
                     d3.select(document)
                         .on('mousemove.moveCenter', null)
@@ -405,9 +410,10 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                         slope=-1;
                     }
                     BiG.updateRho(slope*-1);
-                    me.updateModel();
+                    me.plotModelCurves();
                 })
                 .on('mouseup.moveCenter', function() {
+                    me.updateModel();
                     me.fireCallbacks();
                     d3.select(document)
                         .on('mousemove.moveCenter', null)

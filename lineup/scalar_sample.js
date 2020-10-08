@@ -1,6 +1,7 @@
 var BLUR=true;
 ALL_SAMPLERS = [];
 
+var CALLBACK_SAMPLE = true;
 
 var shaderList = [
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
@@ -56,7 +57,7 @@ ScalarSample.setUniversalColormap = function(colormap) {
     }
 }
 
-ScalarSample.prototype.setModel = function(_model)
+ScalarSample.prototype.setModel = function(_model, dontVis)
 {
     if (this.model) {
         this.model.unregisterCallback(this.callbackID);
@@ -65,15 +66,20 @@ ScalarSample.prototype.setModel = function(_model)
 
     this.model = _model;
     (function(me) {
-        me.callbackID = me.model.addCallback(function() {
-            me.sampleModel();
-            if (me.canvas) {
-                me.vis();
+        me.callbackID = me.model.addCallback(function() 
+        {
+            if (CALLBACK_SAMPLE || me.callbackSample) 
+            {
+                console.log('callback sampling');
+                me.sampleModel();
+                if (me.canvas || me.svg) {
+                    me.vis();
+                }
             }
         });
     })(this);
 
-    if (this.canvas)
+    if (this.canvas && !dontVis)
     {
         this.sampleModel();
         this.vis();
@@ -89,7 +95,12 @@ ScalarSample.prototype.sampleModel = function(_fidelity, model)
 {
     var fidelity = !isNaN(_fidelity) ? _fidelity : this.localN;
     if (!fidelity || isNaN(fidelity)) {
-        fidelity = N;
+        if (typeof N === 'undefined') {
+            fidelity = 0;
+        }
+        else {
+            fidelity = N;
+        }
     }
     if (!model) {
         model = this.model;
@@ -97,9 +108,9 @@ ScalarSample.prototype.sampleModel = function(_fidelity, model)
     model.sampleModel(fidelity, this.field);
 }
 
-ScalarSample.prototype.sampleAndVis = function()
+ScalarSample.prototype.sampleAndVis = function(_fidelity)
 {
-    this.sampleModel();
+    this.sampleModel(_fidelity);
     this.vis();
 }
 

@@ -1,31 +1,82 @@
+var globalMapData = null;
+var USE_GLOBAL_MAP_DATA = true;
+var ENABLE_SPLAT = true;
+var HIST_EQUALIZE = true;
+
+function matrixFromArray(arr)
+{
+	var matrixSize = arr.length * Int32Array.BYTES_PER_ELEMENT;
+	var matrix = new Int32Array(new ArrayBuffer(matrixSize));
+	for (var i=0, len=arr.length; i<len; i++) {
+		matrix[i] = arr[i];
+	}
+	return matrix;
+}
+
+function loadGlobalMapData(mapData)
+{
+	globalMapData = 
+	{
+		pixelMap: mapData.pixelMap,
+		listOfBins: mapData.listOfBins,
+		areas: mapData.areas,
+		minArea: mapData.minArea,
+		maxArea: mapData.maxArea,
+		width: mapData.width,
+		height: mapData.height
+	}
+}
 
 function DiscreteMap(mapData)
 {
-	this.width = mapData.width;
-	this.height = mapData.height;
+	if (USE_GLOBAL_MAP_DATA && globalMapData)
+	{
+		this.width = globalMapData.width;
+		this.height = globalMapData.height;
 
-	this.pixelMap = mapData.pixelMap;
-	this.listOfBins = mapData.listOfBins;
-	this.areas = mapData.areas;
-	this.minArea = mapData.minArea;
-	this.maxArea = mapData.maxArea;
+		this.pixelMap = globalMapData.pixelMap;
+		this.listOfBins = globalMapData.listOfBins;
+		this.areas = globalMapData.areas;
+		this.minArea = globalMapData.minArea;
+		this.maxArea = globalMapData.maxArea;
+	}
+	else if (mapData)
+	{
+		this.width = mapData.width;
+		this.height = mapData.height;
 
+		this.pixelMap = matrixFromArray(mapData.pixelMap);
+		this.listOfBins = mapData.listOfBins;
+		this.areas = mapData.areas;
+
+		// scan to determine mim/max area
+		this.minArea = Number.MAX_VALUE;
+		this.maxArea = Number.MIN_VALUE;
+
+		for (var i=0; i< this.listOfBins.length; i++)
+		{
+			var bin = this.listOfBins[i]
+			var a = this.areas[bin];
+			if (a > 0) 
+			{
+				this.minArea = Math.min(a, this.minArea);
+				this.maxArea = Math.max(a, this.maxArea);
+			}
+		}
+
+		if (USE_GLOBAL_MAP_DATA) 
+		{
+			loadGlobalMapData(mapData);
+		}
+	}
+	else
+	{
+		console.log("error: no map data provided");
+	}
+	
 	this.binMap = {};
 	this.zeroBinMap();
 
-	// scan
-	this.minArea = Number.MAX_VALUE;
-	this.maxArea = Number.MIN_VALUE;
-
-	for (var i=0; i< this.listOfBins.length; i++)
-	{
-		var bin = this.listOfBins[i]
-		var a = this.areas[bin];
-		if (a > 0) {
-			this.minArea = Math.min(a, this.minArea);
-			this.maxArea = Math.max(a, this.maxArea);
-		}
-	}
 }
 
 DiscreteMap.prototype.zeroBinMap = function() 
@@ -42,29 +93,20 @@ DiscreteMap.prototype.zeroBinMap = function()
 
 DiscreteMap.prototype.normalize = function()
 {
+	this.lowCutoff = 0.0;
+	this.highCutoff = 1.0;
+
 	var listOfBins = this.listOfBins;
 	var binMap = this.binMap;
 	var maxDensity = 0.0;
-	var areaSpan = this.maxArea - this.minArea;
+	var areas = this.areas;
 
 	for (var i=0, len=listOfBins.length; i<len; i++) 
 	{
 		var I = listOfBins[i];
-		var area = this.areas[I];
-		var areaRatio = this.areas[I]/this.maxArea;
-		
-		var areaN = (area - this.minArea) / (this.maxArea-this.minArea);
-		var P = 0.002 + areaN*(1-0.002*2);
-		//binMap[I] *= Math.pow(1-P, 1)
-		//Math.pow(1-(P, 1), 1);
 
-		//binMap[I] *= Math.pow(1/areaRatio,1/1.1);
-		binMap[I] *= 1/Math.pow(this.areas[I], 1/1.1);
-		
-		//var areaRatio = 1-((this.areas[I]-this.minArea) / areaSpan);
-
-		//var areaRatio = Math.pow((this.areas[I]-this.minArea) / areaSpan,1/2);
-		//binMap[I] *= 1/areaRatio;
+		//binMap[I] *= 1/Math.pow(this.areas[I], 1);
+		binMap[I] *= 1/areas[I];
 		maxDensity = Math.max(maxDensity, binMap[I]);
 	}
 
@@ -77,35 +119,76 @@ DiscreteMap.prototype.normalize = function()
 			binMap[I] *= k;
 		}
 	}
+
+	if (HIST_EQUALIZE) {
+		this.percentileCutoff();
+	}
 }
 
-DiscreteMap.prototype.plotChoropleth = function(_svg, _colormap)
+DiscreteMap.prototype.percentileCutoff = function()
 {
-	(function(svg, bins, binMap, pixelMap, colormap) 
+	var CUTOFF_PERCENT_LOW = .01/4;
+	var CUTOFF_PERCENT_HIGH = 1-0.01/4;
+
+	var histogram = [];
+	var listOfBins = this.listOfBins;
+	var binMap = this.binMap;
+
+	for (var i=0, len=listOfBins.length; i<len; i++) 
 	{
+		var bin = listOfBins[i];
+		histogram.push({bin: bin, v: binMap[bin]});
+	}
+
+	histogram.sort(function(a, b) { return a.v-b.v; });
+	
+	var L = Math.max(
+		0, 
+		Math.ceil(histogram.length * CUTOFF_PERCENT_LOW)
+	);
+
+	var H = Math.min(
+		histogram.length-1, 
+		Math.floor(histogram.length * CUTOFF_PERCENT_HIGH)
+	);
+
+	this.histogram = histogram;
+	this.lowCutoff = histogram[L].v;
+	this.highCutoff = histogram[H].v;
+}
+
+DiscreteMap.prototype.plotChoropleth = function(_svg, colormap)
+{
+	(function(svg, binMap, L, H) 
+	{
+		if (svg.selectAll === undefined) {
+			svg = d3.select(svg);
+		}
+		
 		svg.selectAll('.choroplethBin')
 			.each(function(d) 
 			{
 				var me = d3.select(this);
 				var id = d.id;
-				var element = binMap[id];
-				if (element === null || element === undefined) {
-					element = binMap[+id];
+				var value = binMap[id];
+				if (value === null || value === undefined) {
+					value = binMap[+id];
 				}
-				if (element != null && element != undefined) {
-					var color = colormap.mapValue(element);
+
+				if (value != null && value != undefined) 
+				{
+					value = Math.max(Math.min(H, value), L);
+					var nValue = (value-L) / (H-L);
+					var color = colormap.mapValue(nValue);
 					me.style('fill', color);
 				}
-				else
-				{
-					var t=4;
-				}
 			});
-	})(_svg, this.listOfBins, this.binMap, this.pixelMap, _colormap)
+	})(_svg, this.binMap, this.lowCutoff, this.highCutoff)
 }
 
 function GaussMixBiDiscrete(w, h, svg, dMapData)
 {
+	console.log('BiDiscreteModel constructor');
 	this.discreteMap = new DiscreteMap(dMapData);
 
 	GaussMixBivariate.call(this, w, h, svg)
@@ -211,18 +294,31 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 
     // reset scalar field with zeros
     //_field.zeroLeaveEmpty();
-    var view = _field.view;
-    for (var i=0, len=view.length; i<len; i++) 
+    var view = _field ? _field.view : null;
+    
+    if (_field)
     {
-    	if (pixelMap[i] == 0) 
-    	{
-    		view[i] = SCALAR_EMPTY;
-    	}
-    	else
-    	{
-    		view[i] = 0.0;
-    	}
-    }
+	    if (!_field.emptyMarked) 
+	    {
+	    	var empty = SCALAR_EMPTY;
+		    for (var i=0, len=view.length; i<len; i++) 
+		    {
+		    	if (pixelMap[i] == 0) 
+		    	{
+		    		view[i] = empty;
+		    	}
+		    	else
+		    	{
+		    		view[i] = 0.0;
+		    	}
+		    }
+		    _field.emptyMarked = true;
+		}
+		else
+		{
+			_field.zeroLeaveEmpty();
+		}
+	}
 
     // iterate
     for (var i=0; i<iterations; i++)
@@ -231,11 +327,13 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
         var I = cdfMap[ Math.floor(Math.random() * cdfLen) ];
 
         // convert to row, column coordinate
-        var C = I % w;
+        //var C = I % w;
         var R = Math.floor(I/w);
+        var C = I- R*w;
 
-        // find splat boundary
-
+        // SPLAT
+        // =====
+	    // find splat boundary
         var R0 = Math.max(0, R-SPLAT_SIZE), R1 = Math.min(h_1, R+SPLAT_SIZE);
         var C0 = Math.max(0, C-SPLAT_SIZE), C1 = Math.min(w_1, C+SPLAT_SIZE);
         var cummP=0;
@@ -262,27 +360,37 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
             	if (bin > 0)
             	{
             		var s = splat[k] * cummP
-                	view[ P ] += s;
+                	if (view) {
+                		view[ P ] += s;
+                	}
                 	binMap[ bin ] += s;
                 }
             }
         }
         
+        
         /*
-        var bin = pixelMap[ R*w + C ];
+        // OR one hit, as opposed to a splat
+        // =================================
+        var K = R*w + C;
+        var bin = pixelMap[ K ];
         if (bin > 0) {
-        	var p = cdf[R*w + C];
-        	view[R*w + C] += p;
-        	binMap[bin] += p
+        	//var p = cdf[R*w + C];
+        	view[K] += 1;
+        	binMap[bin] += 1;
         }
         */
+        
+        
     }
 
     // normalize discrete map / field
     discreteMap.normalize();
 
-    _field.normalize();
-    _field.updated();
+    if (_field) {
+    	_field.normalize();
+    	_field.updated();
+    }
 }
 
 

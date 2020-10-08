@@ -1,19 +1,33 @@
-function ChoroplethSample(w, h, svg, model, colormap)
+//BI_MAP_SIZE=1;
+//CALLBACK_SAMPLE = false;
+
+function ChoroplethSampler(w, h, svg, model, colormap)
 {
 	this.svg = svg;
 	this.colormap = colormap;
-	ScalarSample.call(this, w, h, null, model, colormap);
+	
+	this.w = w;
+    this.h = h;
+    this.field = null;
+    this.model = model;
+
+    // add myself to the model
+    if (model) {
+        this.setModel(model);
+    }
+
+    ALL_SAMPLERS.push(this);
 }
 
-ChoroplethSample.prototype = Object.create(ScalarSample.prototype);
+ChoroplethSampler.prototype = Object.create(ScalarSample.prototype);
 
 
-ChoroplethSample.prototype.vis = function()
+ChoroplethSampler.prototype.vis = function()
 {
 	if (!this.model) {
 		console.error("ChoroplethSample: No model!")
 	}
-	else if (!this.mode.discreteMap)
+	else if (!this.model.discreteMap)
 	{
 		console.error("ChoroplethSample: model has no discrete map!")
 
@@ -22,7 +36,7 @@ ChoroplethSample.prototype.vis = function()
 	discreteMap.plotChoropleth(this.svg, this.colormap);
 }
 
-ChoroplethSample.prototype.setColorMap = function(colormap)
+ChoroplethSampler.prototype.setColorMap = function(colormap)
 {
 	this.colormap = colormap;
 }

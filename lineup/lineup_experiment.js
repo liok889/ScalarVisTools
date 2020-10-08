@@ -1,4 +1,4 @@
-function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption, mainModel, decoyModel)
+function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption, table)
 {
     // width / height of the model
     this.w = w;
@@ -7,14 +7,24 @@ function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption, mainModel, 
     // whether to randomly perturb decoy (subjec to perturbation parameters)
     this.perturb = true;
 
-    this.main = mainModel ? mainModel : new GaussMixBivariate(w, h, gMain);
-    this.decoy = decoyModel ? decoyModel : new GaussMixBivariate(w, h, gDecoy);
+    // create model
+    var modelType = GaussMixBivariate;
+    if (typeof MODEL_TYPE !== 'undefined') {
+        modelType = MODEL_TYPE;
+    }
+    this.main = new modelType(w, h, gMain);
+    this.decoy = new modelType(w, h, gDecoy);
 
     this.randomModel();
 
     // lineup
     this.lineupN = _lineupN;
-    this.lineup = new Lineup(w, h, _lineupN, this.main, this.decoy, nullOption);
+    if (table) {
+        this.lineup = new LineupFixed(w, h, _lineupN, this.main, this.decoy, nullOption, table);
+    }
+    else {
+        this.lineup = new Lineup(w, h, _lineupN, this.main, this.decoy, nullOption);
+    }
 
     this.canMakeSelection = false;
     this.nullOption = nullOption;
@@ -88,18 +98,25 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
     // new lineup
     this.trialHasDecoy = noDecoy ? false : true;
-    this.lineup.sample(fidelity, noDecoy);
     this.lineup.layoutCanvases(domSelection);
+    this.lineup.sample(fidelity, noDecoy);
     this.domSelection = domSelection;
+
+    this.correctAnswer = this.lineup.getCorrectAnswer();
 
     // clear out old selection / answer
     this.answer = null;
     domSelection.selectAll('td').style('background-color', null);
 
     // setup callbacks
-    (function(lineup, dom, noDecoy)
+    (function(lineup, dom, noDecoy, correctAnswer)
     {
-        dom.selectAll('canvas').on('click', function()
+        var canvasType = 'canvas'
+        if (typeof CANVAS_TYPE === 'string') {
+            canvasType = CANVAS_TYPE
+        }
+
+        dom.selectAll(canvasType).on('click', function()
         {
             if (lineup.incorrect) lineup.incorrect();
             if (lineup.canMakeSelection)
@@ -124,12 +141,12 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             lineup.canvasIndex = '98';
         });
 
-    })(this, domSelection, noDecoy);
+    })(this, domSelection, noDecoy, this.correctAnswer);
 
 
-    (function(lineup, dom, noDecoy)
+    (function(lineup, dom, noDecoy, correctAnswer)
     {
-        d3.select('#sample' + (lineup.lineupN-1)).on('click', function()
+        d3.select('#sample' + correctAnswer).on('click', function()
         {
             if (lineup.correct) lineup.correct();
             if (lineup.canMakeSelection)
@@ -141,7 +158,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             lineup.answer = noDecoy ? '0' : '1';
             lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         })
-    })(this, domSelection, noDecoy);
+    })(this, domSelection, noDecoy, this.correctAnswer);
 }
 
 // generates a lineup with an expected distance between the main and the decoy
