@@ -22,6 +22,10 @@ function ScalarSample(w, h, canvas, model, colormap)
         this.setModel(model);
     }
 
+    // if we're passed a d3 selection, convert to a standard canvas
+    if (this.canvas.selectAll) {
+        this.canvas = this.canvas.node();
+    }
 
     if (this.canvas)
     {

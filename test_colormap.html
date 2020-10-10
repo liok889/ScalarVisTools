@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <head>
-	<script src="jnd/lib/d3.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
 	<script src="design/src/colormap.js"></script>
-	<script src="https://d3js.org/d3-color.v2.min.js"></script>
+	<!--<script src="https://d3js.org/d3-color.v1.min.js"></script>-->
+	<script src="lib/colorname/c3.js"></script>
 
 	<style>
 		body {
@@ -14,16 +15,64 @@
 <body>
 	
 	<div>
-		<canvas width="250" height="40" id="scaleCanvas"></canvas stlye="border: solid 1px black">
+		<canvas width="350" height="40" id="scaleCanvas"></canvas stlye="border: solid 1px black">
 	</div>
 
 	<p><b>Color samples</b>
-	<p><div style="width: 400px; height: 50px" id="colorsDiv">
+	<p><div style="width: 400px; height: 400px; border: solid 1px black" id="colorsDiv">
 	</div>
+	<svg class="main" width="600" height="400"></svg>
 
 	<script>
 		var SAMPLES = 10;
 		var colormap = null;
+
+		c3.load('lib/colorname/c3_data.json');
+
+		function rgbToHex(r, g, b) 
+		{
+			function componentToHex(c) {
+				var hex = c.toString(16);
+				return hex.length == 1 ? "0" + hex : hex;
+			}
+			return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+		}
+
+		// build lookup table
+		var cmap = {};
+		for (var c=0; c<c3.color.length; ++c) 
+		{
+			var x = c3.color[c];
+			cmap[[x.l,x.a,x.b].join(",")] = c;
+		}
+
+		function index(c) 
+		{
+			var x = d3.lab(c),
+			L = 5 * Math.round(x.l/5),
+			a = 5 * Math.round(x.a/5),
+			b = 5 * Math.round(x.b/5),
+			s = [L,a,b].join(",");
+			return cmap[s];
+		}
+
+		function nameSalience(c) 
+		{
+			var minE = -4.5;
+			var maxE = 0.0;
+
+			var i = index(c);
+			var ent = c3.color.entropy(i);
+
+			return (ent - minE) / (maxE-minE);
+		}
+
+		function nameDistance(c1, c2) 
+		{
+			var i1 = index(c1);
+			var i2 = index(c2);
+			return 1 - c3.color.cosine(i1, i2);
+		}
 		
 		function changeColormap(name)
 		{
@@ -40,20 +89,336 @@
 				'horizontal',	// direction
 				canvas.node());
 
-			var str = "";
-			for (var i=0; i<SAMPLES; i++) {
+			var str = ""; 
+			var avgSalience = 0, avgDistance = 0, colorNameVariation = 0;
+
+			for (var i=0; i<SAMPLES; i++) 
+			{
 				var c = colormap.mapValue(i/(SAMPLES-1));
 				var cc = d3.color(c);
-				str = str + cc.formatHex()
+				var rgb = d3.rgb(cc); 
+				var hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+				
+				// compute color name salience
+				var sal = nameSalience(cc);
+				avgSalience += sal;
+
+				str = str + hex;
+
+				if (i < SAMPLES-1) {
+					var c2 = colormap.mapValue((i+1)/(SAMPLES-1));
+					var dist = nameDistance(c, c2);
+					avgDistance += dist;
+				}
 				if (i < SAMPLES-1) {
 					str += ', ';
 				}
+
+				//console.log("salience [" + cc.formatHex + ']: ' +);
 			}
+			avgSalience /= SAMPLES;
+			colorNameVariation = avgDistance;
+			avgDistance /= SAMPLES-1;
+
+			str += '<br>Average salience: ' + avgSalience.toFixed(2);
+			str += '<br>Avg distance: ' + avgDistance.toFixed(2);
+
+
 			d3.select('#colorsDiv').html(str);
+		}
+
+		var RAMPS = [
+			"threewave",
+			"blueorange",
+			"rainbow",
+			"rainbowcie",
+			"rainbowjet",
+			"cubehelix",
+			"bodyheat",
+			"extendedBlackBody",
+			"kindlmann",
+			"spectralFull",
+			"coolwarmMoreland",
+			"viridis",
+			"plasma",
+			"redpurple",
+			"greyred",
+			"coolwarm",
+			"reds",
+			"purples",
+			"blues",
+			"spectral",
+			"turbo",
+		];
+		var rampMap = {};
+
+		function computeColormapStats()
+		{
+			var rampStats = [];
+			var MAX_SAMPLES = 15;
+
+			for (var i=0; i<RAMPS.length; i++)
+			{
+				var ramp = {
+					name: RAMPS[i],
+					colormap: getColorPreset(RAMPS[i]),
+					nameSalience: [],
+					nameVariation: [],
+					labLength: [],
+
+					sampleNameSalience: {},
+					sampleNameVariation: {},
+					sampleLabLength: {},
+				};
+				rampMap[ramp.name] = ramp;
+
+				for (var s=3; s<15; s++) 
+				{
+
+					// sample ramps
+					var nS = 0;
+					var nV = 0;
+					var labLen = 0;
+
+
+					for (var k=0; k<s; k++) 
+					{
+						var v = k/(s-1);
+						var c = d3.lab(ramp.colormap.mapValue(v));
+
+						nS += nameSalience(c);
+
+						if (k < s-1)
+						{
+							var v2 = (k+1)/(s-1);
+							var c2 = d3.lab(ramp.colormap.mapValue(v2));
+							nV += nameDistance(c, c2);
+							labLen += Math.sqrt(
+								Math.pow(c.l-c2.l, 2) +
+								Math.pow(c.a-c2.a, 2) +
+								Math.pow(c.b-c2.b, 2))
+						}
+					}
+
+					nS /= s;
+					nV /= s-1;
+					labLen /= s-1;
+					ramp.nameSalience.push({value: nS, samples: s});
+					ramp.nameVariation.push({value: nV, samples: s});
+					ramp.labLength.push({value: labLen, samples: s});
+
+					ramp.sampleNameSalience[s] = nS;
+					ramp.sampleNameVariation[s] = nV;
+					ramp.sampleLabLength[s] = labLen;
+				}
+				rampStats.push(ramp)
+			}
+			return rampStats;
+		}
+
+		function json2csv(json, header)
+		{
+			var str = "";
+			for (var i=0; i<header.length; i++) 
+			{
+				str += header[i];
+				if (i<header.length-1) {
+					str += ',';
+				}
+			}
+			str += "\n";
+
+			for (var i=0; i<json.length; i++)
+			{
+				var row = json[i];
+				for (var j=0; j<header.length; j++) {
+					str += row[header[j]]
+					if (j<header.length-1) {
+						str += ',';
+					}
+				}
+				if (i<json.length-1) {
+					str += "\n";
+				}
+			}
+			return str;
+		}
+		function printStats()
+		{
+			var header = ['nameVariation', 'nameSalience', 'labLength'];
+			var data = getRampStats(SAMPLES, header);
+			header = ['name'].concat(header);
+
+			var str = json2csv(data, header);
+			console.save(str, 'stats.csv');
+
+		}
+
+		function getRampStats(samples, stats)
+		{
+			if (!Array.isArray(stats)) {
+				stats = [stats];
+			}
+			var statPack = [];
+			for (var i=0; i<RAMPS.length; i++) 
+			{
+				var ramp = rampMap[RAMPS[i]];
+				var rPack = {
+					name: ramp.name
+				};
+				for (var s=0; s<stats.length; s++)
+				{
+					var statName = stats[s]
+					var theStat = ramp[statName];
+					for (var j=0; j<theStat.length; j++) {
+						if (theStat[j].samples == samples) {
+							rPack[statName] = theStat[j].value
+						}
+					}
+				}
+				statPack.push(rPack)
+			}
+			return statPack;
 		}
 
 		changeColormap('turbo');
 	</script>
 
+	<script>
+		function plotRampStat(allRamps, stat)
+		{
+			var CHART_W = 300;
+			var CHART_H = 200;
+			var COLORS = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#444444','#b15928'];
+
+			var samplesMin = 0;
+			var samplesMax = 0;
+			var yMin = 0;
+			var yMax = 0;
+
+			var stats = [];
+			for (var i=0; i<allRamps.length; i++)
+			{
+				var ramp = allRamps[i];
+				var theStat = ramp[stat];
+
+				for (var j=0; j<theStat.length; j++) 
+				{
+					var s = theStat[j].samples;
+					var v = theStat[j].value;
+
+					samplesMin = Math.min(s, samplesMin);
+					samplesMax = Math.max(s, samplesMax);
+					yMax = Math.max(v, yMax)
+				}
+			}
+
+			var xScale = d3.scaleLinear()
+				.domain([samplesMin, samplesMax])
+				.range([0, CHART_W]);
+			var yScale = d3.scaleLinear()
+				.domain([yMin, yMax])
+				.range([CHART_H, 0]);
+
+			var g = d3.select("svg.main").append('g')
+			g.attr('transform', 'translate(40,10)');
+
+			var xAxis = d3.axisBottom(xScale);
+			g.append('g')
+				.attr('transform', 'translate(0,'+CHART_H + ')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale);
+			g.append('g')
+				.call(yAxis);
+
+
+			var lineGenerator = d3.line()
+				.x(function(d) { return xScale(d.samples); })
+				.y(function(d) { return yScale(d.value); })
+
+			var paths = g.selectAll('path.ramps').data(allRamps)
+			paths.enter().append('path')
+				.attr('d', function(d) { return lineGenerator(d[stat]); })
+				.attr('class', 'ramps')
+				.style('fill', 'none')
+				.style('stroke-width', '1px')
+				.attr('id', function(d) { return d.name;})
+				.style('stroke', function(d, i) { return COLORS[i] || 'black';})
+				.on('mouseover', function(d) 
+				{
+					d3.selectAll('path.ramps')
+						.style('stroke-width', "0.2px");
+					d3.select(this)
+						.style('stroke-width', '2px');
+
+					d3.select('text.' + d.name)
+						.style('font-weight', 'bold');
+
+				})
+				.on('mouseout', function(d) 
+				{
+					d3.selectAll('path.ramps')
+						.style('stroke-width', "1px");
+
+					d3.select('text.' + d.name)
+						.style('font-weight', null);					
+					
+				})
+
+
+			var lines = g.selectAll('line.legend').data(allRamps)
+			lines.enter().append('line')
+				.attr('x1', CHART_W+20)
+				.attr('x2', CHART_W+40)
+				.attr('y1', function(d, i) { return i*20})
+				.attr('y2', function(d, i) { return i*20})
+				.style('stroke-width', '2px')
+				.style('stroke', function(d, i) { return COLORS[i] || 'black';});
+
+			var text = g.selectAll('text.legend').data(allRamps)
+			text.enter().append('text')
+				.attr('class', function(d) { return d.name; })
+				.attr('x', CHART_W+45)
+				.attr('y', function(d, i) { return i*20+5; })
+				.html(function(d) { return d.name});
+
+
+			g.append('text.lab')
+				.attr('x', CHART_W/2)
+				.attr('y', CHART_H+40)
+				.html('# of samples');
+
+			g.append('text.lab')
+				.attr('transform', 'translate(-30,' + (CHART_H/1.2) + ') rotate(-90)')
+				.html(stat);
+		}
+		console.save = function(data, filename){
+
+		    if(!data) {
+		        console.error('Console.save: No data')
+		        return;
+		    }
+
+		    if(!filename) filename = 'console.json'
+
+		    if(typeof data === "object"){
+		        data = JSON.stringify(data, undefined, 4)
+		    }
+
+		    var blob = new Blob([data], {type: 'text/json'}),
+		        e    = document.createEvent('MouseEvents'),
+		        a    = document.createElement('a')
+
+		    a.download = filename
+		    a.href = window.URL.createObjectURL(blob)
+		    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+		    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+		    a.dispatchEvent(e)
+		}
+
+		var rampStats = computeColormapStats();
+
+	</script>
 </body>
 </html>

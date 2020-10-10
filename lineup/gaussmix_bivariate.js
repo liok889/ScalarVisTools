@@ -487,7 +487,7 @@ GaussMixBivariate.prototype.computeCDFs = function()
 }
 
 // construct map
-GaussMixBivariate.prototype.computeCDFMap = function()
+GaussMixBivariate.prototype.computeCDFMap = function(pixelMap)
 {
     var cdf = this.cdf.view;
     var cummDensity = this.cummDensity;
@@ -500,7 +500,8 @@ GaussMixBivariate.prototype.computeCDFMap = function()
         {
             last++;
         }
-        cdfMap[i]=last;
+        cdfMap[i] = last;
+        //cdfMap[i]= pixelMap ? pixelMap(last) : last;
     }
     this.updateCDFMap = false;
 }

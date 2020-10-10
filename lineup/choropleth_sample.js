@@ -33,7 +33,7 @@ ChoroplethSampler.prototype.vis = function()
 
 	}
 	var discreteMap = this.model.discreteMap
-	discreteMap.plotChoropleth(this.svg, this.colormap);
+	discreteMap.colorChoropleth(this.svg, this.colormap);
 }
 
 ChoroplethSampler.prototype.setColorMap = function(colormap)

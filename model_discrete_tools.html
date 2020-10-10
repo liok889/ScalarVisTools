@@ -56,12 +56,14 @@
 	<canvas id="containmentTestCanvas" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
 	</canvas>
 	
+	<div id="divTarget" style="position: absolute; top: 10px; left: 10px; "> 
+	</div>
+	<div id="divTargetControl" style="position: absolute; top: 10px; left: 10px;"></div>
+	</div>
 
-	<svg id="svgChoroplethTarget" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
-	</svg>
-	<svg id="svgChoroplethDecoy" width="350" height="250" style="position: absolute; top: 10px; left: 370px; border: solid 1px black">
-	</svg>
-
+	<div id="divDecoy" style="position: absolute; top: 10px; left: 370px;">
+	</div>
+	<div id="divDecoyControl" style="position: absolute; top: 10px; left: 370px;">"</div>
 
 	<!--
 	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></canvas>
@@ -91,12 +93,13 @@
 
 				</tr>
 
+				<!--
 				<tr>
-					<td><strike>variation</strike></td>
+					<td><strike>std. deviation</strike></td>
 					<td><div class="uiDiv sliderDiv" id="sliderGSTD"></div></td>
 					<td><span id="labelGSTD"></span></td>
-
 				</tr>
+				-->
 
 				<tr>
 					<td>correlation</td>
@@ -113,60 +116,72 @@
 		<div>
 			<p>&nbsp;
 			<p>
-			click on the picture below that doesn't belong. <span id="answer"></span>
+			Click on the picture below that doesn't belong. <span id="answer"></span>
 			<p>
-			<table cellspacing="10" cellpadding="3" id="lineupTable">
-				<tr>
-					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
-					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
-				</tr>
-				<tr>
-					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
-					<td><svg width="350" height="250" class="lineupSVG"></svg></td>
-				</tr>
-
-			</table>
+			<table id="lineupTable"></table>
 		</div>
 
 		
 	</div>
 
 
-<script>
+	<script>
 
-</script>
+		// width / height of stimuli
+		var WIDTH = 350;
+		var HEIGHT = 250;
+
+		// how many choices within the lineup
+		var LINEUP_N = 4;
+
+		// set type of canvases and samplers expected by the model
+		var MODEL_TYPE = GaussMixBiDiscrete;
+		var SAMPLER_TYPE = ChoroplethSampler; //ScalarSample;
+		var CANVAS_TYPE = 'svg';
+
+
+		createLineupElements(d3.select("#lineupTable"), LINEUP_N, CANVAS_TYPE, WIDTH, HEIGHT);
+		d3.select('#lineupTable').selectAll(CANVAS_TYPE)
+			.classed('lineupSVG', true);
+
+		// create two representations at the top of the page
+		// of both the target and the decoy
+		d3.select('#divTarget')
+			.append(CANVAS_TYPE)
+			.attr('id', 'svgTarget')
+			.attr('width', WIDTH).attr('height', HEIGHT)
+			.classed('lineupSVG', true);
+		
+		d3.select('#divDecoy')
+			.append(CANVAS_TYPE)
+			.attr('id', 'svgDecoy')
+			.attr('width', WIDTH).attr('height', HEIGHT)
+			.classed('lineupSVG', true);
+
+
+	</script>
+
+
 	<script type="text/javascript">
 
 		BLUR = false;
-		var WIDTH = 350;
-		var HEIGHT = 250;
-		var ITER = 16000*4;
+
+		// number of sampling iterations
+		var ITER = 16000*3;
 		var N = ITER;
 		var GOOD_ITER = ITER * 1;
+
+		// prevent auto rendering when model us updated 
 		var CALLBACK_SAMPLE = false;
 
-		
-		// how many choices within the lineup
-		LINEUP_N = 4;
-
+		// choropleth elements
 		var theCounties = null;
 		var theStates = null;
 		var theProjection = null, thePath = null;
 
-		// two models
-		/*
-		var targetModel, fieldTarget = new ScalarField(WIDTH, HEIGHT), colormap = null;
-		var decoyModel, fieldDecoy = new ScalarField(WIDTH, HEIGHT), colormap = null;
-		*/
-
-		// set type of canvases and samplers expected by the model
-		var MODEL_TYPE = GaussMixBiDiscrete;
-		var SAMPLER_TYPE = ChoroplethSampler;
-		var CANVAS_TYPE = 'svg';
-
-		// lineup
-		var svgTarget = d3.select("#svgChoroplethTarget");
-		var svgDecoy = d3.select("#svgChoroplethDecoy");
+		// lineupx
+		var svgTarget = d3.select("#svgTarget");
+		var svgDecoy = d3.select("#svgDecoy");
 
 		var lineupExp = null;
 
@@ -276,6 +291,7 @@
 
 			lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
 				svgTarget, svgDecoy, false, d3.select("#lineupTable"));
+			lineupExp.canMakeSelection = true;
 
 			// show the divergence between the model and the decoy
 			lineupExp.getMain().addCallback(computeDivergence);
@@ -324,6 +340,14 @@
 
 		function drawPaths(paths, svg)
 		{
+			// create a white background
+			svg.append('rect')
+				.attr('width', +svg.attr('width'))
+				.attr('height', +svg.attr('height'))
+				.style('fill', 'white')
+				.style('stroke', 'none');
+
+			// plot paths
 			svg.selectAll('.county')
 				.data(paths)
 				.enter()
@@ -390,10 +414,10 @@
 					.attr("d", path);
         }
         function drawTopoJson() {
-        	d3.select("#svgChoroplethTarget").selectAll('*').remove();
+        	d3.select("#svgTarget").selectAll('*').remove();
         	d3.json('lineup/maps/us.json')
         		.then(function(data) {
-        			drawGeoSimplify(data, d3.select("#svgChoroplethTarget"))
+        			drawGeoSimplify(data, d3.select("#svgTarget"))
         		})
         }
 

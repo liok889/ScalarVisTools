@@ -13,6 +13,15 @@ function matrixFromArray(arr)
 	return matrix;
 }
 
+function mapFromArray(arr)
+{
+	var aMap = {};
+	for (var i=0, len=arr.length; i<len; i++) {
+		aMap[i] = arr[i];
+	}
+	return aMap;
+}
+
 function loadGlobalMapData(mapData)
 {
 	globalMapData = 
@@ -45,7 +54,7 @@ function DiscreteMap(mapData)
 		this.width = mapData.width;
 		this.height = mapData.height;
 
-		this.pixelMap = matrixFromArray(mapData.pixelMap);
+		this.pixelMap = mapFromArray(mapData.pixelMap);
 		this.listOfBins = mapData.listOfBins;
 		this.areas = mapData.areas;
 
@@ -76,17 +85,17 @@ function DiscreteMap(mapData)
 	
 	this.binMap = {};
 	this.zeroBinMap();
-
 }
 
 DiscreteMap.prototype.zeroBinMap = function() 
 {
 	var listOfBins = this.listOfBins;
+	var totalBins = this.totalBins || listOfBins.length;
 	var binMap = this.binMap;
 
-	for (var i=0, len=listOfBins.length; i<len; i++) 
+	for (var i=0, len=totalBins; i<len; i++) 
 	{
-		var I = listOfBins[i];
+		var I = listOfBins ? listOfBins[i] : i;
 		binMap[I] = 0.0;
 	}
 }
@@ -97,13 +106,14 @@ DiscreteMap.prototype.normalize = function()
 	this.highCutoff = 1.0;
 
 	var listOfBins = this.listOfBins;
+	var totalBins = this.totalBins || listOfBins.length;
 	var binMap = this.binMap;
 	var maxDensity = 0.0;
 	var areas = this.areas;
 
-	for (var i=0, len=listOfBins.length; i<len; i++) 
+	for (var i=0, len=totalBins; i<len; i++) 
 	{
-		var I = listOfBins[i];
+		var I = listOfBins ? listOfBins[i] : i;
 
 		//binMap[I] *= 1/Math.pow(this.areas[I], 1);
 		binMap[I] *= 1/areas[I];
@@ -113,9 +123,9 @@ DiscreteMap.prototype.normalize = function()
 	if (maxDensity > 0) 
 	{
 		var k = 1 / maxDensity;
-		for (var i=0, len=listOfBins.length; i<len; i++) 
+		for (var i=0, len=totalBins; i<len; i++) 
 		{
-			var I = listOfBins[i];
+			var I = listOfBins ? listOfBins[i] : i;
 			binMap[I] *= k;
 		}
 	}
@@ -132,11 +142,12 @@ DiscreteMap.prototype.percentileCutoff = function()
 
 	var histogram = [];
 	var listOfBins = this.listOfBins;
+	var totalBins = this.totalBins || listOfBins.length;
 	var binMap = this.binMap;
 
-	for (var i=0, len=listOfBins.length; i<len; i++) 
+	for (var i=0, len=totalBins; i<len; i++) 
 	{
-		var bin = listOfBins[i];
+		var bin = listOfBins ? listOfBins[i] : i;
 		histogram.push({bin: bin, v: binMap[bin]});
 	}
 
@@ -157,7 +168,7 @@ DiscreteMap.prototype.percentileCutoff = function()
 	this.highCutoff = histogram[H].v;
 }
 
-DiscreteMap.prototype.plotChoropleth = function(_svg, colormap)
+DiscreteMap.prototype.colorChoropleth = function(_svg, colormap)
 {
 	(function(svg, binMap, L, H) 
 	{
@@ -186,6 +197,79 @@ DiscreteMap.prototype.plotChoropleth = function(_svg, colormap)
 	})(_svg, this.binMap, this.lowCutoff, this.highCutoff)
 }
 
+DiscreteMap.prototype.mapPixel = function(i, r, c)
+{
+	return this.pixelMap[i];
+}
+
+DiscreteMap.prototype.hasPixel = function(i, r, c)
+{
+	return this.pixelMap[i] > 0;
+}
+
+
+DiscreteMap.prototype.mapAndIncrementPixel = function(i, r, c, value)
+{
+	var bin = this.mapPixel(i, r, c);
+	if (bin > 0) 
+	{
+		this.binMap[bin] += value;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+function HeatMap(d)
+{
+	this.width = d.width;
+	this.height = d.height;
+	this.binSize = binSize;
+
+	this.binCount = [
+		Math.floor(.5 + this.width  / this.binSize[0]),
+		Math.floor(.5 + this.height / this.binSize[1])
+	];
+
+	// reconfig binSize
+	this.binSize = [
+		this.width / this.binCount[0],
+		this.height / this.binCount[1]
+	];
+	this.totalBins = this.binCount[0] * this.binCount[1];
+	this.binMap = []; 
+	this.binMap.length=this.totalBins
+	this.zeroBinMap();
+}
+
+HeatMap.prototype = Object.create(DiscreteMap.prototype);
+
+HeatMap.prototype.mapPixel = function(i, r, c)
+{
+	var binSize = this.binSize;
+	var r = Math.floor(i / binSize[0]);
+	var c = Math.floor((i-r*binSize[0])/binSize[0]);
+
+	return r*binCount[0] + c;
+	//return this.pixelMap[i];
+}
+
+HeatMap.prototype.hasPixel = function(i, r, c)
+{
+	return true;
+	//return this.pixelMap[i] > 0;
+}
+
+HeatMap.prototype.mapAndIncrementPixel = function(i, r, c, value)
+{
+	var bin = this.mapPixel(i, r, c);
+	this.binMap[bin] += value;
+	return true;
+}
+
+
 function GaussMixBiDiscrete(w, h, svg, dMapData)
 {
 	console.log('BiDiscreteModel constructor');
@@ -209,7 +293,9 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
     var h = this.h;
     var models = this.models;
     var mCount = models.length;
+    var discreteMap = this.discreteMap;
     var pixelMap = this.discreteMap.pixelMap;
+
 
     // compute PDF / CDF
     var cummDensity = 0, maxDensity = 0, minDensity=Number.MAX_VALUE;
@@ -229,7 +315,7 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
 
             // evaluate density of all models
             var P=0;
-            if (pixelMap[I] > 0) {
+            if (discreteMap.hasPixel(I, r, c)) {
 
 	            for (var m=0; m<mCount; m++)
 	            {
@@ -263,10 +349,16 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
 
 GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 {
-    var pixelMap = this.discreteMap.pixelMap;
+	var discreteMap = this.discreteMap;
     var pdf = this.pdf.view;
 
     if (this.updateCDFMap) {
+        /*
+        (function(model, _discreteMap) 
+        {
+        	model.computeCDFMap(function(I) { return _discreteMap.mapPixel(I); });
+        })(this, this.discreteMap);
+        */
         this.computeCDFMap();
     }
 
@@ -288,8 +380,6 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
     // reset the discrete map
     var discreteMap = this.discreteMap;
     discreteMap.zeroBinMap();
-    var binMap = discreteMap.binMap;
-    var pixelMap = discreteMap.pixelMap;
 
 
     // reset scalar field with zeros
@@ -298,18 +388,25 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
     
     if (_field)
     {
+    	// clear out unused pixels in the scalar field
+    	// (i.e., areas that lie outside the discrete map boundaries)
 	    if (!_field.emptyMarked) 
 	    {
 	    	var empty = SCALAR_EMPTY;
-		    for (var i=0, len=view.length; i<len; i++) 
+		    for (var r=0, c=0, i=0, len=view.length; i<len; i++, c++) 
 		    {
-		    	if (pixelMap[i] == 0) 
+		    	if (discreteMap.mapPixel(i, r, c)==0)
 		    	{
 		    		view[i] = empty;
 		    	}
 		    	else
 		    	{
 		    		view[i] = 0.0;
+		    	}
+
+		    	if (c==w) {
+		    		c=0;
+		    		r++;
 		    	}
 		    }
 		    _field.emptyMarked = true;
@@ -355,33 +452,26 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
         {
             for (var c=C0; c<=C1; c++, k++)
             {
-            	var P = r*w + c;
-            	var bin = pixelMap[ P ];
-            	if (bin > 0)
-            	{
-            		var s = splat[k] * cummP
-                	if (view) {
-                		view[ P ] += s;
-                	}
-                	binMap[ bin ] += s;
-                }
+            	var pixel = r*w + c;
+            	
+            	var s = splat[k] * cummP;
+            	var updated = discreteMap.mapAndIncrementPixel(pixel, r, c, s);
+            	if (updated && view) {
+            		view[ pixel ] += s;
+            	}
             }
         }
-        
-        
+
         /*
-        // OR one hit, as opposed to a splat
-        // =================================
-        var K = R*w + C;
-        var bin = pixelMap[ K ];
-        if (bin > 0) {
-        	//var p = cdf[R*w + C];
-        	view[K] += 1;
-        	binMap[bin] += 1;
+        // OR a single hit, as opposed to a splat
+        // ======================================
+        var pixel = R*w + C;
+        var updated = discreteMap.mapAndIncrementPixel( pixel, R, C, 1 );
+        if (updated && view) 
+        {
+        	view[pixel] += 1;
         }
         */
-        
-        
     }
 
     // normalize discrete map / field
