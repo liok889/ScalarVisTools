@@ -5,6 +5,9 @@ var DOUBLE_PRECISION=true;
 function GaussMixBivariate(w, h, svg)
 {
     GaussMix.call(this, w, h, svg);
+    if (this.svg) {
+        this.svg = this.svg.append('g');
+    }
 
     // double precision for pdf
     this.pdf = new ScalarField(w, h, DOUBLE_PRECISION);
@@ -364,6 +367,7 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                     d3.select(document)
                         .on('mousemove.moveCenter', null)
                         .on('mouseup.moveCenter', null);
+                    me.putOnTop();
                 });
         });
 
@@ -390,6 +394,7 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                     d3.select(document)
                         .on('mousemove.moveCenter', null)
                         .on('mouseup.moveCenter', null);
+                    me.putOnTop();
                 });
         });
 
@@ -418,6 +423,7 @@ GaussMixBivariate.prototype.plotModelCurves = function()
                     d3.select(document)
                         .on('mousemove.moveCenter', null)
                         .on('mouseup.moveCenter', null);
+                    me.putOnTop();
                 });
         });
 
@@ -667,6 +673,23 @@ for (var I=0,r=-SPLAT_SIZE; r<=SPLAT_SIZE; r++)
 
 for (var i=0; i<BI_SPLAT.length; i++) {
     BI_SPLAT[i] /= cummSplat;
+}
+
+GaussMixBivariate.prototype.putOnTop = function()
+{
+    function putNodeOnTop(node)
+    {
+        var n = jQuery(node);
+        n.parent().append(n.detach());
+    }
+
+    if (!this.svg) {
+        return;
+    }
+    else
+    {
+        putNodeOnTop(this.svg.node());
+    }
 }
 
 GaussMixBivariate.prototype.sampleModel = function(iterations, _field)

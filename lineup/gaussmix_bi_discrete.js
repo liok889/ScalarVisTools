@@ -32,7 +32,10 @@ function loadGlobalMapData(mapData)
 		minArea: mapData.minArea,
 		maxArea: mapData.maxArea,
 		width: mapData.width,
-		height: mapData.height
+		height: mapData.height,
+
+		// bin size (for heatmaps)
+		binSize: mapData.binSize
 	}
 }
 
@@ -116,7 +119,9 @@ DiscreteMap.prototype.normalize = function()
 		var I = listOfBins ? listOfBins[i] : i;
 
 		//binMap[I] *= 1/Math.pow(this.areas[I], 1);
-		binMap[I] *= 1/areas[I];
+		if (areas) {
+			binMap[I] *= 1/areas[I];
+		}
 		maxDensity = Math.max(maxDensity, binMap[I]);
 	}
 
@@ -163,21 +168,25 @@ DiscreteMap.prototype.percentileCutoff = function()
 		Math.floor(histogram.length * CUTOFF_PERCENT_HIGH)
 	);
 
-	this.histogram = histogram;
+	//this.histogram = histogram;
 	this.lowCutoff = histogram[L].v;
 	this.highCutoff = histogram[H].v;
 }
 
-DiscreteMap.prototype.colorChoropleth = function(_svg, colormap)
+DiscreteMap.prototype.visTheMap = function(_svg, colormap, selection)
 {
-	(function(svg, binMap, L, H) 
+	return (function(svg, binMap, L, H) 
 	{
 		if (svg.selectAll === undefined) {
 			svg = d3.select(svg);
 		}
 		
-		svg.selectAll('.choroplethBin')
-			.each(function(d) 
+		if (!selection) {
+			selection = svg.selectAll('.choroplethBin');
+		}
+		
+		selection
+			.style('fill', function(d)
 			{
 				var me = d3.select(this);
 				var id = d.id;
@@ -191,9 +200,16 @@ DiscreteMap.prototype.colorChoropleth = function(_svg, colormap)
 					value = Math.max(Math.min(H, value), L);
 					var nValue = (value-L) / (H-L);
 					var color = colormap.mapValue(nValue);
-					me.style('fill', color);
+					return color;
+				}
+				else 
+				{
+					return null;
 				}
 			});
+		
+		return selection;
+
 	})(_svg, this.binMap, this.lowCutoff, this.highCutoff)
 }
 
@@ -224,9 +240,17 @@ DiscreteMap.prototype.mapAndIncrementPixel = function(i, r, c, value)
 
 function HeatMap(d)
 {
-	this.width = d.width;
-	this.height = d.height;
-	this.binSize = binSize;
+	if (USE_GLOBAL_MAP_DATA) {
+		this.width = globalMapData.width;
+		this.height = globalMapData.height;
+		this.binSize = globalMapData.binSize;
+	}
+	else
+	{
+		this.width = d.width;
+		this.height = d.height;
+		this.binSize = d.binSize;
+	}
 
 	this.binCount = [
 		Math.floor(.5 + this.width  / this.binSize[0]),
@@ -240,8 +264,13 @@ function HeatMap(d)
 	];
 	this.totalBins = this.binCount[0] * this.binCount[1];
 	this.binMap = []; 
-	this.binMap.length=this.totalBins
-	this.zeroBinMap();
+	
+	for (var i=0; i<this.totalBins; i++) {
+		this.binMap.push(0);
+	}
+	
+	this.rectSelections = {};
+
 }
 
 HeatMap.prototype = Object.create(DiscreteMap.prototype);
@@ -249,17 +278,19 @@ HeatMap.prototype = Object.create(DiscreteMap.prototype);
 HeatMap.prototype.mapPixel = function(i, r, c)
 {
 	var binSize = this.binSize;
-	var r = Math.floor(i / binSize[0]);
-	var c = Math.floor((i-r*binSize[0])/binSize[0]);
+	var binCount = this.binCount;
+	
+	var R = Math.floor(r/binSize[1]); //Math.floor(i / w);
 
-	return r*binCount[0] + c;
-	//return this.pixelMap[i];
+	var C = Math.floor(c/binSize[0]);   //Math.floor((i-r*w) / binSize[0]);
+
+	return R*binCount[0] + C;
 }
 
 HeatMap.prototype.hasPixel = function(i, r, c)
 {
+	// by definition, a heat map encompases the entire domain
 	return true;
-	//return this.pixelMap[i] > 0;
 }
 
 HeatMap.prototype.mapAndIncrementPixel = function(i, r, c, value)
@@ -269,11 +300,65 @@ HeatMap.prototype.mapAndIncrementPixel = function(i, r, c, value)
 	return true;
 }
 
+HeatMap.prototype.visTheMap = function(svg, colormap, selection)
+{
+	return (function(heatmap, binMap, L, H) 
+	{
+		if (!svg.selectAll) {
+			svg = d3.select(svg);
+		}
+		
+		// check if there's an existing selection
+		if (!selection) 
+		{
+			var rects = svg.selectAll('rect.heatmap')
+				.data(binMap)
+			
+			// create rectangles
+			var newrects = rects.enter().append('rect');
+			newrects.each(function(d, i) 
+			{
+				var y = Math.floor(i/heatmap.binCount[0]);
+				var x = i-y*heatmap.binCount[0];
+
+				d3.select(this)
+					.attr('x', x*heatmap.binSize[0])
+					.attr('y', y*heatmap.binSize[1])
+					.attr('width', heatmap.binSize[0])
+					.attr('height', heatmap.binSize[1])
+					.style('stroke', 'none');
+			});
+
+			// create a new selection and use it
+			selection = newrects;
+		}
+
+		selection
+			.style('fill', function(d, i) 
+			{
+				// d should be equal to heatmap.binMap[i]
+				value = Math.max(Math.min(H, binMap[i]), L);
+				
+				var nValue = (value-L) / (H-L);
+				var color = colormap.mapValue(nValue);
+				return color;
+			});
+		return selection;
+
+	})(this, this.binMap, this.lowCutoff, this.highCutoff);
+
+	return outSelection;
+}
+
 
 function GaussMixBiDiscrete(w, h, svg, dMapData)
 {
-	console.log('BiDiscreteModel constructor');
-	this.discreteMap = new DiscreteMap(dMapData);
+	var mapType = DiscreteMap;
+	if (typeof DISCRETE_TYPE !== 'undefined')
+	{
+		mapType = DISCRETE_TYPE;
+	}
+	this.discreteMap = new mapType(dMapData);
 
 	GaussMixBivariate.call(this, w, h, svg)
 
@@ -395,7 +480,7 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
 	    	var empty = SCALAR_EMPTY;
 		    for (var r=0, c=0, i=0, len=view.length; i<len; i++, c++) 
 		    {
-		    	if (discreteMap.mapPixel(i, r, c)==0)
+		    	if (!discreteMap.hasPixel(i, r, c))
 		    	{
 		    		view[i] = empty;
 		    	}
@@ -428,6 +513,7 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
         var R = Math.floor(I/w);
         var C = I- R*w;
 
+        
         // SPLAT
         // =====
 	    // find splat boundary
@@ -461,6 +547,7 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
             	}
             }
         }
+        
 
         /*
         // OR a single hit, as opposed to a splat
@@ -472,6 +559,8 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
         	view[pixel] += 1;
         }
         */
+
+        
     }
 
     // normalize discrete map / field

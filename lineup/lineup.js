@@ -1,36 +1,3 @@
-function createLineupElements(table, n, elementType, w, h)
-{
-    // how many rows
-    var rows = 2;
-
-    var rs = d3.range(rows);
-
-
-    table.selectAll('tr').data(rs)
-        .enter().append('tr')
-        .each(function(rowNum)
-        {
-            var cols = Math.ceil(n/2);
-            d3.select(this).selectAll('td').data(d3.range(cols))
-                .enter().append('td').each(function(d, i) {
-                    var index = i + rowNum*cols;
-                    if (index < n) 
-                    {
-
-                        d3.select(this).append(elementType)
-                            .attr('width', w)
-                            .attr('height', h)
-                            .attr('id', "sample" + index);
-                    }
-                })
-        });
-
-    table
-        .attr('cellspacing', 10)
-        .attr('cellpadding', 10);
-        
-}
-
 function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
 {
     // total number of exposures (n-1 actual + 1 decoy)

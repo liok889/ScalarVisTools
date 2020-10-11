@@ -28,6 +28,8 @@
 	<script src="lineup/lineup.js"></script>
 	<script src="lineup/sim.js"></script>
 	<script src="lineup/lineup_experiment.js"></script>
+	<script src="lineup/utils.js"></script>
+
 	<style>
 		.county {
 			fill: none;
@@ -63,7 +65,7 @@
 
 	<div id="divDecoy" style="position: absolute; top: 10px; left: 370px;">
 	</div>
-	<div id="divDecoyControl" style="position: absolute; top: 10px; left: 370px;">"</div>
+	<div id="divDecoyControl" style="position: absolute; top: 10px; left: 370px;"></div>
 
 	<!--
 	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></canvas>
@@ -130,19 +132,34 @@
 		// width / height of stimuli
 		var WIDTH = 350;
 		var HEIGHT = 250;
+		var HEATMAP_BIN_SIZE = [10, 10];
 
 		// how many choices within the lineup
 		var LINEUP_N = 4;
 
-		// set type of canvases and samplers expected by the model
-		var MODEL_TYPE = GaussMixBiDiscrete;
-		var SAMPLER_TYPE = ChoroplethSampler; //ScalarSample;
-		var CANVAS_TYPE = 'svg';
+		// number of sampling iterations
+		var ITER = 16000 * 3;
+		var N = ITER;
 
+		// 'good' sampling iterations to show a better representation of the model (for debugging)
+		var GOOD_ITER = ITER * 1;
 
+		// type of representation
+		var VIS_TYPE = 'mapDiscrete';
+		setRepresentationType(VIS_TYPE);
+
+		// create lineup elements
 		createLineupElements(d3.select("#lineupTable"), LINEUP_N, CANVAS_TYPE, WIDTH, HEIGHT);
+
+		// give them a thin border
 		d3.select('#lineupTable').selectAll(CANVAS_TYPE)
-			.classed('lineupSVG', true);
+			.style('border', 'solid 1px black');
+
+		// prevent auto rendering when model us updated 
+		var CALLBACK_SAMPLE = false;
+
+		// no BLUR on rendering smooth fields
+		BLUR = false;
 
 		// create two representations at the top of the page
 		// of both the target and the decoy
@@ -158,26 +175,10 @@
 			.attr('width', WIDTH).attr('height', HEIGHT)
 			.classed('lineupSVG', true);
 
-
 	</script>
 
 
 	<script type="text/javascript">
-
-		BLUR = false;
-
-		// number of sampling iterations
-		var ITER = 16000*3;
-		var N = ITER;
-		var GOOD_ITER = ITER * 1;
-
-		// prevent auto rendering when model us updated 
-		var CALLBACK_SAMPLE = false;
-
-		// choropleth elements
-		var theCounties = null;
-		var theStates = null;
-		var theProjection = null, thePath = null;
 
 		// lineupx
 		var svgTarget = d3.select("#svgTarget");
@@ -190,6 +191,30 @@
 
 		// colormap
 		var colormap = null;
+
+		// load and fireup
+		initInterface();
+
+		// load jsons
+		loadExperimentData(initLineup);
+
+		function initLineup()
+		{
+			lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+				svgTarget, svgDecoy, false, d3.select("#lineupTable"));
+			lineupExp.canMakeSelection = true;
+
+			// show the divergence between the model and the decoy
+			lineupExp.getMain().addCallback(computeDivergence);
+			lineupExp.getDecoy().addCallback(computeDivergence);
+
+			// create samplers
+			setSamplers();				
+   
+			// get random target-decoy pairs
+			randomLineup();			
+		}
+
 
 		function setSamplers() 
 		{
@@ -229,8 +254,6 @@
 			refreshModel();
 		}
 
-		
-
 		function changeColormap(_colormapName) 
 		{
 			colormap = getColorPreset(_colormapName);
@@ -245,6 +268,9 @@
 
 			// copy and perturb
 			lineupExp.copyToDecoy();
+
+			refreshModel();
+			//randomLineup();
 		}
 
 		function initInterface()
@@ -277,39 +303,19 @@
 			d3.select("#labelKLD").html(out);
 		}
 
-		function qLoadJSON(url, callback)
-		{
-			d3.json(url).then(function(data) {
-				callback(null, data)
-			});
-		}
-
-		function initLineup(dMapData)
-		{
-			// load global discrete map data
-			loadGlobalMapData(dMapData);
-
-			lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
-				svgTarget, svgDecoy, false, d3.select("#lineupTable"));
-			lineupExp.canMakeSelection = true;
-
-			// show the divergence between the model and the decoy
-			lineupExp.getMain().addCallback(computeDivergence);
-			lineupExp.getDecoy().addCallback(computeDivergence);
-
-			// create samplers
-			setSamplers();				
-   
-			// get random target-decoy pairs
-			randomLineup();			
-		}
-
-
 		function refreshModel()
 		{
 			targetSampler.sampleAndVis();
-			decoySampler.sampleAndVis();			
+			decoySampler.sampleAndVis();
+
+			lineupExp.main.putOnTop();
+			lineupExp.decoy.putOnTop();
 		}
+
+		// choropleth elements
+		var theCounties = null;
+		var theStates = null;
+		var theProjection = null, thePath = null;
 
 		// filter out Alaska, Hawaii, and Puerto Rico	
 		function filterStates(d) 
@@ -336,25 +342,6 @@
 					return true;
 				}
 			}
-		}
-
-		function drawPaths(paths, svg)
-		{
-			// create a white background
-			svg.append('rect')
-				.attr('width', +svg.attr('width'))
-				.attr('height', +svg.attr('height'))
-				.style('fill', 'white')
-				.style('stroke', 'none');
-
-			// plot paths
-			svg.selectAll('.county')
-				.data(paths)
-				.enter()
-				.append('path')
-					.attr('class', 'county choroplethBin')
-					.attr('d', function(d) { return d.path })
-					.attr('id', function(d) { return d.id; });
 		}
 
 		function drawGeoSimplify(usTopo, svg) 
@@ -623,7 +610,6 @@
 			};
 
 			// add a lookup function by mouseover
-			
 		}
 
 		console.save = function(data, filename){
@@ -649,50 +635,6 @@
 		    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
 		    a.dispatchEvent(e)
 		}
-
-		// load and fireup
-		initInterface();
-
-		// load jsons
-		var q = d3.queue();
-		q
-			.defer(qLoadJSON, 'lineup/maps/us_county_paths.json')
-			.defer(qLoadJSON, 'lineup/maps/us_countymap.json')
-			.awaitAll(function(error, results) 
-			{
-
-				var US = results[0];
-				var dMapData = results[1];
-
-				/*
-				// convert topoJSON to GeoJSON
-				var counties = topojson.feature(US, US.objects.counties);
-				
-				// filter out AK, HI, and Puerto Rico (so that we only show)
-				counties.features = counties.features.filter(filterStates);
-				theCounties = counties;
-				*/
-
-				// draw choropleth maps
-				//drawPaths(US, svgTarget);
-				//drawPaths(US, svgDecoy);
-
-				d3.select('#lineupTable').selectAll('svg')
-					.each(function() {
-						drawPaths(US, d3.select(this));
-					});
-
-				console.log('initializing model...');
-				var start = new Date();
-				// initialize lineup
-				initLineup(dMapData);
-
-				var e = ((new Date()) - start)/1000;
-				console.log("init time: " + e.toFixed(2) + ' sec');
-
-			});
-
-		
 
 
 	</script>
