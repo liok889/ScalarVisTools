@@ -129,7 +129,7 @@ GaussMixBivariate.prototype.remove = function() {
 }
 
 var MIN_M_PERTURB = 0.0;
-var MAX_M_PERTURB = 0.2
+var MAX_M_PERTURB = 0.25
 
 var MIN_R_PERTURB = 0.0;
 var MAX_R_PERTURB = 0.3;

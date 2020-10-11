@@ -153,6 +153,25 @@ function plotParamSweep(svg, results, xScale, yScale)
             .call(yAxis)
 }
 
+var SIMRESULTS=null;
+function saveResults()
+{
+    var seeds = [];
+    for (var i=0; i<SIMRESULTS.length; i++) {
+        var rec = SIMRESULTS[i];
+        seeds.push({
+            center: rec.center,
+            correlation: rec.correlation,
+
+            // expected divergence
+            expectation: rec.avgDist,
+
+            // standard deviation
+            std: rec.stdDist
+        });
+    }
+    console.save(seeds, 'block_seed.json')
+}
 function runParametersSim(param, steps)
 {
     var _M_PERTURB = M_PERTURB;
@@ -188,6 +207,9 @@ function runParametersSim(param, steps)
 
         var rs = runSimulation();
         rs.p = p;
+        rs.center = M_PERTURB;
+        rs.correlation = R_PERTURB;
+
         scaleMax = Math.max(scaleMax, rs.avgDist+rs.stdDist);
         results.push(rs);
     }
@@ -197,4 +219,5 @@ function runParametersSim(param, steps)
     var yScale = d3.scaleLinear().domain([0, scaleMax]).range([PLOT_H, 0]);
     plotParamSweep(d3.select("#simulationResults"), results, xScale, yScale);
 
+    SIMRESULTS = results;
 }
