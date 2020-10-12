@@ -3,6 +3,7 @@
  * processing pipeine in GLSL
  * -------------------------------------------
  */
+var CACHE_RENDERERS = true;
 
 var RENDERERS = {};
 function getRenderer(nameOrCanvas) 
@@ -19,9 +20,16 @@ function getRenderer(nameOrCanvas)
 			canvas: canvas
 		});
 		r.setClearColor(0x444444, 1);
-		RENDERERS[name] = r;
+		
+		if (CACHE_RENDERERS) {
+			RENDERERS[name] = r;
+		}
 		return r;
 	}
+}
+
+function removeRenderCache(name) {
+	RENDERERS[name] = undefined;
 }
 
 function PipelineStage(stage)

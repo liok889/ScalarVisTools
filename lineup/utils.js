@@ -1,3 +1,6 @@
+
+var HEATMAP_BIN_SIZE = [10, 10];
+
 var MODEL_TYPE, DISCRETE_TYPE, SAMPLER_TYPE, CANVAS_TYPE;
 
 function setRepresentationType(_vis_type)
@@ -37,11 +40,14 @@ function setRepresentationType(_vis_type)
 
 function createLineupElements(table, n, elementType, w, h)
 {
+	if (!elementType) {
+		elementType = CANVAS_TYPE;
+	}
+
     // how many rows
     var rows = 2;
 
     var rs = d3.range(rows);
-
 
     table.selectAll('tr').data(rs)
         .enter().append('tr')
@@ -72,6 +78,7 @@ var US_COUNTY_PATHS = 'lineup/maps/us_county_paths.json';
 var US_COUNTY_PIXEL_MAP = 'lineup/maps/us_countymap.json';
 
 
+var US_COUNTY_DATA = null;
 function drawPaths(paths, svg)
 {
 	// create a white background
@@ -99,15 +106,23 @@ function qLoadJSON(url, callback)
 	});
 }
 
+var LOAD_ALL_REGARDLESS = false;
+function setBasicMapData(width, height) {
+	loadGlobalMapData({
+		width: width, 
+		height: height,
+		binSize: HEATMAP_BIN_SIZE
+	});
+}
 function loadExperimentData(callback)
 {
 	var q = d3.queue();
-	if (VIS_TYPE.substr(0,3) == 'map') 
+	if (LOAD_ALL_REGARDLESS || VIS_TYPE.substr(0,3) == 'map') 
 	{
 		console.log("load: " + US_COUNTY_PIXEL_MAP);
 		q.defer(qLoadJSON, US_COUNTY_PIXEL_MAP)
 	}
-	if (VIS_TYPE == 'mapDiscrete') {
+	if (LOAD_ALL_REGARDLESS || VIS_TYPE == 'mapDiscrete') {
 		console.log("load: " + US_COUNTY_PATHS);
 		q.defer(qLoadJSON, US_COUNTY_PATHS);
 	}
@@ -116,25 +131,29 @@ function loadExperimentData(callback)
 	{
 		var start = new Date();
 
-		if (VIS_TYPE == 'mapDiscrete') 
+		if (LOAD_ALL_REGARDLESS || VIS_TYPE == 'mapDiscrete') 
 		{
 			var countyPaths = results[1];
+			US_COUNTY_DATA = countyPaths;
 
 			//drawPaths(countyPaths, svgTarget)
 			//drawPaths(countyPaths, svgDecoy)
 
-			d3.select('#lineupTable').selectAll('svg')
-				.each(function() {
-					drawPaths(countyPaths, d3.select(this));
-				});
+			if (!LOAD_ALL_REGARDLESS) {
+				d3.select('#lineupTable').selectAll('svg')
+					.each(function() {
+						drawPaths(countyPaths, d3.select(this));
+					});
+			}
 			console.log('map draw time: ' + ((new Date()-start)/1000).toFixed(2) + ' seconds');
 		}
 				
 		// load pixel map data
 		var dMapData;
-		if (VIS_TYPE.substr(0, 3) == 'map')
+		if (LOAD_ALL_REGARDLESS || VIS_TYPE.substr(0, 3) == 'map')
 		{
 			dMapData = results[0];
+			dMapData.binSize = HEATMAP_BIN_SIZE;
 		}
 		else
 		{

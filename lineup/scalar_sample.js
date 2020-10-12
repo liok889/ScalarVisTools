@@ -1,4 +1,6 @@
-var BLUR=true;
+var BLUR=false;
+
+// disable renderer caching, forcing new canvases each time
 ALL_SAMPLERS = [];
 
 var CALLBACK_SAMPLE = true;
@@ -11,6 +13,7 @@ var shaderList = [
 
 function ScalarSample(w, h, canvas, model, colormap)
 {
+    console.log('scalar sample constructor');
     this.w = w;
     this.h = h;
     this.field = new ScalarField(w, h);
@@ -32,7 +35,11 @@ function ScalarSample(w, h, canvas, model, colormap)
         (function(me) {
             me.visualizer = new ColorAnalysis(
                 me.field, me.canvas,
-                function() { me.initVisPipeline(); }, shaderList
+                function() 
+                {
+                    console.log('initVisPipeline'); 
+                    me.initVisPipeline(); 
+                }, shaderList
             );
         })(this);
     }
@@ -46,18 +53,46 @@ function ScalarSample(w, h, canvas, model, colormap)
     ALL_SAMPLERS.push(this);
 }
 
+ScalarSample.prototype.dispose = function()
+{
+    for (var i=0; i<ALL_SAMPLERS.length; i++) {
+        var s = ALL_SAMPLERS[i];
+        if (s == this) {
+            ALL_SAMPLERS.splice(i, 1);
+            break;
+        }
+    }
+
+    if (this.canvas) {
+        var c = this.canvas
+        if (!c.attr) {
+            c = d3.select(this.canvas);
+        }
+        removeRenderCache(c.attr('id'));
+
+    }
+    this.field = null;
+    this.model = null;
+    this.canvas = null;
+    this.w = null;
+    this.h = null;
+
+}
+
 ScalarSample.prototype.setColorMap = function(colormap)
 {
     this.field.setColorMap(colormap);
 }
 
-ScalarSample.setUniversalColormap = function(colormap) {
+ScalarSample.setUniversalColormap = function(colormap, dontVis) {
     for (var i=0; i<ALL_SAMPLERS.length; i++)
     {
         ALL_SAMPLERS[i].setColorMap(colormap);
 
         // render?
-        ALL_SAMPLERS[i].vis();
+        if (!dontVis) {
+         ALL_SAMPLERS[i].vis();
+        }
     }
 }
 

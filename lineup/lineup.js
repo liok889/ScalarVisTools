@@ -62,6 +62,14 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
     this.correctSample = n-1;
 }
 
+Lineup.prototype.dispose = function() {
+    for (var i=0; i<this.samplers.length; i++) {
+        this.samplers[i].dispose();
+    }
+    this.samplers = null;
+    this.canvases = null;
+}
+
 Lineup.prototype.getCorrectAnswer = function() {
     return this.correctSample;
 }
@@ -79,6 +87,7 @@ Lineup.prototype.sample = function(samplingRate, noDecoy)
 }
 
 var LINEUP_PADDING = 6;
+var LINEUP_SPACING = 10;
 
 Lineup.prototype.layoutCanvases = function(table)
 {
@@ -100,7 +109,8 @@ Lineup.prototype.layoutCanvases = function(table)
 
     // remove everything in the table
     table.selectAll('*').remove();
-    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", "0")
+    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
+
     // how many rows
     var rows = 2;
     var cols = Math.ceil(this.n/2);
@@ -132,7 +142,7 @@ Lineup.prototype.layoutCanvases = function(table)
 
                                 this.appendChild( randomCanvases[index] );
                                 d3.select(randomCanvases[index])
-                                    .classed('index' + index, true);
+                                    .attr('class', 'index' + index);
                             }
                         });
 
@@ -194,18 +204,22 @@ function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
         samplerType = SAMPLER_TYPE;
     }
 
-    (function(_table, canvases, canvasType) {
-        var selectionSize = table.selectAll(canvasType).size()
+    (function(_table, canvases, canvasType) 
+    {
+        var selectionSize = table.selectAll(canvasType).size();
         if (selectionSize != n) {
             console.error("LineupFixed: number of canvases (" + selectionSize + ") + doesn't match number of requested lineup samples (" + n + ")");
         }
-        table.selectAll(canvasType).each(function() 
-        {
+
+        table.selectAll(canvasType).each(function() {
             canvases.push(d3.select(this));
             d3.select(this)
                 .attr('id', 'sample' + (canvases.length-1))
                 .classed('index' + (canvases.length-1), true);
         });
+
+        table
+            .attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
     })(table, this.canvases, this.canvasType);
     this.table = table;
 

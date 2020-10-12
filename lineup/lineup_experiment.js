@@ -30,6 +30,16 @@ function LineupExperiment(w, h, _lineupN, gMain, gDecoy, nullOption, table)
     this.nullOption = nullOption;
 }
 
+LineupExperiment.prototype.dispose = function() {
+    this.lineup.dispose();
+    this.main.dispose();
+    this.decoy.dispose();
+    this.main = null;
+    this.decoy = null;
+    this.w = null;
+    this.h = null;
+}
+
 LineupExperiment.prototype.enableSelection = function(t) {
     this.canMakeSelection = t;
 }
@@ -79,7 +89,8 @@ LineupExperiment.prototype.highlightCorrect = function(show)
     this.domSelection.selectAll('td').style('background-color', null);
     d3.select('div.nullOption').style('border', 'solid 1px black');
 
-    var td = d3.select('#sample' + (this.lineupN-1)).node().parentNode;
+    var correctID = '#sample' + this.lineup.getCorrectAnswer();
+    var td = d3.select(correctID).node().parentNode;
     if (this.trialHasDecoy) {
 
         d3.select(td)

@@ -52,6 +52,13 @@ biGauss.prototype.eval = function(x, y)
 GaussMixBivariate.prototype = new GaussMix();
 GaussMixBivariate.prototype.constructor = GaussMixBivariate;
 
+GaussMixBivariate.prototype.dispose = function()
+{
+    this.pdf = null;
+    this.cdf = null;
+    this.cdfMap = null;
+}
+
 GaussMixBivariate.prototype.init = function()
 {
     var MIN_GAUSS = 3;

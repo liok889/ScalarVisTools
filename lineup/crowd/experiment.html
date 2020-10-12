@@ -18,10 +18,14 @@
 	<script src="../../jnd/lib/three.min.js"></script>
 	<script src="../gaussmix.js"></script>
 	<script src="../gaussmix_bivariate.js"></script>
+	<script src="../gaussmix_bi_discrete.js"></script>
 	<script src="../scalar_sample.js"></script>
+	<script src="../choropleth_sample.js"></script>
 	<script src="../lineup.js"></script>
 	<script src="../sim.js"></script>
 	<script src="../lineup_experiment.js"></script>
+	<script src="../utils.js"></script>
+
 	<style>
 		body {
 			font-family: Arial; sans-serif
@@ -57,6 +61,11 @@
 		 width: 80%;
 	   }
 
+	   .county {
+	   		fill: none;
+	   		stroke: none;
+	   }
+
 	</style>
 </head>
 <body>
@@ -79,16 +88,17 @@
 			<p>Click on the image that <b>doesn't belong</b>
 		</div>
 
-		<div style="width: 730px; height: 450px; margin-top: 40px">
+		<img id="imgLoading" src="../../img/loading2.gif" style="position: absolute; top: 220px; left: 350px" />
+
+		<div style="width: 900px; height: 450px; margin-top: 40px">
 			<div style="float: left;">
-				<table style="margin-left: 120px" id="lineupTable"></table>
+				<table style="margin-left: 60px" id="lineupTable" cellspacing="10"></table>
 			</div>
 			<div id="divColorScale" style="width: 90; height: 210px; float: right;">
 				<div style="margin-top: 140px; font-size: 16px">
-					color<br>scale<br><canvas id="colorScaleCanvas" width="25" height="140"></canvas><br><!--low<br>values-->
+					color<br>scale<br><canvas id="colorScaleCanvas" width="25" height="200"></canvas><br><!--low<br>values-->
 				</div>
 			</div>
-
 		</div>
 
 		<p id="incorrect" style="visibility: hidden">Incorrect choice. Real answer highlighted in green</p>
@@ -145,11 +155,12 @@
 
 
 	<script>
-		var WIDTH=200;
-		var HEIGHT=200;
+		var WIDTH=350;
+		var HEIGHT=250;
 		var TRAINING = false;
+		var FINISHED_REDICTED_URL = null;	// 'strategy.html'
 
-		var SAMPLE_FIDELITY=14000;
+		var SAMPLE_FIDELITY=16000 * 2//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 4;
 
@@ -159,35 +170,75 @@
 		    {name: 'blur',		path: '../../design/src/shaders/blur.frag'}
 		];
 
+		var ALL_VIS_TYPES = [
+			'mapDiscrete',
+			'mapSmooth',
+			'fieldDiscrete',
+			'fieldSmooth'
+		];
+
 		var ALL_COLORMAPS = [
+
+			/*
 			'singlehue',
 			'viridis',
 			'spectral',
 			'coolwarm',
 			'turbo',
 			'rainbowjet',
+			*/
+
+			'blues',
+			'purples',
+			'reds',
+
+			'redpurple',
+			'viridis',
+			'plasma',
+
+			'coolwarm',
+			'greyred',
+			'spectral',
+
+			'rainbowjet',
+			'turbo',
+			'rainbowcie'
 		];
 
-		var COMBINATION = 'abc';
-		var RANDOMIZE_COLOR_ORDER = true;
+		var COLOR_COMBINATION = 'j';
+		var VIS_COMBINATION = 'abcd';
+
+		var RANDOMIZE_COLOR = true;
+		var RANDOMIZE_VIS = false;
+
 		var BLOCK_SEED = [
-			{ center: 0.05, correlation: 0.07, expectation: 0.160, std: 0.04},
-			{ center: 0.06, correlation: 0.07, expectation: 0.190, std: 0.04},
-			{ center: 0.07, correlation: 0.07, expectation: 0.210, std: 0.04},
-			{ center: 0.08, correlation: 0.07, expectation: 0.230, std: 0.04},
-			{ center: 0.09, correlation: 0.07, expectation: 0.240, std: 0.04},
-			{ center: 0.10, correlation: 0.07, expectation: 0.260, std: 0.04},
-			{ center: 0.11, correlation: 0.07, expectation: 0.270, std: 0.04},
-			{ center: 0.12, correlation: 0.07, expectation: 0.285, std: 0.05},
-			{ center: 0.13, correlation: 0.07, expectation: 0.300, std: 0.05},
-			{ center: 0.14, correlation: 0.07, expectation: 0.320, std: 0.05},
+			{ center: 0.030, correlation: 0.07, expectation: 0.110, std: 0.02},
+			
+			/*
+			{ center: 0.040, correlation: 0.07, expectation: 0.130, std: 0.04},
+			{ center: 0.050, correlation: 0.07, expectation: 0.160, std: 0.04},
+			{ center: 0.060, correlation: 0.07, expectation: 0.190, std: 0.04},
+			{ center: 0.070, correlation: 0.07, expectation: 0.210, std: 0.04},
+			{ center: 0.080, correlation: 0.07, expectation: 0.230, std: 0.04},
+			//{ center: 0.090, correlation: 0.07, expectation: 0.240, std: 0.04},
+			{ center: 0.100, correlation: 0.07, expectation: 0.260, std: 0.04},
+			//{ center: 0.110, correlation: 0.07, expectation: 0.270, std: 0.04},
+			{ center: 0.120, correlation: 0.07, expectation: 0.285, std: 0.05},
+			{ center: 0.130, correlation: 0.07, expectation: 0.300, std: 0.05},
+			{ center: 0.140, correlation: 0.07, expectation: 0.320, std: 0.05},
+			{ center: 0.165, correlation: 0.07, expectation: 0.340, std: 0.05},
+			*/
+			
 		];
 		var trialPerSubblock = 2;
 
-		// create lineup experiment
+		// OLD: create lineup experiment
+		// this will be done from within changeVisType()
+		var lineup = null;
+		/*
 		var lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N);
 		lineup.enableSelection(true);
-		var correct = false;
+		*/
 
 		// store results
 		var csv = [];
@@ -200,12 +251,9 @@
 		var engagementPerBlock = 2;
 
 		// preset blocks
-		var blocks = [
-			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
-			{ colormap: 'turbo', center: 0.12, correlation: 0.07, expectation: 0.28},
-			{ colormap: 'viridis', center: 0.07, correlation: 0.07, expectation: 0.22},
-			{ colormap: 'turbo', center: 0.07, correlation: 0.07, expectation: 0.22}
-		];
+		var blocks = null;
+
+		// engagement checks
 		var ENGAGEMENT = {
 			center: 0.24,
 			correlation: 0.08,
@@ -220,9 +268,10 @@
 		// current status
 		// ==============
 		var trialNum = -1, blockNum = -1, engagementNum = 0;
-		var currentColormap = null;
 		var distance = null;
 		BLUR = false;
+		CALLBACK_SAMPLE = false;
+		LOAD_ALL_REGARDLESS = true;
 
 		// flag on whether experiment is complete
 		var complete = false;
@@ -230,6 +279,61 @@
 		var EXPERIMENT_URL = 'experiment.html';
 		var DATA_URL = 'php/experimental_data.php';
 
+		var CUR_VIS_TYPE = null;
+		function changeVisType(visType, callback)
+		{
+			if (visType == CUR_VIS_TYPE) {
+				// do nothing
+			}
+			else
+			{
+
+				CUR_VIS_TYPE = visType;
+				setRepresentationType(visType);
+
+				var table = d3.select("#lineupTable");
+				if (lineup) 
+				{
+					// remove old lineup
+					table.selectAll('*').remove();
+					lineup.dispose();
+					lineup = null;
+				}
+
+				// create a new lineup elements
+				createLineupElements(table, LINEUP_N, null, WIDTH, HEIGHT);
+
+				// draw choropleth?
+				if (visType == 'mapDiscrete') {
+					table.selectAll('svg').each(function() {
+						drawPaths(US_COUNTY_DATA, d3.select(this));
+					})
+				}
+
+				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, table);
+				lineup.enableSelection(true);
+	
+				// set feedback
+				lineup.setClickFeedback(showConfirmPrompt, showConfirmPrompt);
+
+				d3.select('#imgLoading').style('visibility', 'hidden');
+			}
+
+		}
+
+		function changeColormap(colormapName)
+		{
+			var colormap = getColorPreset(colormapName);
+			ScalarSample.setUniversalColormap(colormap);
+
+			// draw the current currentColormap
+			var scaleCanvas = d3.select("#colorScaleCanvas");
+			colormap.drawColorScale(
+				+scaleCanvas.attr('width'),
+				+scaleCanvas.attr('height'),
+				+scaleCanvas.attr('height'), 'vertical',
+				scaleCanvas.node());
+		}
 		function nextBlock()
 		{
 			blockNum++;
@@ -240,24 +344,21 @@
 				complete = true;
 				return true;
 			}
-			else {
+			else 
+			{
+
 				trialNum = 0;
 				var block = blocks[blockNum];
 
 				M_PERTURB = block.center;
 				R_PERTURB = block.correlation;
 
-				var colormap = getColorPreset(block.colormap)
-				ScalarSample.setUniversalColormap(colormap);
+				// see if the vis is changeing
+				// note: for first time, this will instantiate lineup
+				changeVisType(block.vis);
 
-				// draw the current currentColormap
-				var scaleCanvas = d3.select("#colorScaleCanvas");
-				colormap.drawColorScale(
-					+scaleCanvas.attr('width'),
-					+scaleCanvas.attr('height'),
-					+scaleCanvas.attr('height'), 'vertical',
-					scaleCanvas.node());
-
+				var dontVis = true;
+				changeColormap(block.colormap, dontVis);
 				return false;
 			}
 		}
@@ -271,11 +372,15 @@
 				.style('visibility', null)
 				.html(TRAINING ?
 					'Training is complete. Please proceed to the <a href="' + EXPERIMENT_URL + '"><b>main experiment</b></a>.' :
-					'Thank you! Storing data... (may take a few seconds)');
+					'Thank you! Saving data... (may take a few seconds)');
 
 			sendData(undefined, function() {
 				d3.select("#confirm")
 					.html('DONE');
+				if (FINISHED_REDICTED_URL) 
+				{
+					window.location.replace(FINISHED_REDICTED_URL);
+				}
 			});
 			/*
 			d3.select("#downloadData")
@@ -285,6 +390,15 @@
 
 		var stimulusReady = null, genTime;
 
+		function nextTrialWithLoading()
+		{
+			d3.select('#imgLoading').style('visibility', 'visible');
+			setTimeout(function() {
+				nextTrial();
+				d3.select('#imgLoading').style('visibility', 'hidden');
+			}, 10);
+
+		}
 		function nextTrial()
 		{
 			LINEUP_PADDING = 10;
@@ -292,7 +406,8 @@
 				// do nothing
 				return true;
 			}
-			else {
+			else 
+			{
 				// current block
 				var block = blocks[blockNum];
 
@@ -302,12 +417,39 @@
 						finish();
 						return true;
 					}
-					block = blocks[blockNum];
+					else
+					{
+						// display modal
+						var text2;
+						left = (blocks.length-1)-blockNum;
+						
+						if (blockNum>1) {
+							d3.select("#modalText1").html("Feel free to take a moment to rest if you prefer.");
+						}
 
+						if (left == 0)
+						{
+							d3.select("#modalText1").html("Almost finished. You may rest for a moment if you wish.");
+
+							text2 = "Only 1 set remaining";
+						}
+						else
+						{
+							text2 = "There are " + (1+left) + " sets remaining.";
+						}
+
+						d3.select("#modalText2").html(text2);
+						setModalCallback(function() {
+							stimulusReady = Date.now();
+						});
+						displayModal();
+					}
 				}
 				else {
 					trialNum++;
 				}
+
+				block = blocks[blockNum];
 
 				genTime = Date.now();
 
@@ -322,43 +464,52 @@
 				label = Math.floor(.5+100*p) + '% complete';
 				d3.select('#stimulusNum').html(label);
 
-				setTimeout(function()
-				{
-					if (block.trialSequence[trialNum] == 'e')
-					{
-						console.log("engagement check");
-						M_PERTURB = ENGAGEMENT.center;
-						R_PERTURB = ENGAGEMENT.correlation;
-						lineup.modelWithExpectation(ENGAGEMENT.expectation);
-					}
-					else if ( typeof block.trialSequence[trialNum] === "object" )
-					{
-						var subblock = block.trialSequence[trialNum]
-						M_PERTURB = subblock.center;
-						R_PERTURB = subblock.correlation;
-						lineup.modelWithExpectation(subblock.expectation);
-					}
-					else
-					{
-						M_PERTURB = block.center;
-						R_PERTURB = block.correlation;
-						lineup.modelWithExpectation(block.expectation);
-					}
-
-					// keep track of time needed to generate stimulus
-					distance = lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
-					genTime = Date.now() - genTime;
-
-					// force a min of 250 ms delay to clear our iconic memory
+				(function(_block, _trialNum) {
 					setTimeout(function()
 					{
-						// show lineup
-						d3.select("#lineupTable").style('visibility', null);
+						if (_block.trialSequence[_trialNum] == 'e')
+						{
+							//console.log("engagement check");
+							M_PERTURB = ENGAGEMENT.center;
+							R_PERTURB = ENGAGEMENT.correlation;
+							lineup.modelWithExpectation(ENGAGEMENT.expectation);
+						}
+						else if ( typeof block.trialSequence[_trialNum] === "object" )
+						{
+							var subblock = block.trialSequence[_trialNum]
+							M_PERTURB = subblock.center;
+							R_PERTURB = subblock.correlation;
+							distance = lineup.modelWithExpectation(subblock.expectation);
+							if (Math.abs(distance-subblock.expectation) > LINEUP_TOLERANCE) {
+								console.error("[" + csv.length + "]: exceeded tolerance, e:" + subblock.expectation + ", d: " + distance + ", itr: " + lineup.iterations + ', conv: ' + lineup.converged);
+							}
+							else
+							{
+								console.log("[" + csv.length + "]: e:" + subblock.expectation + ", d: " + distance + ", itr: " + lineup.iterations + ', gap: ' + Math.abs(distance-subblock.expectation));
+							}
+						}
+						else
+						{
+							M_PERTURB = _block.center;
+							R_PERTURB = _block.correlation;
+							distance = lineup.modelWithExpectation(_block.expectation);
+						}
 
-						// keep track of time when stimulus is ultimately ready
-						stimulusReady = Date.now();
-					}, Math.max(0, 250-genTime));
-				}, 10);
+						// keep track of time needed to generate stimulus
+						lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
+						genTime = Date.now() - genTime;
+
+						// force a min of 250 ms delay to clear our iconic memory
+						setTimeout(function()
+						{
+							// show lineup
+							d3.select("#lineupTable").style('visibility', null);
+
+							// keep track of time when stimulus is ultimately ready
+							stimulusReady = Date.now();
+						}, Math.max(0, 250-genTime));
+					}, 20);
+				})(block, trialNum);
 
 				return false;
 			}
@@ -395,43 +546,55 @@
 		    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
 		}
 
-		function createTrialSequence()
+		function getCombination(combination, all, randomize)
 		{
-			if (COMBINATION && COMBINATION.length > 0)
+			function resolveIndices(comb) 
 			{
-				var combination = COMBINATION;
-				if (RANDOMIZE_COLOR_ORDER)
+				var indices = [];
+				for (var i=0; i<comb.length; i++) 
 				{
-					// randomize
-					for (var i=0; i<100; i++)
-					{
-						var r1 = Math.floor(Math.random() * combination.length);
-						var r2 = Math.floor(Math.random() * combination.length);
-						if (r1 != r2) {
-							var c1 = combination.charAt(r1);
-							var c2 = combination.charAt(r2);
-							combination = combination.replaceAt(r1, c2);
-							combination = combination.replaceAt(r2, c1);
-						}
+					var index = comb.charCodeAt(i) - 'a'.charCodeAt(0);
+					indices.push(all[index]);
+				}
+				return indices;
+			}
+
+			// randomize
+			if (randomize && combination.length > 1) 
+			{
+			
+				for (var i=0; i<2000; i++)
+				{
+					var r1 = Math.floor(Math.random() * combination.length);
+					var r2 = Math.floor(Math.random() * combination.length);
+					if (r1 != r2) {
+						var c1 = combination.charAt(r1);
+						var c2 = combination.charAt(r2);
+						combination = combination.replaceAt(r1, c2);
+						combination = combination.replaceAt(r2, c1);
 					}
 				}
-				COMBINATION = combination;
+			}
+			return resolveIndices(combination);
+		}
 
-				// create colorCombination
-				var colorscales = [];
-				for (var i=0; i<COMBINATION.length; i++) {
-					var index = COMBINATION.charCodeAt(i) - 'a'.charCodeAt(0);
-					colorscales.push(ALL_COLORMAPS[index]);
-				}
+		function createTrialSequence()
+		{
+			var colorscales = getCombination(COLOR_COMBINATION, ALL_COLORMAPS, RANDOMIZE_COLOR);
+			var visTypes = getCombination(VIS_COMBINATION, ALL_VIS_TYPES, RANDOMIZE_VIS);
 
-				// construct blocks
-				var generatedBlocks = [];
+			// construct blocks
+			var generatedBlocks = [];
+			for (var v=0; v<visTypes.length; v++)
+			{
 				for (var c=0; c<colorscales.length; c++)
 				{
 					var block = {
+						vis: visTypes[v],
 						colormap: colorscales[c],
-						trialSequence: []
+						trialSequence: [],
 					};
+
 					for (var i=0; i<BLOCK_SEED.length; i++)
 					{
 						var seed = BLOCK_SEED[i];
@@ -446,8 +609,9 @@
 							block.trialSequence.push(subblock);
 						}
 
-						// permutate randomize subblock?
-						for (var x=0; x<9000; x++) {
+						// permutate randomize subblock
+						for (var x=0; x<9000; x++) 
+						{
 							var r1 = Math.floor(Math.random() * block.trialSequence.length);
 							var r2 = Math.floor(Math.random() * block.trialSequence.length);
 							var t = block.trialSequence[r2];
@@ -457,9 +621,10 @@
 					}
 					generatedBlocks.push(block);
 				}
-				blocks = generatedBlocks;
-				trialPerBlock = trialPerSubblock * BLOCK_SEED.length;
 			}
+			
+			blocks = generatedBlocks;
+			trialPerBlock = trialPerSubblock * BLOCK_SEED.length;
 
 			for (var b=0; b<blocks.length; b++)
 			{
@@ -477,17 +642,18 @@
 				}
 			}
 		}
+		function showConfirmPrompt() {
+			d3.select("#incorrect").style('visibility', 'hidden');
+			d3.select("#confirm").style('visibility', null);
+		}
+
 
 		function initExperiment()
 		{
 			// trial sequence
 			createTrialSequence();
 
-			function showConfirmPrompt() {
-				d3.select("#incorrect").style('visibility', 'hidden');
-				d3.select("#confirm").style('visibility', null);
-			}
-			lineup.setClickFeedback(showConfirmPrompt, showConfirmPrompt);
+			
 
 			// keyboard events
 			d3.select(document).on('keydown', function()
@@ -503,6 +669,7 @@
 					if (lineup.answer == null || lineup.answer == undefined)
 					{
 						// do nothing
+						return;
 					}
 					else if (lineup.answer == '0' && TRAINING)
 					{
@@ -520,11 +687,22 @@
 							engagementCorrect += +lineup.answer;
 							engagementNum++;
 						}
-						else {
+						else {							
+
 							var colormap = b.colormap;
+							var vis = b.vis;
+
 							if (typeof b.trialSequence[trialNum] == 'object')
 							{
-								b = b.trialSequence[trialNum];
+								b = b.trialSequence[trialNum];	
+							}
+
+							if (trialNum - engagementNum == trialPerBlock * BLOCK_SEED.length-1) {
+								console.log("lastTrial")
+							}
+
+							if (typeof lineup.getCurExpectation() == 'object') {
+								console.error("expectation is not number: " + lineup.getCurExpectation());
 							}
 
 							var stimNum = csv.length+1
@@ -532,23 +710,29 @@
 								blockNum: blockNum+1,
 								trialNum: trialNum+1 - engagementNum,
 								stimulusNum: stimNum,
+								vis: vis,
 								colormap: colormap,
 								distance: lineup.getCurDistance(),
-								requestedDistance: b.expectation,
+								requestedDistance: lineup.getCurExpectation(),
 								correct: +lineup.answer,
+								selection: +lineup.canvasIndex + 1,
 								generationTime: genTime,
+								converged: lineup.converged,
+								iterations: lineup.iterations,
 								responseTime: Date.now()-stimulusReady,
 								center: b.center,
 								correlation: b.correlation,
-								expdistance: b.expectation
+								expdistance: lineup.getCurExpectation()
 							});
 							stimulusCorrect += +lineup.answer;
+							lineup.answer = null;
 
 						}
 
 						d3.select("#confirm").style('visibility', 'hidden');
 						d3.select("#incorrect").style('visibility', 'hidden');
-						nextTrial();
+s
+						nextTrialWithLoading();
 
 					}
 				}
@@ -556,31 +740,10 @@
 
 			nextBlock();
 			trialNum = -1;
-			nextTrial();
+			nextTrialWithLoading();
 		}
 
 		var flashSeq = 0, FLASH_RATE=80;
-
-
-		function flashAnswer()
-		{
-			function flashTimeout() {
-				flashSeq++;
-				if (flashSeq % 2 == 0) {
-					lineup.highlightCorrect(true);
-				}
-				else {
-					lineup.highlightCorrect(false);
-				}
-				if (flashSeq < 4) {
-					setTimeout(flashTimeout, FLASH_RATE);
-				}
-			}
-
-			flashSeq = 0;
-			lineup.highlightCorrect(true);
-			setTimeout(flashTimeout, FLASH_RATE);
-		}
 
 		function checkData()
 		{
@@ -636,11 +799,33 @@
 			}
 		}
 
+
+		function flashAnswer()
+		{
+			function flashTimeout() {
+				flashSeq++;
+				if (flashSeq % 2 == 0) {
+					lineup.highlightCorrect(true);
+				}
+				else {
+					lineup.highlightCorrect(false);
+				}
+				if (flashSeq < 4) {
+					setTimeout(flashTimeout, FLASH_RATE);
+				}
+			}
+
+			flashSeq = 0;
+			lineup.highlightCorrect(true);
+			setTimeout(flashTimeout, FLASH_RATE);
+		}
+
 		function sendData(TRIALS, callback)
 		{
 			var blockCount = blocks.length;
 
 			checkData();
+			
 			var data2send = JSON.stringify(
 			{
 				experimentalData: csv,
@@ -687,7 +872,29 @@
 			})(this, TRIALS != undefined ? TRIALS : 3, data2send, callback);
 		}
 
-		initExperiment();
+		// set periodic timeout to poll heartbeat
+		function heartbeat()
+		{
+			setTimeout(function() {
+				
+				$.post('php/heartbeat.php', {
+					totalComplete: csv.length+1,
+					totalAll: blocks.length * (trialPerBlock + engagementPerBlock)
+				}, function(data, status) {
+					//console.log("heartbeat: " + data + ", status: " + status);
+				});
+				
+				heartbeat();			
+			}, 15*1000);
+		}
+
+		// replace with loading actual pixel map data
+		US_COUNTY_PATHS = '../../' + US_COUNTY_PATHS;
+		US_COUNTY_PIXEL_MAP = '../../' + US_COUNTY_PIXEL_MAP;
+
+		loadExperimentData(function() {
+			initExperiment();
+		});
 
 	</script>
 </body>
