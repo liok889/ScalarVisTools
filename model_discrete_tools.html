@@ -147,8 +147,13 @@
 		// 'good' sampling iterations to show a better representation of the model (for debugging)
 		var GOOD_ITER = ITER * 1;
 
-		// type of representation
-		var VIS_TYPE = 'mapDiscrete';
+		// type of representation:
+		// 'mapSmooth':  smooth US map
+		// 'mapDiscrete': US map binned by counties
+		// 'fieldSmooth': smooth rectangle
+		// 'fieldDiscrete': binned rectangle (10x10 pixel bins)
+		
+		var VIS_TYPE = 'fieldDiscrete';
 		setRepresentationType(VIS_TYPE);
 
 		// create lineup elements
