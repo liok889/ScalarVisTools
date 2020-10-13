@@ -24,7 +24,7 @@
 	<svg class="main" width="600" height="400"></svg>
 
 	<script>
-		var SAMPLES = 10;
+		var SAMPLES = 9;
 		var colormap = null;
 
 		c3.load('lib/colorname/c3_data.json');
@@ -128,23 +128,37 @@
 		}
 
 		var RAMPS = [
+
+			"bluebrown",
+			"bluebrownFull",
+
+			"greenpink",
+			"greenpinkFull",
+
+
+			"greenpurple",
+			"greenpurpleFull",
+
+			"bluegreenyellow",
+
+
 			"threewave",
 			"blueorange",
 			"rainbow",
-			"rainbowcie",
-			"rainbowjet",
+			//"rainbowcie",
+			//"rainbowjet",
 			"cubehelix",
-			"bodyheat",
+			//"bodyheat",
 			"extendedBlackBody",
 			"kindlmann",
-			"spectralFull",
+			//"spectralFull",
 			"coolwarmMoreland",
 			"viridis",
 			"plasma",
 			"redpurple",
 			"greyred",
 			"coolwarm",
-			"reds",
+			//"reds",
 			"purples",
 			"blues",
 			"spectral",
@@ -243,7 +257,7 @@
 			}
 			return str;
 		}
-		function printStats()
+		function downloadStats()
 		{
 			var header = ['nameVariation', 'nameSalience', 'labLength'];
 			var data = getRampStats(SAMPLES, header);

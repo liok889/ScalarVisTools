@@ -545,7 +545,22 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 	return internalCanvas;
 }
 
-var COLOR_PRESETS = {
+var COLOR_PRESETS = 
+{
+		bluebrown: ['#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e'].reverse(),
+		bluebrownFull: ['#543005','#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e','#003c30'].reverse(),
+
+		greenpink: ['#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221'].reverse(),
+		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
+
+
+		purpleorange: ['#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788'].reverse(),
+		purpleorangeFull: ['#7f3b08','#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788','#2d004b'].reverse(),
+
+		greenpurple: ['#762a83','#9970ab','#c2a5cf','#e7d4e8','#f7f7f7','#d9f0d3','#a6dba0','#5aae61','#1b7837'].reverse(),
+		greenpurpleFull: ['#40004b','#762a83','#9970ab','#c2a5cf','#e7d4e8','#f7f7f7','#d9f0d3','#a6dba0','#5aae61','#1b7837','#00441b'].reverse(),
+
+		bluegreenyellow: ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58'].reverse(),
 
 		greyscale: [
 			[0, 0, 0],
@@ -559,6 +574,17 @@ var COLOR_PRESETS = {
 			[255, 255, 0],
 			[255, 0, 0],
 		],
+
+		rainbowFull: [
+			[0, 0, 255],
+			[0, 255, 255],
+			[0, 255, 0],
+			[255, 255, 0],
+			[255, 0, 0],
+			[255, 0, 255],
+
+		],
+
 
 		rainbowcie: [
 			[0, 0, 255],
@@ -1840,6 +1866,13 @@ function getColorPreset(preset, m0, m1, brandNew)
 					colorset.push({
 						value: c.length > 3 ? c[3] : v,
 						rgb: [c[0], c[1], c[2]]
+					});
+				}
+				else if (typeof c == 'string') {
+					var cc = d3.rgb(d3.color(c));
+					colorset.push({
+						value: v,
+						rgb: [cc.r, cc.g, cc.b]
 					});
 				}
 				else
