@@ -660,7 +660,7 @@
 						block.trialSequence[i] = 0;
 					}
 				}
-				trialPerBlock += block.trialSequence.length;
+				trialPerBlock = block.trialSequence.length;
 
 				for (var i=0; i<engagementPerBlock; i++) {
 					var r = Math.floor(Math.random()*trialPerBlock);
