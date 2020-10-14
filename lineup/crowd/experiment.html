@@ -25,6 +25,7 @@
 	<script src="../sim.js"></script>
 	<script src="../lineup_experiment.js"></script>
 	<script src="../utils.js"></script>
+	<script src="block_seeds.js"></script>
 
 	<style>
 		body {
@@ -160,7 +161,7 @@
 		var TRAINING = false;
 		var FINISHED_REDICTED_URL = null;	// 'strategy.html'
 
-		var SAMPLE_FIDELITY=16000 * 2//14000;
+		var SAMPLE_FIDELITY=18000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 4;
 
@@ -205,11 +206,11 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'j';
+		var COLOR_COMBINATION = 'e';
 		var VIS_COMBINATION = 'abcd';
 
 		var RANDOMIZE_COLOR = true;
-		var RANDOMIZE_VIS = false;
+		var RANDOMIZE_VIS = true;
 
 		var BLOCK_SEED = [
 			{ center: 0.030, correlation: 0.07, expectation: 0.110, std: 0.02},
@@ -230,7 +231,7 @@
 			*/
 			
 		];
-		var trialPerSubblock = 2;
+		var trialPerSubblock = 1;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -257,7 +258,7 @@
 		var ENGAGEMENT = {
 			center: 0.24,
 			correlation: 0.08,
-			expectation: [0.36, 0.6]
+			expectation: [0.34, 0.6]
 		}
 
 		// experiment stats
@@ -464,7 +465,8 @@
 				label = Math.floor(.5+100*p) + '% complete';
 				d3.select('#stimulusNum').html(label);
 
-				(function(_block, _trialNum) {
+				(function(_block, _trialNum) 
+				{
 					setTimeout(function()
 					{
 						if (_block.trialSequence[_trialNum] == 'e')
@@ -479,8 +481,18 @@
 							var subblock = block.trialSequence[_trialNum]
 							M_PERTURB = subblock.center;
 							R_PERTURB = subblock.correlation;
+
+							// if standard deviation included, use it to set tolerance
+							if (subblock.std) {
+								LINEUP_TOLERANCE = subblock.std * .25;
+							}
+							else {
+								LINEUP_TOLERANCE = 0.1;
+							}
+
 							distance = lineup.modelWithExpectation(subblock.expectation);
-							if (Math.abs(distance-subblock.expectation) > LINEUP_TOLERANCE) {
+							if (Math.abs(distance-subblock.expectation) > LINEUP_TOLERANCE) 
+							{
 								console.error("[" + csv.length + "]: exceeded tolerance, e:" + subblock.expectation + ", d: " + distance + ", itr: " + lineup.iterations + ', conv: ' + lineup.converged);
 							}
 							else
@@ -595,16 +607,29 @@
 						trialSequence: [],
 					};
 
-					for (var i=0; i<BLOCK_SEED.length; i++)
+					var theSeed = BLOCK_SEED;
+					if (typeof EXPECTED_BLOCK_SEEDS !== 'undefined') 
 					{
-						var seed = BLOCK_SEED[i];
+						var seedType = (block.vis == 'mapDiscrete' || block.vis == 'mapSmooth') ? 'map' : 'field';
+						console.log('seedType: ' + seedType);
+						if (EXPECTED_BLOCK_SEEDS[seedType]) 
+						{
+							console.log("using EXPECTED_BLOCK_SEEDS for " + block.vis);
+							theSeed = EXPECTED_BLOCK_SEEDS[seedType];
+						}
+					}
+
+					for (var i=0; i<theSeed.length; i++)
+					{
+						var seed = theSeed[i];
 						for (var t=0; t<trialPerSubblock; t++)
 						{
 							var subblock = {
 								center: seed.center,
 								correlation: seed.correlation,
 								std: seed.std,
-								expectation: seed.expectation
+								expectation: seed.expectation,
+								trial: t+1,
 							};
 							block.trialSequence.push(subblock);
 						}
@@ -624,7 +649,7 @@
 			}
 			
 			blocks = generatedBlocks;
-			trialPerBlock = trialPerSubblock * BLOCK_SEED.length;
+			trialPerBlock = 0;
 
 			for (var b=0; b<blocks.length; b++)
 			{
@@ -635,6 +660,7 @@
 						block.trialSequence[i] = 0;
 					}
 				}
+				trialPerBlock += block.trialSequence.length;
 
 				for (var i=0; i<engagementPerBlock; i++) {
 					var r = Math.floor(Math.random()*trialPerBlock);
@@ -697,9 +723,11 @@
 								b = b.trialSequence[trialNum];	
 							}
 
-							if (trialNum - engagementNum == trialPerBlock * BLOCK_SEED.length-1) {
+							/*
+							if (trialNum - engagementNum == b.trialSequence.length-1) {
 								console.log("lastTrial")
 							}
+							*/
 
 							if (typeof lineup.getCurExpectation() == 'object') {
 								console.error("expectation is not number: " + lineup.getCurExpectation());
@@ -708,7 +736,7 @@
 							var stimNum = csv.length+1
 							csv.push({
 								blockNum: blockNum+1,
-								trialNum: trialNum+1 - engagementNum,
+								trialNum: b.trial,//trialNum+1 - engagementNum,
 								stimulusNum: stimNum,
 								vis: vis,
 								colormap: colormap,
@@ -757,7 +785,8 @@ s
 				}
 				else
 				{
-					var d = Math.abs(record.distance - record.requestedDistance)
+					var d = Math.abs(record.distance - record.requestedDistance);
+
 					if (d > LINEUP_TOLERANCE) {
 						console.log("[" + i + "]: gap exceeds limit. expD: " + record.requestedDistance + ", gap: " + Math.abs(record.distance - record.requestedDistance));
 					
@@ -787,6 +816,7 @@ s
 						tMap[strMap] = rMap + 1;
 					}
 					record.trialNum = tMap[strMap];
+					
 				}
 
 				t++;
@@ -824,7 +854,7 @@ s
 		{
 			var blockCount = blocks.length;
 
-			checkData();
+			//checkData();
 			
 			var data2send = JSON.stringify(
 			{

@@ -154,8 +154,11 @@ function plotParamSweep(svg, results, xScale, yScale)
 }
 
 var SIMRESULTS=null;
-function saveResults()
+function saveSimResults()
 {
+    if (!SIMRESULTS) {
+        runParametersSim();
+    }
     var seeds = [];
     for (var i=0; i<SIMRESULTS.length; i++) {
         var rec = SIMRESULTS[i];
@@ -170,12 +173,17 @@ function saveResults()
             std: rec.stdDist
         });
     }
-    console.save(seeds, 'block_seed.json')
+    console.save(seeds, 'block_seed.json');
+    SIMRESULTS = null;
 }
 function runParametersSim(param, steps)
 {
     var _M_PERTURB = M_PERTURB;
     var _R_PERTURB = R_PERTURB;
+
+    if (!param) {
+        param = ['center'];
+    }
 
 
     // run through runParameters

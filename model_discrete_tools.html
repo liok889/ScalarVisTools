@@ -49,6 +49,12 @@
 		.lineupSVG {
 			border: solid 1px black;
 		}
+		.histogram {
+			fill: #cccccc;
+		}
+		.histogramNew {
+			fill: #ffe97d;
+		}
 	</style>
 </head>
 
@@ -141,7 +147,7 @@
 		var LINEUP_N = 4;
 
 		// number of sampling iterations
-		var ITER = 16000 * 3;
+		var ITER = 18000 * 3;
 		var N = ITER;
 
 		// 'good' sampling iterations to show a better representation of the model (for debugging)
@@ -153,7 +159,7 @@
 		// 'fieldSmooth': smooth rectangle
 		// 'fieldDiscrete': binned rectangle (10x10 pixel bins)
 		
-		var VIS_TYPE = 'fieldDiscrete';
+		var VIS_TYPE = 'fieldSmooth';
 		setRepresentationType(VIS_TYPE);
 
 		// create lineup elements
