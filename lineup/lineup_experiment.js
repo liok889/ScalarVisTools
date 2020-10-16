@@ -117,24 +117,40 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
     // clear out old selection / answer
     this.answer = null;
-    domSelection.selectAll('td').style('background-color', null);
+    if (!this.tdSelection) {
+        this.tdSelection = domSelection.selectAll('td')
+    }
+
+    var canvasType = 'canvas';
+    if (typeof CANVAS_TYPE === 'string') {
+        canvasType = CANVAS_TYPE
+    }
+
+    if (!this.canvasSelection) {
+        this.canvasSelection = domSelection.selectAll(canvasType)
+    }
+    if (!this.nullSelection) {
+        this.nullSelection = domSelection.selectAll('div.nullOption');
+    }
+
+    this.tdSelection.style('background-color', null);
 
     // setup callbacks
     (function(lineup, dom, noDecoy, correctAnswer)
     {
-        var canvasType = 'canvas'
+        var canvasType = 'canvas';
         if (typeof CANVAS_TYPE === 'string') {
             canvasType = CANVAS_TYPE
         }
 
         dom.selectAll(canvasType).on('click', function()
         {
+            console.log('click');
             if (lineup.incorrect) lineup.incorrect();
             if (lineup.canMakeSelection)
             {
-                //dom.style('border', null);
-                dom.selectAll('td').style('background-color', null);
-                dom.selectAll('div.nullOption').style('border', 'solid 1px black');
+                lineup.tdSelection.style('background-color', null);
+                lineup.nullSelection.style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
             lineup.answer = "0";
@@ -147,8 +163,8 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             else if (!noDecoy && lineup.incorrect) lineup.incorrect();
 
             lineup.answer = noDecoy ? '1' : '0';
+            lineup.tdSelection.style('background-color', null);
             d3.select(this).style('border', 'solid 10px ' + SEL_BORDER)
-            dom.selectAll('td').style('background-color', null);
             lineup.canvasIndex = '98';
         });
 
@@ -162,8 +178,8 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             if (lineup.correct) lineup.correct();
             if (lineup.canMakeSelection)
             {
-                dom.selectAll('td').style('background-color', null);
-                dom.selectAll('div.nullOption').style('border', 'solid 1px black');
+                lineup.tdSelection.style('background-color', null);
+                lineup.nullSelection.style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
             lineup.answer = noDecoy ? '0' : '1';

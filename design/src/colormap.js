@@ -1061,9 +1061,51 @@ var COLOR_PRESETS =
 			[252, 252, 0]
 		],
 
-		rainbowhcl: function(t) {
-			return d3.rgb(d3.hcl(t * 360, 1, .5));
+		rainbowhcl: function(t) 
+		{
+			t = 1-t;
+			t *= .9;
+			t -= .15;
+			var hcl =  d3.hcl(t * 360, 100, 55);
+			var rgb = d3.rgb(hcl);
+
+			var c = rgb;
+			c.r = Math.max(0, Math.min(255, c.r))
+			c.g = Math.max(0, Math.min(255, c.g))
+			c.b = Math.max(0, Math.min(255, c.b))
+			return c;
 		},
+
+		rainbowhcl100: function(t) 
+		{
+			t = 1-t;
+			t *= .9;
+			t -= .15;
+			var hcl =  d3.hcl(t * 360, 50, 100);
+			var rgb = d3.rgb(hcl);
+
+			var c = rgb;
+			c.r = Math.max(0, Math.min(255, c.r))
+			c.g = Math.max(0, Math.min(255, c.g))
+			c.b = Math.max(0, Math.min(255, c.b))
+			return c;
+		},
+
+
+		d3rainbow: function(t) {
+			t = 1-t;
+			t *= .9;
+			var c = d3.rgb(d3.interpolateRainbow(t));
+			return c;
+		},
+
+		d3sinebow: function(t) {
+			t = 1-t;
+			t *= .9;
+			t-=.25;
+			return d3.rgb(d3.interpolateSinebow(t));
+		},
+
 
 		viridis: (function()
 		{
@@ -2011,7 +2053,7 @@ function getColorPreset(preset, m0, m1, brandNew)
 	}
 	else
 	{
-		var colorset;
+		var colorset = [];
 		var normalizedFormat = false;
 
 		if (Array.isArray(colorScheme))
@@ -2041,6 +2083,7 @@ function getColorPreset(preset, m0, m1, brandNew)
 						rgb: [cc.r, cc.g, cc.b]
 					});
 				}
+
 				else
 				{
 					var r = +c.r;
@@ -2078,9 +2121,20 @@ function getColorPreset(preset, m0, m1, brandNew)
 		else if (typeof(colorScheme) === 'string') {
 
 		}
-		else if (!isFunction(colorScheme))
+		else if (isFunction(colorScheme))
 		{
-			colorset = colorScheme;
+			console.log('function!');
+			for (var s = 0, samples=100; s<samples; s++) 
+			{
+				var n = s/(samples-1);
+				var theColor = colorScheme(n);
+			    
+
+				colorset.push({
+					value: s/(samples-1),
+					rgb: [theColor.r, theColor.g, theColor.b]
+				});
+			}
 		}
 
 		var preloaded = loaded_colormaps[preset];
