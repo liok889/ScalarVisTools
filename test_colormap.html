@@ -14,6 +14,12 @@
 			font-size: 13px;
 		}
 
+		.rampHoverLabel
+		{
+			font-size: 14px;
+
+		}
+
 	</style>
 </head>
 <body>
@@ -23,12 +29,12 @@
 	</div>
 
 	<p><b>Color samples</b>
-	<p><div style="width: 400px; height: 400px; border: solid 1px black" id="colorsDiv">
+	<p><div style="width: 400px; height: 200px; border: solid 1px black" id="colorsDiv">
 	</div>
 	<svg class="main" width="600" height="400"></svg>
 
 	<script>
-		var SAMPLES = 9;
+		var SAMPLES = 10;
 		var colormap = null;
 
 		c3.load('lib/colorname/c3_data.json');
@@ -152,24 +158,28 @@
 			"threewave",
 			"blueorange",
 			"rainbow",
-			//"rainbowcie",
-			//"rainbowjet",
+			"rainbowjet",
 			"cubehelix",
-			//"bodyheat",
+			"bodyheat",
 			"extendedBlackBody",
 			"kindlmann",
-			//"spectralFull",
+			"spectralFull",
 			"coolwarmMoreland",
 			"viridis",
 			"plasma",
 			"redpurple",
 			"greyred",
 			"coolwarm",
-			//"reds",
+			"reds",
 			"purples",
 			"blues",
 			"spectral",
 			"turbo",
+			"rainbowhcl",
+			"rainbowhcl100",
+			"rainbowhcl90",	
+			"d3sinebow",
+			"d3rainbow",
 		];
 		var rampMap = {};
 
@@ -275,6 +285,7 @@
 
 		}
 
+
 		function getRampStats(samples, stats)
 		{
 			if (!Array.isArray(stats)) {
@@ -306,6 +317,103 @@
 	</script>
 
 	<script>
+		function plotSalienceVLab()
+		{
+			var CHART_W = 400;
+			var CHART_H = 250;
+
+			var header = ['nameVariation', 'nameSalience', 'labLength'];
+			var data = getRampStats(SAMPLES, header);
+			var maxSalience = d3.max(data, function(d) { return d.nameSalience });
+			var minSalience = d3.min(data, function(d) { return d.nameSalience });
+
+			var maxLabLength = d3.max(data, function(d) { return d.labLength });
+			var minLabLength = d3.min(data, function(d) { return d.labLength });
+
+			maxLabLength = Math.log(maxLabLength);
+			minLabLength = Math.log(minLabLength);
+
+			console.log("labLength: " + minLabLength + ' -- ' + maxLabLength)
+			console.log("nameSalience: " + minSalience + ' -- ' + maxSalience)
+
+			var xScale = d3.scaleLinear();
+			xScale
+				.domain([minLabLength, maxLabLength])
+				.range([0, CHART_W]);
+
+			var yScale = d3.scaleLinear();
+			yScale
+				.domain([minSalience, maxSalience])
+				.range([CHART_H, 0]);
+
+			var svg = d3.select("svg.main");
+			var g = svg.select('g.scatterplot').size()>0 ? svg.select('g.scatterplot') : svg.append('g').attr('class', 'scatterplot')
+			g.attr('transform', 'translate(40,10)');
+
+			var xAxis = d3.axisBottom(xScale);
+			(g.select('g.xAxis').size()>0 ? g.select('g.xAxis') : g.append('g'))
+				.attr('class', 'xAxis')
+				.attr('transform', 'translate(0,'+CHART_H + ')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale);
+			(g.select('g.tAxis').size()>0 ? g.select('g.yAxis') : g.append('g'))
+				.attr('class', 'yAxis')
+				.call(yAxis);
+
+			var circles = g.selectAll('circle.rampScatter').data(data);
+			circles = circles.enter().append('circle')
+				.attr('class', 'rampScatter')
+				.attr('r', '5px')
+				.style("fill", "#999999")
+				.merge(circles);
+
+			circles
+				.transition().duration(500)
+				.attr('cx', function(d) { return xScale(Math.log(d.labLength)); })
+				.attr('cy', function(d) { return yScale(d.nameSalience); });
+				
+			
+			
+			(function(cs, group, svg) 
+			{
+				cs
+					.on('mouseover', function(d) 
+					{
+						var mouse = d3.mouse(svg.node());
+						d3.select(this).attr('r', '7px');
+						console.log(d.name);
+
+						svg.append('text')
+							.classed('rampHoverLabel', true)
+							.attr('x', mouse[0]+10)
+							.attr('y', mouse[1]+20)
+							.style('fill', 'black')
+							.html(d.name)
+					})
+
+					
+					.on('mouseout', function(d) {
+						d3.select(this).attr('r', '5px');
+						d3.selectAll(".rampHoverLabel").remove();
+					})
+
+					.on('click', function(d) 
+					{
+						d3.selectAll('circle.rampScatter')
+							.style('stroke', 'none');
+						d3.select(this)
+							.style('stroke', 'red')
+							.style('stroke-width', '2px');
+
+						changeColormap(d.name);
+					})
+					
+			})(circles, g, svg);
+			
+
+		}
+
 		function plotRampStat(allRamps, stat)
 		{
 			var CHART_W = 300;
@@ -439,6 +547,8 @@
 		}
 
 		var rampStats = computeColormapStats();
+		plotSalienceVLab();
+
 
 	</script>
 </body>

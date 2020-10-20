@@ -1091,6 +1091,39 @@ var COLOR_PRESETS =
 			return c;
 		},
 
+		rainbowhcl80: function(t) 
+		{
+			t = 1-t;
+			t *= .9;
+			t -= .15;
+			var hcl =  d3.hcl(t * 360, 70, 80);
+			var rgb = d3.rgb(hcl);
+
+			var c = rgb;
+			c.r = Math.max(0, Math.min(255, c.r))
+			c.g = Math.max(0, Math.min(255, c.g))
+			c.b = Math.max(0, Math.min(255, c.b))
+			return c;
+		},
+
+		rainbowhcl90: function(t) 
+		{
+			t = 1-t;
+			t *= .9;
+			t -= .15;
+			var hcl =  d3.hcl(t * 360, 70, 90);
+			var rgb = d3.rgb(hcl);
+
+			var c = rgb;
+			c.r = Math.max(0, Math.min(255, c.r))
+			c.g = Math.max(0, Math.min(255, c.g))
+			c.b = Math.max(0, Math.min(255, c.b))
+			return c;
+		},
+
+
+
+
 
 		d3rainbow: function(t) {
 			t = 1-t;
@@ -2107,7 +2140,6 @@ function getColorPreset(preset, m0, m1, brandNew)
 						value: c.v !== undefined ? +c.v : v,
 						rgb: [r, g, b]
 					});
-					console.log('rgb: ' + [r, g, b]);
 				}
 			}
 		}
@@ -2123,7 +2155,6 @@ function getColorPreset(preset, m0, m1, brandNew)
 		}
 		else if (isFunction(colorScheme))
 		{
-			console.log('function!');
 			for (var s = 0, samples=100; s<samples; s++) 
 			{
 				var n = s/(samples-1);
