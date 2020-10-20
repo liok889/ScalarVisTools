@@ -359,6 +359,14 @@
 			var maxLabLength = d3.max(data, function(d) { return d.labLength });
 			var minLabLength = d3.min(data, function(d) { return d.labLength });
 
+			// find median line to plot a reference line
+			var medianSalience = 0, saliences = [];
+			for (var i=0; i<data.length; i++) {
+				saliences.push(data[i].nameSalience);
+				saliences.sort();
+				medianSalience = saliences[ Math.ceil(saliences.length/2) ];
+			}
+
 			maxLabLength = Math.log(maxLabLength);
 			minLabLength = Math.log(minLabLength);
 
@@ -387,6 +395,14 @@
 			(g.select('g.yAxis').size()>0 ? g.select('g.yAxis') : g.append('g'))
 				.attr('class', 'yAxis')
 				.call(yAxis);
+
+			(g.select('line.median').size()>0 ? g.select('line.median') : g.append('line'))
+				.attr('class', 'median')
+				.style('stroke', 'red')
+				.transition().duration(500)
+				.attr('x1', 0).attr('x2', CHART_W)
+				.attr('y1', yScale(medianSalience)).attr('y2', yScale(medianSalience));
+
 
 			var circles = g.selectAll('circle.rampScatter').data(data);
 			circles = circles.enter().append('circle')
