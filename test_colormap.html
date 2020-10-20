@@ -117,7 +117,8 @@
 
 				str = str + hex;
 
-				if (i < SAMPLES-1) {
+				if (i < SAMPLES-1) 
+				{
 					var c2 = colormap.mapValue((i+1)/(SAMPLES-1));
 					var dist = nameDistance(c, c2);
 					avgDistance += dist;
@@ -133,10 +134,11 @@
 			avgDistance /= SAMPLES-1;
 
 			str += '<br>Average salience: ' + avgSalience.toFixed(2);
-			str += '<br>Avg distance: ' + avgDistance.toFixed(2);
+			str += '<br>Avg name distance: ' + avgDistance.toFixed(2) + ', name variation: ' + (avgDistance*(SAMPLES-1)).toFixed(2);
 
 
 			d3.select('#colorsDiv').html(str);
+			d3.select("#ramp_" + name).attr('r', '7px');
 		}
 
 		var RAMPS = [
@@ -183,6 +185,16 @@
 			"d3sinebow",
 			"d3rainbow",
 		];
+		function enumerateRamps() 
+		{
+			RAMPS=[];
+			for (var key in COLOR_PRESETS) {
+				if (COLOR_PRESETS.hasOwnProperty(key)) {
+					RAMPS.push(key)
+				}
+			}
+		}
+		enumerateRamps();
 		var rampMap = {};
 
 		function computeColormapStats()
@@ -353,6 +365,15 @@
 
 			var header = ['nameVariation', 'nameSalience', 'labLength'];
 			var data = getRampStats(SAMPLES, header);
+
+			// filter only to include scales with at least 2.1 log-LAB length
+			var filteredData = [];
+			for (var i=0; i<data.length; i++) {
+				if (Math.log(data[i].labLength) >= 2.1) {
+					filteredData.push(data[i]);
+				}
+			}
+			data=filteredData;
 			var maxSalience = d3.max(data, function(d) { return d.nameSalience });
 			var minSalience = d3.min(data, function(d) { return d.nameSalience });
 
@@ -360,13 +381,20 @@
 			var minLabLength = d3.min(data, function(d) { return d.labLength });
 
 			// find median line to plot a reference line
-			var medianSalience = 0, saliences = [];
+			var medianSalience = 0, medianLabLength = 0, saliences = [], labLens = [];
 			for (var i=0; i<data.length; i++) {
 				saliences.push(data[i].nameSalience);
-				saliences.sort();
-				medianSalience = saliences[ Math.ceil(saliences.length/2) ];
+				labLens.push(data[i].labLength);
 			}
+			saliences.sort(function(a,b){return a-b});
+			medianSalience = saliences[ Math.ceil(saliences.length/2) ];
 
+			labLens.sort(function(a,b){return a-b});
+			medianLabLength = Math.log(labLens[ Math.ceil(labLens.length/2) ]);
+
+			console.log("median lab length: " + medianLabLength);
+			
+			// take log
 			maxLabLength = Math.log(maxLabLength);
 			minLabLength = Math.log(minLabLength);
 
@@ -396,12 +424,20 @@
 				.attr('class', 'yAxis')
 				.call(yAxis);
 
-			(g.select('line.median').size()>0 ? g.select('line.median') : g.append('line'))
-				.attr('class', 'median')
+			(g.select('line.medianSal').size()>0 ? g.select('line.medianSal') : g.append('line'))
+				.attr('class', 'medianSal')
 				.style('stroke', 'red')
 				.transition().duration(500)
 				.attr('x1', 0).attr('x2', CHART_W)
 				.attr('y1', yScale(medianSalience)).attr('y2', yScale(medianSalience));
+
+			(g.select('line.medianLab').size()>0 ? g.select('line.medianLab') : g.append('line'))
+				.attr('class', 'medianLab')
+				.style('stroke', 'blue')
+				.transition().duration(500)
+				.attr('y1', 0).attr('y2', CHART_H)
+				.attr('x1', xScale(medianLabLength)).attr('x2', xScale(medianLabLength));
+
 
 
 			var circles = g.selectAll('circle.rampScatter').data(data);
@@ -414,7 +450,8 @@
 			circles
 				.transition().duration(500)
 				.attr('cx', function(d) { return xScale(Math.log(d.labLength)); })
-				.attr('cy', function(d) { return yScale(d.nameSalience); });
+				.attr('cy', function(d) { return yScale(d.nameSalience); })
+				.attr('id', function(d) { return 'ramp_' + d.name });
 				
 			
 			
