@@ -29,13 +29,15 @@
 	</div>
 
 	<p><b>Color samples</b>
-	<p><div style="width: 400px; height: 200px; border: solid 1px black" id="colorsDiv">
+	<p><div style="width: 400px; height: 150px; border: solid 1px black" id="colorsDiv">
 	</div>
+	<p><button onclick="loadDSRamps()">Load more color ramps</button>
 	<svg class="main" width="600" height="400"></svg>
 
 	<script>
 		var SAMPLES = 10;
 		var colormap = null;
+		var CIRCLE_R=3;
 
 		c3.load('lib/colorname/c3_data.json');
 
@@ -285,6 +287,33 @@
 
 		}
 
+		function loadDSRamps(callback) {
+			d3.csv('colormaps/ds_ramps.csv', function(rows) {
+				var data = [], names=[];
+				for (var i=0, len=rows.length; i<len; i++) {
+					var colors = [];
+
+					// DS colormaps has 9 samples each
+					for (var j=0; j<9; j++) {
+						colors.push(rows[i]['C' + (j+1)])
+					}
+					data.push({
+						name: rows[i].Name,
+						samples: colors
+					})
+					names.push(rows[i].Name);
+					COLOR_PRESETS[rows[i].Name] = colors;
+				}
+
+				// merge with list of ramps
+				RAMPS = RAMPS.concat(names);
+				computeColormapStats();
+				plotSalienceVLab();
+				if (callback) {
+					callback(data);
+				}
+			})
+		}
 
 		function getRampStats(samples, stats)
 		{
@@ -333,8 +362,6 @@
 			maxLabLength = Math.log(maxLabLength);
 			minLabLength = Math.log(minLabLength);
 
-			console.log("labLength: " + minLabLength + ' -- ' + maxLabLength)
-			console.log("nameSalience: " + minSalience + ' -- ' + maxSalience)
 
 			var xScale = d3.scaleLinear();
 			xScale
@@ -357,14 +384,14 @@
 				.call(xAxis);
 
 			var yAxis = d3.axisLeft(yScale);
-			(g.select('g.tAxis').size()>0 ? g.select('g.yAxis') : g.append('g'))
+			(g.select('g.yAxis').size()>0 ? g.select('g.yAxis') : g.append('g'))
 				.attr('class', 'yAxis')
 				.call(yAxis);
 
 			var circles = g.selectAll('circle.rampScatter').data(data);
 			circles = circles.enter().append('circle')
 				.attr('class', 'rampScatter')
-				.attr('r', '5px')
+				.attr('r', CIRCLE_R + 'px')
 				.style("fill", "#999999")
 				.merge(circles);
 
@@ -382,7 +409,6 @@
 					{
 						var mouse = d3.mouse(svg.node());
 						d3.select(this).attr('r', '7px');
-						console.log(d.name);
 
 						svg.append('text')
 							.classed('rampHoverLabel', true)
@@ -394,7 +420,7 @@
 
 					
 					.on('mouseout', function(d) {
-						d3.select(this).attr('r', '5px');
+						d3.select(this).attr('r', CIRCLE_R + 'px');
 						d3.selectAll(".rampHoverLabel").remove();
 					})
 
