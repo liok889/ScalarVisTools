@@ -1,13 +1,13 @@
 /* -------------------------------------
- * GLSL color analysis pipeline 
+ * GLSL color analysis pipeline
  * -------------------------------------
  */
 
 function gLoadShader(object, shaderPath, shaderName, callback)
 {
-	(function(_path, _name, _object, _callback) 
+	(function(_path, _name, _object, _callback)
 	{
-		d3.text(_path).then(function(text, error) 
+		d3.text(_path).then(function(text, error)
 		{
 			if (error) {
 				if (_callback) _callback(error); else throw error;
@@ -21,7 +21,7 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 	})(shaderPath, shaderName, object, callback);
 }
 
-ColorAnalysis = function(field, glCanvas, _readyCallback)
+ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 {
 	this.glCanvas = glCanvas;
 	this.field = field;
@@ -32,40 +32,83 @@ ColorAnalysis = function(field, glCanvas, _readyCallback)
 	this.copyList = [];
 
 	// load shaders
-	(function(object, readyCallback) {
+	(function(object, readyCallback, shaderList) {
 		var q = d3.queue();
-		q
-			.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
-			.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
-			.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
-			.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
-			.defer( gLoadShader, object, 'design/src/shaders/cam022rgb.frag', 'cam02slice')
-			.defer( loadExternalColorPresets )
-
-			.awaitAll(function(error, results) 
+		if (shaderList)
+		{
+			for (var i=0; i<shaderList.length; i++)
 			{
-				if (error) { 
-					throw error;
+				var shaderPath = shaderList[i].path;
+				var shaderName = shaderList[i].name;
+
+				q.defer( gLoadShader, object, shaderPath, shaderName )
+			}
+		}
+		else
+		{
+			q
+				.defer( gLoadShader, object, 'design/src/shaders/vertex.vert', 'vertex' )
+				.defer( gLoadShader, object, 'design/src/shaders/cie2000.frag', 'cie2000')
+				.defer( gLoadShader, object, 'design/src/shaders/speed.frag', 'speed')
+				.defer( gLoadShader, object, 'design/src/shaders/vis.frag', 'vis')
+				.defer( gLoadShader, object, 'design/src/shaders/cam022rgb.frag', 'cam02slice')
+				.defer( loadExternalColorPresets )
+		}
+
+		q.awaitAll(function(error, results)
+		{
+			if (error) {
+				throw error;
+			}
+			else if (!shaderList)
+			{
+				object.createDefaultPipelines();
+				object.isReady = true;
+				if (readyCallback) {
+					readyCallback();
 				}
-				else 
-				{
-					object.createPipelines();
-					object.isReady = true;
-					if (readyCallback) {
-						readyCallback();
-					}
+			}
+			else
+			{
+				object.isReady = true;
+				if (readyCallback) {
+					readyCallback();
 				}
-			});
-	})(this, _readyCallback)
+			}
+		});
+	})(this, _readyCallback, _shaderList)
+}
+
+ColorAnalysis.prototype.clearCanvas = function() {
+	var gl = this.glCanvas.getContext('webgl');
+	gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
 ColorAnalysis.prototype.ready = function() {
 	return this.isReady === true;
 }
 
-ColorAnalysis.prototype.createPipelines = function() 
+ColorAnalysis.prototype.createVisPipeline = function()
 {
-	// create a color scale from extendedBlackBody to be used 
+	var visPipeline = new GLPipeline(this.glCanvas);
+	visPipeline.addStage({
+		uniforms: {
+			scalarField: {},
+			colormap: {},
+			contour: {value: -1.0}
+		},
+		inTexture: 'scalarField',
+		fragment: this.shaders['vis'],
+		vertex: this.shaders['vertex']
+	});
+	this.visPipeline = visPipeline;
+	if (!this.pipelines) this.pipelines = {};
+	this.pipelines['vis'] = visPipeline;
+}
+
+ColorAnalysis.prototype.createDefaultPipelines = function()
+{
+	// create a color scale from extendedBlackBody to be used
 	// to visualzie cie2000de or speed
 	var c = getColorPreset('extendedBlackBody');
 	this.gpuDiffColormapTexture = c.createGPUColormap()
@@ -86,12 +129,12 @@ ColorAnalysis.prototype.createPipelines = function()
 	var diffPipeline = new GLPipeline(this.glCanvas);
 	diffPipeline.addStage({
 		uniforms: {
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			scalarField: {},
 			colormap: {},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
-			outputColor: {value: true} 
+			outputColor: {value: true}
 		},
 		inTexture: 'scalarField',
 		fragment: this.shaders['cie2000'],
@@ -100,16 +143,16 @@ ColorAnalysis.prototype.createPipelines = function()
 	this.diffPipeline = diffPipeline;
 
 	var speedPipeline = new GLPipeline(this.glCanvas);
-	
+
 	// add first stage to perform a cie2000 color-diff
 	speedPipeline.addStage({
 		uniforms: {
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			scalarField: {},
 			colormap: {},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
-			outputColor: {value: false} 
+			outputColor: {value: false}
 		},
 		inTexture: 'scalarField',
 		fragment: this.shaders['cie2000'],
@@ -120,8 +163,8 @@ ColorAnalysis.prototype.createPipelines = function()
 	speedPipeline.addStage({
 		uniforms: {
 			colorDiff: {},
-			hPitch: {value: 1.0 / this.field.w},
-			vPitch: {value: 1.0 / this.field.h},
+			hPitch: {value: 1.0 / this.field.getMaskedW()},
+			vPitch: {value: 1.0 / this.field.getMaskedH()},
 			colorDiffScale: {value: this.gpuDiffColormapTexture},
 			outputColor: {value: false}
 		},
@@ -150,7 +193,7 @@ ColorAnalysis.prototype.createPipelines = function()
 ColorAnalysis.prototype.getUniforms = function(pipelineName, stageIndex, uniformName)
 {
 	var pipeline = this.pipelines[pipelineName];
-	if (!pipeline) 
+	if (!pipeline)
 	{
 		console.error("Can not find pipeline: " + pipelineName);
 		return;
@@ -176,16 +219,20 @@ ColorAnalysis.prototype.run = function(analysis)
 	}
 
 	// deal with GPU texture
-	if (!field.gpuTexture) {
-		field.createGPUTexture();
+	if (!this.field.gpuTexture) {
+		this.field.createGPUTexture();
 	}
 
 	// deal with color map
-	if (!field.gpuColormapTexture) {
-		field.setColorMap();
+	if (!this.field.gpuColormapTexture) {
+		this.field.setColorMap();
 	}
 
 	var pipeline = this.pipelines[analysis];
+	if (!pipeline) {
+		console.error("Can not find pipeline: " + analysis);
+		return;
+	}
 
 	// initialize stage0 to take scalarField as inTexture
 	var stage0 = pipeline.getStage(0);
@@ -195,22 +242,22 @@ ColorAnalysis.prototype.run = function(analysis)
 		uniforms[stage0.inTexture].value = this.field.gpuTexture;
 	}
 
-	for (var i=0; i<pipeline.getStageCount(); i++) 
+	for (var i=0; i<pipeline.getStageCount(); i++)
 	{
 		var s = pipeline.getStage(i);
 		var u = s.getUniforms();
-		
+
 		// does this stage require a colormap?
 		if (u.colormap) {
 			// if so, give it the current colormap associated with the scalar field
-			u.colormap.value = field.gpuColormapTexture;
+			u.colormap.value = this.field.gpuColormapTexture;
 		}
 	}
 
 	pipeline.run();
 
 	// deal with copy list
-	for (var i=0; i<this.copyList.length; i++) 
+	for (var i=0; i<this.copyList.length; i++)
 	{
 		var copyTarget = this.copyList[i];
 		glCanvasToCanvas(this.glCanvas, copyTarget);
@@ -221,7 +268,7 @@ ColorAnalysis.prototype.copyToCanvas = function(copyTarget, dontFlip) {
 	glCanvasToCanvas(this.glCanvas, copyTarget, dontFlip);
 }
 
-ColorAnalysis.prototype.addCopyCanvas = function(canvas) 
+ColorAnalysis.prototype.addCopyCanvas = function(canvas)
 {
 	// render color diff
 	this.copyList.push(canvas);

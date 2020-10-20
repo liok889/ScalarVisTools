@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<head>
+	<!--
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	-->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+
+
+	<script src="../../jnd/lib/d3.min.js"></script>
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+	<script src="../../src/scalar.js"></script>
+	<script src="../../design/src/colormap.js"></script>
+	<script src="../../design/src/gl_pipeline.js"></script>
+	<script src="../../design/src/coloranalysis.js"></script>
+	<script src="../../jnd/lib/three.min.js"></script>
+	<script src="../gaussmix.js"></script>
+	<script src="../gaussmix_bivariate.js"></script>
+	<script src="../scalar_sample.js"></script>
+	<script src="../lineup.js"></script>
+	<script src="../sim.js"></script>
+	<script src="../lineup_experiment.js"></script>
+	<style>
+		body {
+			font-family: Arial; sans-serif
+			font-size: 12px;
+		}
+
+		#divColorScale {
+			text-align: center;
+		}
+
+
+		/* The Modal (background) */
+	   .modal {
+		 display: none; /* Hidden by default */
+		 position: fixed; /* Stay in place */
+		 z-index: 10000; /* Sit on top */
+		 padding-top: 200px; /* Location of the box */
+		 left: 0;
+		 top: 0;
+		 width: 100%; /* Full width */
+		 height: 100%; /* Full height */
+		 overflow: auto; /* Enable scroll if needed */
+		 background-color: rgb(0,0,0); /* Fallback color */
+		 background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+	   }
+
+	   /* Modal Content */
+	   .modal-content {
+		 background-color: #fefefe;
+		 margin: auto;
+		 padding: 20px;
+		 border: 1px solid #888;
+		 width: 80%;
+	   }
+
+	</style>
+</head>
+<body>
+
+	<!-- The Modal -->
+	<div id="myModal" class="modal">
+
+		<!-- Modal content -->
+		<div class="modal-content" style="font-size: 22px">
+			<span class="close">&times;</span>
+				<p><span id="modalText1">Doing great! Feel free to take a moment to rest your eyes if you wish.</span> </p>
+				<p id="modalText2">There are <span>Num</span> sets left.</p>
+		</div>
+	</div>
+
+	<div style="width: 800px">
+
+		<div id="prompt">
+			<p>Practice <span id="stimulusNum"></span>
+			<p>Click on the image that <b>doesn't belong</b>
+		</div>
+
+		<div style="width: 730px; height: 450px; margin-top: 40px">
+			<div style="float: left;">
+				<table style="margin-left: 120px" id="lineupTable"></table>
+			</div>
+			<div id="divColorScale" style="width: 90; height: 210px; float: right;">
+				<div style="margin-top: 140px; font-size: 16px">
+					color<br>scale<br><canvas id="colorScaleCanvas" width="25" height="140"></canvas><br><!--low<br>values-->
+				</div>
+			</div>
+
+		</div>
+
+		<!--<p id="incorrect" style="visibility: hidden">Incorrect choice. Real answer highlighted in green</p><br>
+		-->
+		<div id="correct" style="visibility: hidden; font-size: 19px; margin-left: 300px">Correct!</div>
+		<p id="confirm" style="visibility: hidden">Press <b>ENTER</b> to confirm selection.</p>
+	</div>
+
+	<!--
+		<p><button id="downloadData" style="font-size: 17px; visibility: hidden" onclick="downloadCSV()">Download data</button></p>
+	-->
+	<script type="text/javascript">
+		var modal = document.getElementById("myModal");
+
+		// Get the <span> element that closes the modal
+		var span = document.getElementsByClassName("close")[0];
+
+		function displayModal() {
+			modal.style.display = "block";
+		}
+		var _modalCallback = null;
+		function setModalCallback(_callback) {
+			_modalCallback = _callback;
+		}
+
+		// When the user clicks on <span> (x), close the modal
+		span.onclick = function() {
+			var originalDisplay = modal.style.display;
+			modal.style.display = "none";
+			if (originalDisplay == 'block') {
+				console.log("close modal");
+				if (_modalCallback) {
+					_modalCallback();
+				}
+			}
+		}
+
+		// When the user clicks anywhere outside of the modal, close it
+		window.onclick = function(event)
+		{
+		  if (event.target == modal)
+		  {
+			var originalDisplay = modal.style.display;
+			modal.style.display = "none";
+			if (originalDisplay == 'block') {
+				console.log("close modal");
+				if (_modalCallback) {
+					_modalCallback();
+				}
+			}
+		  }
+		}
+
+	</script>
+
+
+
+	<script>
+		var WIDTH=200;
+		var HEIGHT=200;
+		var TRAINING = true;
+
+		var SAMPLE_FIDELITY=14000;
+		var N = SAMPLE_FIDELITY;
+		var LINEUP_N = 4;
+
+		shaderList = [
+		    {name: 'vis',		path: '../../design/src/shaders/vis.frag'},
+		    {name: 'vertex',	path: '../../design/src/shaders/vertex.vert'},
+		    {name: 'blur',		path: '../../design/src/shaders/blur.frag'}
+		];
+
+		var ALL_COLORMAPS = [
+			'singlehue',
+			'viridis',
+			'spectral',
+			'coolwarm',
+			'turbo',
+			'rainbowjet',
+		];
+
+		var COMBINATION = 'abc';
+		var RANDOMIZE_COLOR_ORDER = true;
+		var BLOCK_SEED = [
+			/*
+			{ center: 0.05, correlation: 0.07, expectation: 0.160, std: 0.04},
+			{ center: 0.06, correlation: 0.07, expectation: 0.190, std: 0.04},
+			{ center: 0.07, correlation: 0.07, expectation: 0.210, std: 0.04},
+			{ center: 0.08, correlation: 0.07, expectation: 0.230, std: 0.04},
+			*/
+			{ center: 0.09, correlation: 0.07, expectation: 0.240, std: 0.04},
+			{ center: 0.10, correlation: 0.07, expectation: 0.260, std: 0.04},
+			//{ center: 0.11, correlation: 0.07, expectation: 0.270, std: 0.04},
+			{ center: 0.12, correlation: 0.07, expectation: 0.285, std: 0.05},
+			//{ center: 0.13, correlation: 0.07, expectation: 0.300, std: 0.05},
+			{ center: 0.14, correlation: 0.07, expectation: 0.320, std: 0.05},
+		];
+		var trialPerSubblock = 2;
+
+		// create lineup experiment
+		var lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N);
+		lineup.enableSelection(true);
+		var correct = false;
+
+		// store results
+		var csv = [];
+		var stimulusCount = 0;
+		var subjectid = Math.floor(Math.random()*10000);
+
+		// experiment structure
+		// =====================
+		var trialPerBlock = 5;
+		var engagementPerBlock = 0;
+
+		var blocks = [
+			{ colormap: 'viridis', center: 0.12, correlation: 0.07, expectation: 0.28},
+			{ colormap: 'turbo', center: 0.12, correlation: 0.07, expectation: 0.28},
+			{ colormap: 'viridis', center: 0.07, correlation: 0.07, expectation: 0.22},
+			{ colormap: 'turbo', center: 0.07, correlation: 0.07, expectation: 0.22}
+		];
+		var ENGAGEMENT = {
+			center: 0.24,
+			correlation: 0.08,
+			expectation: [0.36, 0.6]
+		}
+
+		// experiment stats
+		// ================
+		var engagementCorrect = 0;
+		var stimulusCorrect = 0;
+
+		// current status
+		// ==============
+		var trialNum = -1, blockNum = -1, engagementNum = 0;
+		var currentColormap = null;
+		var distance = null;
+		BLUR = false;
+
+		// flag on whether experiment is complete
+		var complete = false;
+		var wasIncorrect = false;
+
+		var EXPERIMENT_URL = 'experiment.html';
+		var DATA_URL = 'php/experimental_data.php';
+
+		function nextBlock()
+		{
+			blockNum++;
+			engagementNum = 0;
+
+			if (blockNum >= blocks.length)
+			{
+				complete = true;
+				return true;
+			}
+			else {
+				trialNum = 0;
+				var block = blocks[blockNum];
+
+				M_PERTURB = block.center;
+				R_PERTURB = block.correlation;
+
+				var colormap = getColorPreset(block.colormap)
+				ScalarSample.setUniversalColormap(colormap);
+
+				// draw the current currentColormap
+				var scaleCanvas = d3.select("#colorScaleCanvas");
+				colormap.drawColorScale(
+					+scaleCanvas.attr('width'),
+					+scaleCanvas.attr('height'),
+					+scaleCanvas.attr('height'), 'vertical',
+					scaleCanvas.node());
+
+				return false;
+			}
+		}
+
+		function finish()
+		{
+			d3.select("#prompt").style('visibility', 'hidden');
+			d3.select('#lineupTable').style('visibility', 'hidden');
+
+			d3.select("#confirm")
+				.style('visibility', null)
+				.html(true ?
+					'Training is complete. Please proceed to the <a href="' + EXPERIMENT_URL + '"><b>main experiment</b></a>.' :
+					'Thank you! Storing data... (may take a few seconds)');
+
+			if (TRAINING)
+			{
+				window.location.href = "debrief.html"
+			}
+			else {
+
+				sendData(undefined, function() {
+					d3.select("#confirm")
+						.html('DONE');
+				});
+			}
+			/*
+			d3.select("#downloadData")
+				.style("visibility", TRAINING ? 'hidden' : null);
+			*/
+		}
+
+		var stimulusReady = null, genTime;
+
+		function nextTrial()
+		{
+			wasIncorrect = false;
+			LINEUP_PADDING = 10;
+			if (complete) {
+				// do nothing
+				return true;
+			}
+			else {
+				// current block
+				var block = blocks[blockNum];
+
+				if (trialNum >= block.trialSequence.length-1)
+				{
+					if (nextBlock()) {
+						finish();
+						return true;
+					}
+				}
+				else {
+					trialNum++;
+				}
+
+				genTime = Date.now();
+
+				// hide lineup temporarily while model/samples are being created
+				d3.select("#lineupTable").style('visibility', 'hidden');
+
+				// update status label
+				var stimPerBlock = trialPerBlock + engagementPerBlock;
+				var p = (trialNum + blockNum*stimPerBlock) /	(stimPerBlock*blocks.length)
+				var label = (trialNum+1 + blockNum*stimPerBlock) + " / " +
+				(stimPerBlock*blocks.length) + ' (' + Math.floor(.5+100*p) + '% complete)';
+				label = Math.floor(.5+100*p) + '% complete';
+				d3.select('#stimulusNum').html(label);
+
+				setTimeout(function()
+				{
+					if (block.trialSequence[trialNum] == 'e')
+					{
+						console.log("engagement check");
+						M_PERTURB = ENGAGEMENT.center;
+						R_PERTURB = ENGAGEMENT.correlation;
+						lineup.modelWithExpectation(ENGAGEMENT.expectation);
+					}
+					else if ( typeof block.trialSequence[trialNum] === "object" )
+					{
+						var subblock = block.trialSequence[trialNum]
+						M_PERTURB = subblock.center;
+						R_PERTURB = subblock.correlation;
+						lineup.modelWithExpectation(subblock.expectation);
+					}
+					else
+					{
+						M_PERTURB = block.center;
+						R_PERTURB = block.correlation;
+						lineup.modelWithExpectation(block.expectation);
+					}
+
+					// keep track of time needed to generate stimulus
+					distance = lineup.randomLineup(SAMPLE_FIDELITY, d3.select("#lineupTable"));
+					genTime = Date.now() - genTime;
+
+					// force a min of 250 ms delay to clear our iconic memory
+					setTimeout(function()
+					{
+						// show lineup
+						d3.select("#lineupTable").style('visibility', null);
+
+						// keep track of time when stimulus is ultimately ready
+						stimulusReady = Date.now();
+					}, Math.max(0, 250-genTime));
+				}, 10);
+
+				return false;
+			}
+		}
+
+		function downloadCSV()
+		{
+			var output = "subjectid,responseid,blockNum,trialNum,colormap,distance,correct,responseTime,center,correlation,expdistance\n";
+			for (var i=0, len=csv.length; i<len; i++)
+			{
+				var d = csv[i];
+				var r =
+					subjectid + ',' +
+					(i+1) + ',' +
+					d.blockNum + ',' +
+					d.trialNum + ',' +
+					d.colormap + ',' +
+					d.distance + ',' +
+					d.correct + ',' +
+					d.responseTime + ',' +
+					d.center + ',' +
+					d.correlation + ',' +
+					d.expdistance;
+				output += r + (i==len-1 ? '' : "\n");
+			}
+			var csvContent = "data:text/csv;charset=utf-8," + output;
+			var encodedUri = encodeURI(csvContent);
+			window.open(encodedUri);
+
+			//return output;
+		}
+
+		String.prototype.replaceAt=function(index, replacement) {
+		    return this.substr(0, index) + replacement+ this.substr(index + replacement.length);
+		}
+
+		function createTrialSequence()
+		{
+			if (COMBINATION && COMBINATION.length > 0)
+			{
+				var combination = COMBINATION;
+				if (RANDOMIZE_COLOR_ORDER)
+				{
+					// randomize
+					for (var i=0; i<100; i++)
+					{
+						var r1 = Math.floor(Math.random() * combination.length);
+						var r2 = Math.floor(Math.random() * combination.length);
+						if (r1 != r2) {
+							var c1 = combination.charAt(r1);
+							var c2 = combination.charAt(r2);
+							combination = combination.replaceAt(r1, c2);
+							combination = combination.replaceAt(r2, c1);
+						}
+					}
+				}
+				COMBINATION = combination;
+
+				// create colorCombination
+				var colorscales = [];
+				for (var i=0; i<COMBINATION.length; i++) {
+					var index = COMBINATION.charCodeAt(i) - 'a'.charCodeAt(0);
+					colorscales.push(ALL_COLORMAPS[index]);
+				}
+
+				// construct blocks
+				var generatedBlocks = [];
+				for (var c=0; c<colorscales.length; c++)
+				{
+					var block = {
+						colormap: colorscales[c],
+						trialSequence: []
+					};
+					for (var i=0; i<BLOCK_SEED.length; i++)
+					{
+						var seed = BLOCK_SEED[i];
+						for (var t=0; t<trialPerSubblock; t++)
+						{
+							var subblock = {
+								center: seed.center,
+								correlation: seed.correlation,
+								std: seed.std,
+								expectation: seed.expectation
+							};
+							block.trialSequence.push(subblock);
+						}
+
+						// permutate randomize subblock?
+						for (var x=0; x<9000; x++) {
+							var r1 = Math.floor(Math.random() * block.trialSequence.length);
+							var r2 = Math.floor(Math.random() * block.trialSequence.length);
+							var t = block.trialSequence[r2];
+							block.trialSequence[r2] = block.trialSequence[r1];
+							block.trialSequence[r1] = t;
+						}
+					}
+					generatedBlocks.push(block);
+				}
+				blocks = generatedBlocks;
+				trialPerBlock = trialPerSubblock * BLOCK_SEED.length;
+			}
+
+			for (var b=0; b<blocks.length; b++)
+			{
+				var block = blocks[b];
+				if (!block.trialSequence) {
+					block.trialSequence = d3.range(trialPerBlock);
+					for (var i=0; i<trialPerBlock; i++) {
+						block.trialSequence[i] = 0;
+					}
+				}
+
+				for (var i=0; i<engagementPerBlock; i++) {
+					var r = Math.floor(Math.random()*trialPerBlock);
+					block.trialSequence.splice(r, 0, 'e');
+				}
+			}
+		}
+
+		function initExperiment()
+		{
+			// trial sequence
+			createTrialSequence();
+
+			function showConfirmPrompt() {
+				d3.select("#incorrect").style('visibility', 'hidden');
+				d3.select("#confirm").style('visibility', null);
+			}
+			lineup.setClickFeedback(showConfirmPrompt, showConfirmPrompt);
+
+			// keyboard events
+			d3.select(document).on('keydown', function()
+			{
+				if (complete) {
+					// do nothing
+					return;
+				}
+
+				if (d3.event.keyCode === 13)
+				{
+					d3.select("#correct").style('visibility', 'hidden')
+
+					// ENTER
+					if (lineup.answer == null || lineup.answer == undefined)
+					{
+						// do nothing
+					}
+					else if (lineup.answer == '0' && TRAINING)
+					{
+						d3.select("#incorrect").style('visibility', null);
+						d3.select("#confirm").style('visibility', 'hidden');
+						wasIncorrect = true;
+						flashAnswer();
+					}
+					else {
+						if (!wasIncorrect) {
+							d3.select("#correct").style('visibility', null);
+							setTimeout(function() {
+								d3.select("#correct").style('visibility', 'hidden')
+							}, 800);
+						}
+
+						// register response
+						var b = blocks[blockNum];
+
+						if (b.trialSequence[trialNum] == 'e')
+						{
+							// an engagement check. don't store, just check correctness
+							engagementCorrect += +lineup.answer;
+							engagementNum++;
+						}
+						else {
+							var colormap = b.colormap;
+							if (typeof b.trialSequence[trialNum] == 'object')
+							{
+								b = b.trialSequence[trialNum];
+							}
+
+							var stimNum = csv.length+1
+							csv.push({
+								blockNum: blockNum+1,
+								trialNum: trialNum+1 - engagementNum,
+								stimulusNum: stimNum,
+								colormap: colormap,
+								distance: lineup.getCurDistance(),
+								requestedDistance: b.expectation,
+								correct: +lineup.answer,
+								generationTime: genTime,
+								responseTime: Date.now()-stimulusReady,
+								center: b.center,
+								correlation: b.correlation,
+								expdistance: b.expectation
+							});
+							stimulusCorrect += +lineup.answer;
+
+						}
+
+						d3.select("#confirm").style('visibility', 'hidden');
+						d3.select("#incorrect").style('visibility', 'hidden');
+						nextTrial();
+
+					}
+				}
+			});
+
+			nextBlock();
+			trialNum = -1;
+			nextTrial();
+		}
+
+		var flashSeq = 0, FLASH_RATE=80;
+
+
+		function flashAnswer()
+		{
+			function flashTimeout() {
+				flashSeq++;
+				if (flashSeq % 2 == 0) {
+					lineup.highlightCorrect(true);
+				}
+				else {
+					lineup.highlightCorrect(false);
+				}
+				if (flashSeq < 4) {
+					setTimeout(flashTimeout, FLASH_RATE);
+				}
+			}
+
+			flashSeq = 0;
+			lineup.highlightCorrect(true);
+			setTimeout(flashTimeout, FLASH_RATE);
+		}
+
+		function sendData(TRIALS, callback)
+		{
+			var blockCount = blocks.length;
+
+			var data2send = JSON.stringify(
+			{
+				experimentalData: csv,
+				engagementCorrect: engagementCorrect,
+				engagementTotal: engagementPerBlock * blockCount,
+				engagementAccuracy: engagementPerBlock > 0 ? (engagementCorrect / (blockCount * engagementPerBlock)) : 0.0,
+
+				stimulusCorrect: stimulusCorrect,
+				stimulusTotal: blockCount * trialPerBlock,
+				stimulusAccuracy: stimulusCorrect / (blockCount * trialPerBlock)
+			});
+
+			console.log("data2send size: " + data2send.length);
+
+			(function(experiment, trial, _data2send, _callback) {
+				$.ajax({
+					type: "POST",
+					url: DATA_URL,
+
+					data: _data2send,
+					dataType: "json",
+					contentType: "application/json; charset=utf-8",
+
+					success: function(data)
+					{
+						console.log("sendData SUCCESS");
+						_callback(true);
+					},
+
+					error: function(errMsg)
+					{
+						console.log("sendData failed: " + errMsg);
+						console.log("trials left: " + (trial));
+						if (trial > 0) {
+							experiment.sendData(trial-1, _callback);
+						}
+						else
+						{
+							_callback(false);
+						}
+					}
+				});
+				//console.log("send complete");
+			})(this, TRIALS != undefined ? TRIALS : 3, data2send, callback);
+		}
+
+		initExperiment();
+
+	</script>
+</body>
+</html>

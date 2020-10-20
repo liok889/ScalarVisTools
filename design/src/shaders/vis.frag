@@ -13,6 +13,14 @@ void main()
 	}
 	else
 	{
-		gl_FragColor = texture2D(colormap, colormapCoord);
+		if (data.x >= 0.0)
+		{
+			gl_FragColor = texture2D(colormap, colormapCoord);
+		}
+		else
+		{
+			gl_FragColor = vec4(1.0);
+			//gl_FragColor = mix(texture2D(colormap, colormapCoord), vec4(1.0), 0.7);
+		}
 	}
 }

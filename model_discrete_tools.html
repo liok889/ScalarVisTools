@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<head>
+
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="jnd/lib/d3.min.js"></script>
+
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+	<!--<script src="https://d3js.org/topojson.v1.min.js"></script>-->
+	<script src="https://unpkg.com/topojson-client@3"></script>
+	<script src="https://unpkg.com/topojson-simplify@3"></script>
+
+	<script src="https://d3js.org/d3-array.v1.min.js"></script>
+	<script src="https://d3js.org/d3-geo.v1.min.js"></script>
+
+	<script src="src/scalar.js"></script>
+	<script src="design/src/colormap.js"></script>
+	<script src="design/src/gl_pipeline.js"></script>
+	<script src="design/src/coloranalysis.js"></script>
+	<script src="jnd/lib/three.min.js"></script>
+	<script src="lineup/gaussmix.js"></script>
+	<script src="lineup/gaussmix_bivariate.js"></script>
+	<script src="lineup/gaussmix_bi_discrete.js"></script>
+	<script src="lineup/scalar_sample.js"></script>
+	<script src="lineup/choropleth_sample.js"></script>
+	<script src="lineup/lineup.js"></script>
+	<script src="lineup/sim.js"></script>
+	<script src="lineup/lineup_experiment.js"></script>
+	<script src="lineup/utils.js"></script>
+	<script src="lineup/sim.js"></script>
+
+	<style>
+		.county {
+			fill: none;
+			stroke: black;
+			stroke-width: 0.0px;
+		}
+		.choroplethBin {
+
+		}
+
+		body {
+			font-family: arial;
+			font-size: 14px;
+		}
+
+		.lineupSVG {
+			border: solid 1px black;
+		}
+		.histogram {
+			fill: #cccccc;
+		}
+		.histogramNew {
+			fill: #ffe97d;
+		}
+	</style>
+</head>
+
+<body>
+
+	<canvas id="containmentTestCanvas" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	</canvas>
+	
+	<div id="divTarget" style="position: absolute; top: 10px; left: 10px; "> 
+	</div>
+	<div id="divTargetControl" style="position: absolute; top: 10px; left: 10px;"></div>
+	</div>
+
+	<div id="divDecoy" style="position: absolute; top: 10px; left: 370px;">
+	</div>
+	<div id="divDecoyControl" style="position: absolute; top: 10px; left: 370px;"></div>
+
+	<div style="position: absolute; top: 10px; left: 780px">
+		<svg width="350" height="600" style="border: solid 1px blue">
+			<g id="simulationResults" transform="translate(10,20)"></g>
+		</svg>
+	</div>
+
+	<!--
+	<canvas id="canvasModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></canvas>
+
+	<svg id="svgModel" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 1px black"></svg>
+
+	<canvas id="canvasDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></canvas>
+
+	<svg id="svgDecoy" width="350" height="250" style="position: absolute; top: 270px; left: 370px; border: solid 1px black"></svg>
+	-->
+
+	<div style="position: absolute; top: 270px; left: 10px">
+		<div>
+			<button style="" onclick="randomLineup()">Random model (or press ENTER)</button>
+		</div>
+
+		<div>
+			<table>
+				<tr>
+					<td colspan="2"><b>model peturbation</b></td>
+				</tr>
+
+				<tr>
+					<td width="100">centers</td>
+					<td width="100"><div class="uiDiv sliderDiv" id="sliderGCenter"></div></td>
+					<td width="100"><span id="labelGCenter"></span></td>
+
+				</tr>
+
+				<!--
+				<tr>
+					<td><strike>std. deviation</strike></td>
+					<td><div class="uiDiv sliderDiv" id="sliderGSTD"></div></td>
+					<td><span id="labelGSTD"></span></td>
+				</tr>
+				-->
+
+				<tr>
+					<td>correlation</td>
+					<td><div class="uiDiv sliderDiv" id="sliderGCorrelation"></div></td>
+					<td><span id="labelGCorrelation"></span></td>
+				</tr>
+
+				<tr>
+					<td colspan="3"><span id="labelKLD"></span></td>
+				</tr>
+			</table>
+		</div>
+
+		<div>
+			<p>&nbsp;
+			<p>
+			Click on the picture below that doesn't belong. <span id="answer"></span>
+			<p>
+			<table id="lineupTable"></table>
+		</div>
+
+		
+	</div>
+
+	<script>
+
+		// width / height of stimuli
+		var WIDTH = 350;
+		var HEIGHT = 250;
+
+		// how many choices within the lineup
+		var LINEUP_N = 4;
+
+		// number of sampling iterations
+		var ITER = 18000 * 3;
+		var N = ITER;
+
+		// 'good' sampling iterations to show a better representation of the model (for debugging)
+		var GOOD_ITER = ITER * 1;
+
+		// type of representation:
+		// 'mapSmooth':  smooth US map
+		// 'mapDiscrete': US map binned by counties
+		// 'fieldSmooth': smooth rectangle
+		// 'fieldDiscrete': binned rectangle (10x10 pixel bins)
+		
+		var VIS_TYPE = 'fieldSmooth';
+		setRepresentationType(VIS_TYPE);
+
+		// create lineup elements
+		createLineupElements(d3.select("#lineupTable"), LINEUP_N, CANVAS_TYPE, WIDTH, HEIGHT);
+
+		// give them a thin border
+		d3.select('#lineupTable').selectAll(CANVAS_TYPE)
+			.style('border', 'solid 1px black');
+
+		// prevent auto rendering when model us updated 
+		var CALLBACK_SAMPLE = false;
+
+		// no BLUR on rendering smooth fields
+		BLUR = false;
+
+		// create two representations at the top of the page
+		// of both the target and the decoy
+		d3.select('#divTarget')
+			.append(CANVAS_TYPE)
+			.attr('id', 'svgTarget')
+			.attr('width', WIDTH).attr('height', HEIGHT)
+			.classed('lineupSVG', true);
+		
+		d3.select('#divDecoy')
+			.append(CANVAS_TYPE)
+			.attr('id', 'svgDecoy')
+			.attr('width', WIDTH).attr('height', HEIGHT)
+			.classed('lineupSVG', true);
+
+	</script>
+
+
+	<script type="text/javascript">
+
+		// lineupx
+		var svgTarget = d3.select("#svgTarget");
+		var svgDecoy = d3.select("#svgDecoy");
+
+		var lineupExp = null;
+
+		// samplers
+		var targetSampler = null, decoySampler = null;
+
+		// colormap
+		var colormap = null;
+
+		// load and fireup
+		initInterface();
+
+		// load jsons
+		loadExperimentData(initLineup);
+
+		function initLineup()
+		{
+			lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+				svgTarget, svgDecoy, false, d3.select("#lineupTable"));
+			lineupExp.canMakeSelection = true;
+
+			// show the divergence between the model and the decoy
+			lineupExp.getMain().addCallback(computeDivergence);
+			lineupExp.getDecoy().addCallback(computeDivergence);
+
+			// create samplers
+			setSamplers();				
+   
+			// get random target-decoy pairs
+			randomLineup();			
+		}
+
+
+		function setSamplers() 
+		{
+			targetSampler = new SAMPLER_TYPE(WIDTH, HEIGHT, svgTarget);
+			decoySampler= new SAMPLER_TYPE(WIDTH, HEIGHT, svgDecoy);
+
+			targetSampler.setSamplingFidelity(GOOD_ITER);
+			targetSampler.setModel(lineupExp.getMain())
+
+			decoySampler.setSamplingFidelity(GOOD_ITER);
+			decoySampler.setModel(lineupExp.getDecoy())
+
+			if (!colormap) {
+				colormap = getColorPreset('rainbowjet');
+				ScalarSample.setUniversalColormap(colormap);
+			}
+		}
+
+		function randomLineup()
+		{
+			var start = Date.now();
+			d3.select("#answer").html('');
+
+			// arm feedbacks
+			lineupExp.setClickFeedback(
+				function() {
+					d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+				},
+				function() {
+					d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
+				}
+			);
+
+			lineupExp.randomModel();
+			lineupExp.randomLineup(ITER, d3.select('#lineupTable'));
+			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
+			refreshModel();
+		}
+
+		function changeColormap(_colormapName) 
+		{
+			colormap = getColorPreset(_colormapName);
+			ScalarSample.setUniversalColormap(colormap);
+		}
+
+
+		function updateModelParameters()
+		{
+			M_PERTURB = +$('#sliderGCenter').slider('value');
+			R_PERTURB = +$('#sliderGCorrelation').slider('value');
+
+			// copy and perturb
+			lineupExp.copyToDecoy();
+
+			refreshModel();
+			//randomLineup();
+		}
+
+		function initInterface()
+		{
+			// keyboard events
+			d3.select(document).on('keydown', function() {
+				if (d3.event.keyCode === 13) {
+					randomLineup();
+				}
+			});
+
+			// sliders
+			$('#sliderN').slider({ step: 10, min: 670, max: GOOD_ITER, value: ITER, change: refreshModel, slide: function(event, ui) { d3.select("#sliderNValue").html(ui.value);} });
+
+			$('#sliderGCenter').slider({ step: 0.005, min: 0, max: .2, value: M_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCenter").html(ui.value);} });
+
+			$('#sliderGCorrelation').slider({ step: 0.005, min: 0, max: .3, value: R_PERTURB, change: updateModelParameters, slide: function(event, ui) { d3.select("#labelGCorrelation").html(ui.value);} });
+
+			d3.select("#labelGCenter").html(M_PERTURB);
+			d3.select("#labelGCorrelation").html(R_PERTURB);
+
+			//showColormaps();
+			
+		}
+
+		function computeDivergence()
+		{
+			var distance = lineupExp.modelDecoyDistance();
+			var out = "<br>distance: " + distance.toFixed(2) + "%";
+			d3.select("#labelKLD").html(out);
+		}
+
+		function refreshModel()
+		{
+			targetSampler.sampleAndVis();
+			decoySampler.sampleAndVis();
+
+			lineupExp.main.putOnTop();
+			lineupExp.decoy.putOnTop();
+		}
+
+		// choropleth elements
+		var theCounties = null;
+		var theStates = null;
+		var theProjection = null, thePath = null;
+
+		// filter out Alaska, Hawaii, and Puerto Rico	
+		function filterStates(d) 
+		{
+			if (typeof(d.id) == 'string')
+			{
+				var stateID = d.id.substr(0, 2)
+				if (stateID == "02" || stateID == "15" || stateID =="72") 
+				{
+					return false;
+				}
+				else {
+					return true;
+				}
+			}
+			else
+			{
+				d = d.id;
+
+				if ((d>=2000 && d<3000) || (d>=15000 && d <16000) || (d>=72000&&d<73000)) {
+					return false;
+				}
+				else {
+					return true;
+				}
+			}
+		}
+
+		function drawGeoSimplify(usTopo, svg) 
+		{
+			var albers = d3.geoAlbersUsa()
+				.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+
+			usTopo = topojson.presimplify(usTopo)
+			usTopo = topojson.simplify(usTopo, 5000);
+
+			/*
+			var area = 70; 
+			var simplify = d3.geoTransform({
+				point: function(x, y, z) 
+				{
+					if (z >= area) {
+						this.stream.point(x, y);
+					};
+				}
+			});
+
+			var simplify_then_project = d3.geoTransform(
+			{
+				point: function(x, y, z) { 
+					//simplify.stream(s)
+            		if (z >= area) {
+						return this.stream.point(albers([x, y]));
+					}
+            	}
+            });
+            */
+
+			/*
+            simplify_then_project
+            	.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+			*/
+
+            
+            var counties = topojson.feature(usTopo, usTopo.objects.counties);
+            counties.features = counties.features.filter(filterStates);
+            counties.features = counties.features.filter(function(d) { return d.id == 23003 ? false : true});
+
+            theCounties = counties;
+            var path = d3.geoPath()
+            	.projection(albers)
+            theProjection = albers;
+            thePath = path;
+
+            var g = svg.append('g');
+            var countyShapes = g.selectAll(".county")
+				.data(counties.features)
+				.enter()
+				.append("path")
+					.attr("class", function(d) { return 'county choroplethBin c' + d.id; })
+					.attr("d", path);
+        }
+        function drawTopoJson() {
+        	d3.select("#svgTarget").selectAll('*').remove();
+        	d3.json('lineup/maps/us.json')
+        		.then(function(data) {
+        			drawGeoSimplify(data, d3.select("#svgTarget"))
+        		})
+        }
+
+
+		function drawGeoCounties(counties, svg) {
+
+			// simplify the geometry 
+			/*
+			(topojson.presimplify(us));
+
+			var area = 70, simplify = d3.geoTransform({
+				point: function(x, y, z) {
+					if (z >= area) this.stream.point(x/2, y/2);
+				}
+			});
+			*/
+
+			// states?
+			//theStates = topojson.feature(us, us.objects.states)
+			//theStates.features = theStates.features.filter(filterStates);
+
+			var projection = d3.geoAlbersUsa()
+				.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+
+			var path = d3.geoPath()
+				.projection(projection);
+			theProjection = projection;
+			thePath = path;
+
+			var countyShapes = svg.selectAll(".county")
+				.data(counties.features)
+				.enter()
+				.append("path")
+					.attr("class", "county choroplethBin")
+					.attr("d", path)
+		}
+
+		var pix2County = null;
+		var countyMap = null;
+
+		var binColors = {};
+		function lookupColor(id)
+		{
+			var c = binColors[id];
+			if (!c) {
+				c = [ 
+					Math.floor(Math.random() * 256),
+					Math.floor(Math.random() * 256),
+					Math.floor(Math.random() * 256)
+				];
+				binColors[id] = c;
+			}
+			return c;
+		}
+
+		function findCounty(id) 
+		{
+			var res = [];
+			for (var i=0; i<theCounties.features.length; i++) {
+				var c = theCounties.features[i];
+				if (c.id == id) {
+					res.push(c);
+				}
+			}
+			return res;
+		}
+		function countyArea(id) 
+		{
+			var features = findCounty(id);
+			if (features.length > 0) {
+				var area = 0;
+				for (var i=0; i<features.length; i++)
+				{
+					area += thePath.area(features[i]);
+				}
+				return area;
+			}
+			else {
+				return null;
+			}
+		}
+
+		function testContainment()
+		{
+			var canvas = d3.select('canvas');
+			var width = WIDTH;
+			var height = HEIGHT;
+			var totalPixels = width * height;
+			var curPixel = 0;
+
+			var mapSize = width * height * Int32Array.BYTES_PER_ELEMENT;
+			pix2County = new Int32Array(new ArrayBuffer(mapSize));
+
+			var counties = theCounties;
+			var context = canvas.node().getContext('2d');
+			var imgd = context.getImageData(0, 0, width, height);
+			var pixels = imgd.data;
+
+			var inCount = 0;
+			var countyLength = 0;
+			var counter = 0;
+			var lastHit = null;
+
+			for (var r=0; r<height; r++) 
+			{
+				for (var c=0; c<width; c++, curPixel++) 
+				{
+					var K = (r*width + c);
+					var I = K * 4;
+
+					pixels[I] = 255;
+					pixels[I+1] = 255;
+					pixels[I+2] = 255;
+					pix2County[K]=0;
+
+					// convert pixel coordinates to lat/long
+					var theP = theProjection.invert([c, r]);
+
+					if (lastHit) 
+					{
+						if (d3.geoContains(lastHit, theP)) {
+							inCount++;
+							var color = lookupColor(lastHit.id);
+							pixels[I] = color[0];
+							pixels[I+1] = color[1];
+							pixels[I+2] = color[2];
+							pixels[I+3] = 255;
+							pix2County[K] = lastHit.id;
+							continue;
+						}
+					}
+					
+					// search all counties
+					for (var county = 0, clen=counties.features.length; county < clen; county++)
+					{
+						var theC = counties.features[county];
+						var test = d3.geoContains(theC, theP);
+
+						counter++;
+						if (counter%10000 == 0) {
+							console.log((100 * curPixel/totalPixels).toFixed(1) + '%, ' + I);
+							counter = 0;
+						}
+
+						if (test) 
+						{
+							inCount++;
+							var color = lookupColor(theC.id);
+
+							pixels[I] = color[0];
+							pixels[I+1] = color[1];
+							pixels[I+2] = color[2];
+							pixels[I+3] = 255;
+							lastHit = theC;
+							pix2County[K] = lastHit.id;
+							break;
+						}
+					}
+					
+				}
+			}
+
+			context.putImageData(imgd, 0, 0);
+			console.log("inCount: " + inCount);
+
+			// convert pix2County to a standard array
+			var buffer = [], binMap = {}, listOfBins = [];
+			for (var i=0, len=pix2County.length; i<len; i++) 
+			{
+				var bin = pix2County[i];
+				buffer.push(bin);
+				if (bin > 0) {
+					if (!binMap[bin]) {
+						binMap[bin] = true;
+						listOfBins.push(bin);
+					}
+				}
+			}
+
+			// sort list of bins
+			listOfBins.sort(function(a,b) { return a-b; });
+
+			// compute areas
+			var areas = {}, minArea = Number.MAX_VALUE, maxArea = Number.MIN_VALUE;
+			for (var i=0; i<listOfBins.length; i++)
+			{
+				var id = listOfBins[i];
+				var a = countyArea(id);
+				areas[id] = a;
+				minArea = Math.min(minArea, a);
+				maxArea = Math.max(maxArea, a);
+			};
+
+			countyMap = {
+				width: width,
+				height: height,
+				pixelMap: buffer,
+				listOfBins: listOfBins,
+				areas: areas,
+				minArea: minArea,
+				maxArea: maxArea
+			};
+
+			// add a lookup function by mouseover
+		}
+
+		console.save = function(data, filename){
+
+		    if(!data) {
+		        console.error('Console.save: No data')
+		        return;
+		    }
+
+		    if(!filename) filename = 'console.json'
+
+		    if(typeof data === "object"){
+		        data = JSON.stringify(data, undefined, 4)
+		    }
+
+		    var blob = new Blob([data], {type: 'text/json'}),
+		        e    = document.createEvent('MouseEvents'),
+		        a    = document.createElement('a')
+
+		    a.download = filename
+		    a.href = window.URL.createObjectURL(blob)
+		    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+		    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+		    a.dispatchEvent(e)
+		}
+
+
+	</script>
+</body>
+</html>

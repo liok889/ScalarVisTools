@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+
+
+	<script src="../src/scalar.js"></script>
+	<script src="../design/src/colormap.js"></script>
+	<script src="../design/src/gl_pipeline.js"></script>
+	<script src="../design/src/coloranalysis.js"></script>
+	<script src="../design/src/scalarvis.js"></script>
+	<script src="../jnd/lib/three.min.js"></script>
+	<script src="../src/perlin.js"></script>
+	<script src="../src/noisegen.js"></script>
+
+	<!-- Daniell's name libraries -->
+	<script src="c3.js"></script>
+	<script src="palettes.js"></script>
+	<script src="analyzer.js"></script>
+	<script src="utils.js"></script>
+
+
+	<script src="cubehelix.js"></script>
+	<script src="value_estimation.js"></script>
+	<script src="name_metrics.js"></script>
+
+	<style>
+		.visSpace {
+			position: absolute;
+			top: 70px;
+			left: 30px;
+		}
+
+		#colorScaleCanvas {
+			position: absolute;
+			top: 120px;
+			left: 530px;
+			border: solid 1px black;
+		}
+
+		#colorScaleSVG {
+			position: absolute;
+			top: 110px;
+			left: 480px;
+			z-index: 10;
+		}
+
+		.cross {
+			stroke: black;
+			stroke-width: 1px;
+		}
+
+		.cross2 {
+			stroke: #eeeeee;
+			stroke-width: 1px;
+		}
+
+		#submitButton {
+			position: absolute;
+			top: 220px;
+			left: 620px;
+			font-size: 15px;
+
+		}
+
+		body {
+			font-family: sans-serif;
+			font-size: 16px;
+
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+		}
+	</style>
+</head>
+
+<body>
+	<div>
+		Click on the color scale level that matches the color under the center of the crosshair.
+		<p><span id="prompt">Progress: <span id="labelProgress"></span></span>
+	</div>
+
+	<div>
+		<canvas width="400" height="400" id="visCanvas" class="visSpace"></canvas>
+
+		<svg width="400" height="400" id="visSVG" class="visSpace" style="border: solid 1px black">
+			<g style="opacity: 1.0" transform="translate(40,40)" id="crosshair">
+				<line class="cross2" x1="-20" x2="-6" y1="1" y2="1"></line>
+				<line class="cross2" x1="20" x2="6" y1="1" y2="1"></line>
+
+				<line class="cross2" y1="-20" y2="-6" x1="-1" x2="-1"></line>
+				<line class="cross2" y1="20" y2="6" x1="-1" x2="-1"></line>
+
+				<line class="cross" x1="-20" x2="-6" y1="0" y2="0"></line>
+				<line class="cross" x1="20" x2="6" y1="0" y2="0"></line>
+
+				<line class="cross" y1="-20" y2="-6" x1="0" x2="0"></line>
+				<line class="cross" y1="20" y2="6" x1="0" x2="0"></line>
+
+
+			</g>
+		</svg>
+
+
+		<!-- training labels -->
+		<img id="upArrow" style="position: absolute; top: 70px; left: 530px; visibility: hidden" src="up.png" width="50" height="50">
+		<img id="downArrow" style="position: absolute; top: 70px; left: 530px; visibility: hidden" src="down.png" width="50" height="50">
+
+		<div id="trainingLabel" style="visibility: hidden; position: absolute; top: 80px; left: 580px; font-size: 17px">go down</div>
+
+		<!-- color scales -->
+		<canvas width="50" height="290" id="colorScaleCanvas" style="pointer-events: none"></canvas>
+		<svg width="130" height="310" id="colorScaleSVG"></svg>
+		<button style="visibility: hidden" id="submitButton">Submit</button>
+
+	</div>
+
+	<script>
+
+		var TRAINING = true;
+		var TRAINING_TOLERANCE = 0.04 * .75;
+		var COLORMAP_PADDING = 0.1;
+
+		var BLOCK_SEED = [
+			{
+				colormap: 'cubehelix',
+				start: 0.5,
+				rots: -1.5,
+				hues: 1
+
+			},
+			{
+				colormap: 'cubehelix',
+				start: 0.5,
+				rots: -2.0,
+				hues: 1
+			},
+			{
+				colormap: 'cubehelix',
+				start: 0.5,
+				rots: -2.3,
+				hues: 1
+			},
+
+			{
+				colormap: 'rainbowjet'
+			},
+			{
+				colormap: 'viridis'
+			}
+		];
+		var VALUES_IN_BLOCK = 5;
+		var TRIALS_PER_VALUE = 1;
+		var blocks = [];
+
+		var randomizeBlockOrder = true;
+		var randomizeValueOrder = true;
+
+		function generateBlocks()
+		{
+			blocks = [];
+			for (var i=0; i<BLOCK_SEED.length; i++)
+			{
+				var seed = BLOCK_SEED[i];
+				var trials = [];
+				for (var j=0; j<VALUES_IN_BLOCK; j++) 
+				{
+					var value = 1 - COLORMAP_PADDING*2;
+					value *= j/(VALUES_IN_BLOCK-1);
+					value += COLORMAP_PADDING;
+
+					for (var t=0; t<TRIALS_PER_VALUE; t++)
+					{
+						trials.push({
+							value: value
+						});
+					}
+				}
+
+				// randomize value order?
+				if (randomizeValueOrder)
+				{
+					var len = trials.length;
+					for (var x=0; x<5000; x++) {
+						var r1 = Math.floor(Math.random() * len);
+						var r2 = Math.floor(Math.random() * len);
+						if (r1 != r2) {
+							var temp = trials[r1];
+							trials[r1] = trials[r2];
+							trials[r2] = temp;
+						}
+					}
+				}
+				blocks.push({
+					trials: trials,
+					colormap: seed.colormap,
+					start: seed.start,
+					rots: seed.rots,
+					hues: seed.hues
+
+				});
+			}
+
+			if (randomizeBlockOrder)
+			{
+				var len = blocks.length;
+				for (var x=0; x<5000; x++) 
+				{
+					var r1 = Math.floor(Math.random() * len);
+					var r2 = Math.floor(Math.random() * len);
+					if (r1 != r2) {
+						var temp = blocks[r1];
+						blocks[r1] = blocks[r2];
+						blocks[r2] = temp;
+					}
+				}
+			}
+		}
+
+		shaderList = [
+			{name: 'vis',	path: '../design/src/shaders/vis.frag'},
+			{name: 'vertex',	path: '../design/src/shaders/vertex.vert'},
+		];
+
+		// load color utilities
+		c3.load("c3_data.json");
+		init();
+
+		// create blocks
+		generateBlocks();
+
+		// create experiment interface
+		var exp = new ValueEstimation(blocks, 
+			d3.select('#visCanvas').node(),
+			d3.select("#colorScaleCanvas").node(),
+			d3.select('#visSVG'),
+			d3.select("#colorScaleSVG")
+		);
+
+	</script>
+
+</body>

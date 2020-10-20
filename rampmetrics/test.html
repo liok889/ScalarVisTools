@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+	<script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+	<script src="../src/scalar.js"></script>
+	<script src="../design/src/colormap.js"></script>
+	<script src="../design/src/gl_pipeline.js"></script>
+	<script src="../design/src/coloranalysis.js"></script>
+	<script src="../design/src/scalarvis.js"></script>
+	<script src="../jnd/lib/three.min.js"></script>
+	<script src="../src/perlin.js"></script>
+	<script src="../src/noisegen.js"></script>
+
+
+	<!-- Danielle's color utility scripts -->
+	<script src="c3.js"></script>
+	<script src="palettes.js"></script>
+	<script src="analyzer.js"></script>
+	<script src="utils.js"></script>
+	<script src="cubehelix.js"></script>
+
+
+	<style>
+		body {
+			font-family: sans-serif;
+			font-size: 15px;
+		}
+	</style>
+</head>
+
+<body>
+
+	<div style="height: 55px">
+		<canvas id="scaleCanvas" width="400" height="50" style="pointer-events: none; position: absolute; border: solid 1px black"></canvas>
+		<svg id="scaleSVG" width="400" height="50" style="border: solid 1px black; position: absolute; z-index: 10"></svg>
+	</div>
+
+	<div>
+		<svg id="svgScaleStats" width="400" height="50" style="border: solid 1px black"></svg>
+	</div>
+	<canvas id="dataCanvas" width="400" height="400"></canvas>
+
+	<p><svg class="main" width="1300" height="270">
+	</svg>
+
+	<div>
+		start: <span id="labelStart"></span><div id="sliderStart" style="width: 150px"></div><br>
+		rots:  <span id="labelRots"></span><div id="sliderRots"  style="width: 150px"></div><br>
+		hues:  <span id="labelHues"></span><div id="sliderHues"  style="width: 150px"></div>
+
+	</div>
+
+	<script type="text/javascript">
+		
+		// load color utilities
+		c3.load("c3_data.json");
+		init();
+
+		var STEP_START = 0.1/4;
+		var STEP_SAMPLES = 6;
+		var STEP_S = 0.1/12;
+		var STEP = 0.1/1.0;
+		var STEP_P = 0.1/6;
+
+
+
+		// function to sample a continuous colormap returning a discrete color sequence
+		function sampleRamp(colormap, n)
+		{
+			if (!n) n=9;
+			var ramp = {
+				name: "nothing",
+				colors: []
+			};
+
+			for (var i=0; i<n; i++)
+			{
+				var c = colormap.mapValue(i/(n-1));
+				ramp.colors.push(c);
+			}
+			return ramp;
+		}
+
+
+		function makeUI()
+		{
+			function refreshColormap()
+			{
+				var start = $('#sliderStart').slider('value');
+				var rots = $('#sliderRots').slider('value');
+				var hues = $('#sliderHues').slider('value');
+				makeCubehelix(start, rots, hues);
+
+				d3.select('#labelStart').html(start);
+				d3.select("#labelRots").html(rots);
+				d3.select("#labelHues").html(hues);
+
+			}
+
+			$('#sliderStart').slider({ step: 0.01, min: 0.01, max: 4, value: 0.5, slide: refreshColormap, change: function(event, ui) {			plotRamps();} });
+			$('#sliderRots').slider({ step: 0.01, min: -7, max: 7, value: -1.5, slide: refreshColormap, change: function(event, ui) { plotRamps();} });
+			$('#sliderHues').slider({ step: 0.01, min: 0.01, max: 3.0, value: 1.0, slide: refreshColormap, change: function(event, ui) { plotRamps();} });
+		}
+
+		function makeCubehelix(start, rots, hues)
+		{
+			if (!hues) hues = 1.0;
+			if (!rots) rots = -1.5;
+			if (!start) start = 0.5;
+			
+			var startAngle = (start - 1) * 120;
+			var endingAngle = (start - 1) * 120 + rots * 360;
+			var saturation = hues / 2.0;
+
+			var helix = d3.scaleCubehelix()
+				.domain([0, 1])
+				.range([d3.hsl(startAngle,saturation,0), d3.hsl(endingAngle, saturation, 1)]);
+
+			//var helix = d3.interpolateCubehelix("hsl(300,50%,0%)", "hsl(-240,50%,100%)");
+			var colorSeq = [];
+			for (var i=0; i<100; i++) {
+				var t = helix(i/(100-1));
+				var c = d3.rgb(t);
+
+				colorSeq.push([c.r, c.g, c.b]);
+			}
+
+			COLOR_PRESETS['cubehelix1'] = colorSeq;
+
+			// plot cubehelix
+			var cubehelix1 = getColorPreset('cubehelix1', undefined, undefined, true);
+			var canvas = d3.select("#scaleCanvas")
+			var w = +canvas.attr('width');
+			var h = +canvas.attr('height');
+
+			cubehelix1.drawColorScale(w, h, w,'horizontal', canvas.node());
+
+			// update vis
+			ScalarVis.setUniversalColormap(cubehelix1);
+			colormap = cubehelix1;
+			return cubehelix1;
+		}
+
+		var LAB_SAMPLES = 10;
+
+		function changeColormap(name)
+		{
+			colormap = getColorPreset(name);
+			var canvas = d3.select("#scaleCanvas")
+			var w = +canvas.attr('width');
+			var h = +canvas.attr('height');
+			colormap.drawColorScale(w, h, w,'horizontal', canvas.node());
+			plotRampStats();
+			ScalarVis.setUniversalColormap(colormap);
+		}
+
+		function getNameUniqueness(rampSample)
+		{
+			var distances = 0;
+			var count = 0;
+			for (var i=rampSample.colors.length-1; i>= 1; i--)
+			{
+				for (var j=0; j<i; j++) {
+					var a = [rampSample.colors[i], rampSample.colors[j]];
+					var d = getNameLength({colors: a});
+					distances += d;
+					count++;
+				}
+			}
+			return (distances / count);
+		}
+
+		function computeNameVariationAtValue(v, _colormap)
+		{
+			var cMap = _colormap ? getColorPreset(_colormap) : colormap;
+			var localNVar = 0, samples = 0, localLabDiff = 0;
+			for (var k=0, s=STEP_START; k<STEP_SAMPLES; s+= STEP_S, samples++, k++)
+			{
+				var l = (STEP - STEP_START) * (k/(STEP_SAMPLES-1)) + STEP_START;
+				s = l;
+				var n = v;
+				var c0= cMap.mapValue(n);
+				var c_1 = cMap.mapValue(n-s);
+				var c_2 = cMap.mapValue(n+s);
+
+				var l0 = d3.lab(c0);
+				var l1 = d3.lab(c_1);
+				var l2 = d3.lab(c_2);
+
+				localNVar += getLocalNameVariation([c_1, c0, c_2]);
+			}
+			return localNVar / samples;
+		}
+
+		function getLocalNameVariation(rampSample)
+		{
+			return getNameLength({colors: rampSample})
+		}
+
+		function simulateNameSteps(allRamps, start, end)
+		{
+			for (var i=0; i<allRamps.length; i++)
+			{
+				var colormap = allRamps[i].colormap;
+				var name = allRamps[i].name;
+				
+				var nameLength = [];
+				var maxNLen = 0;
+				var preferedSamples = 0, samples = null;
+				for (var s=start; s<=end; s++)
+				{
+					var rampSample = sampleRamp(colormap, s);
+					var nLen = getNameLength(rampSample);
+					nameLength.push({len: nLen, samples: s});
+					maxNLen = Math.max(maxNLen, nLen);
+					if (maxNLen == nLen) {
+						preferedSamples = s;
+						samples = rampSample;
+					}
+				}
+				allRamps[i].nameLength = nameLength;
+				allRamps[i].maxNameLength = maxNLen;
+				allRamps[i].preferedSamples = preferedSamples;
+
+				// compute LAB length
+				allRamps[i].LABLength = getLABLength(samples);
+
+				var nameUniqueness = getNameUniqueness(samples)
+				console.log("name uniqueness: " + allRamps[i].name + ", " + nameUniqueness + ', bands: ' + samples.colors.length);
+				allRamps[i].nameUniqueness = nameUniqueness;
+			}
+			return allRamps;
+		}
+
+		function plotNameVariation(allRamps)
+		{
+			var CHART_W = 300;
+			var CHART_H = 200;
+			var COLORS = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#444444','#b15928'];
+
+			var samplesMin = 0;
+			var samplesMax = 0;
+			var yMin = 0;
+			var yMax = 0;
+
+			for (var i=0; i<allRamps.length; i++)
+			{
+				var nameLength = allRamps[i].nameLength;
+				var localMax = 0;
+				for (var j=0; j<nameLength.length; j++) 
+				{
+					samplesMax = Math.max(nameLength[j].samples, samplesMax);
+					yMax = Math.max(nameLength[j].len, yMax);
+					localMax = Math.max(nameLength[j].len, localMax)
+				}
+				var maxNameLength = localMax;
+			}
+
+			var xScale = d3.scaleLinear()
+				.domain([samplesMin, samplesMax])
+				.range([0, CHART_W]);
+			var yScale = d3.scaleLinear()
+				.domain([yMin, yMax])
+				.range([CHART_H, 0]);
+
+			var g = d3.select("svg.main").append('g')
+			g.attr('transform', 'translate(40,10)');
+
+			var xAxis = d3.axisBottom(xScale);
+			g.append('g')
+				.attr('transform', 'translate(0,'+CHART_H + ')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale);
+			g.append('g')
+				.call(yAxis);
+
+
+			var lineGenerator = d3.line()
+				.x(function(d) { return xScale(d.samples); })
+				.y(function(d) { return yScale(d.len); })
+
+			var paths = g.selectAll('path.ramps').data(allRamps)
+			paths.enter().append('path')
+				.attr('d', function(d) { return lineGenerator(d.nameLength); })
+				.style('fill', 'none')
+				.style('stroke-width', '2px')
+				.style('stroke', function(d, i) { return COLORS[i];});
+
+			var lines = g.selectAll('line.legend').data(allRamps)
+			lines.enter().append('line')
+				.attr('x1', CHART_W+20)
+				.attr('x2', CHART_W+40)
+				.attr('y1', function(d, i) { return i*20})
+				.attr('y2', function(d, i) { return i*20})
+				.style('stroke-width', '2px')
+				.style('stroke', function(d, i) { return COLORS[i];});
+
+			var text = g.selectAll('text.legend').data(allRamps)
+			text.enter().append('text')
+				.attr('x', CHART_W+45)
+				.attr('y', function(d, i) { return i*20+5; })
+				.html(function(d) { return d.name});
+
+
+			g.append('text.lab')
+				.attr('x', CHART_W/2)
+				.attr('y', CHART_H+40)
+				.html('# of samples');
+
+			g.append('text.lab')
+				.attr('transform', 'translate(-30,' + (CHART_H/1.2) + ') rotate(-90)')
+				.html('color name variation');
+		}
+
+		function plotNameVariationLABLength(allRamps)
+		{
+			var CHART_W = 300;
+			var CHART_H = 200;
+			var X_OFFSET = CHART_W + 30
+			var Y_OFFSET = 0;
+
+			var COLORS = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#444444','#b15928'];
+
+
+			var LABMin = Number.MAX_VALUE;
+			var LABMax = 0;
+			var yMin = Number.MAX_VALUE;
+			var yMax = 0;
+
+			for (var j=0; j<allRamps.length; j++)
+			{
+				LABMax = Math.max(allRamps[j].LABLength, LABMax);
+				LABMin = Math.min(allRamps[j].LABLength, LABMin);
+
+				yMax = Math.max(yMax, allRamps[j].maxNameLength);
+				yMin = Math.min(yMin, allRamps[j].maxNameLength);
+			}
+
+			var xLogScale = d3.scaleLog().base(2)
+				.domain([LABMin, LABMax])
+				.range([0, CHART_W]);
+			var yScale = d3.scaleLinear()
+				.domain([yMin, yMax])
+				.range([CHART_H, 0]);
+
+			var g = d3.select("svg.main").append('g')
+			g.attr('transform', 'translate(' + (CHART_W + 180) + ',10)');
+
+			var xAxis = d3.axisBottom(xLogScale);
+			g.append('g')
+				.attr('transform', 'translate(0,'+CHART_H + ')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale);
+			g.append('g')
+				.call(yAxis);
+			g.selectAll('circle').data(allRamps)
+				.enter().append('circle')
+				.attr('cx', function(d) { return xLogScale(d.LABLength); })
+				.attr('cy', function(d) { return yScale(d.maxNameLength); })
+				.attr('r', 8)
+				.attr('fill', function(d, i) { return COLORS[i];})
+				.attr('class', function(d) { return 'circle_' + d.name;});
+
+			g.selectAll('text.annotation').data(allRamps)
+				.enter().append('text')
+				.attr('x', function(d) { return xLogScale(d.LABLength)+5; })
+				.attr('y', function(d) { return yScale(d.maxNameLength); })
+				.html(function(d) { 
+					console.log("maxNLength: (" + d.name + "): " + d.maxNameLength + ', ' + d.nameUniqueness);
+
+					return d.name
+				})
+				.style('fill', "#aaaaaa")
+				.style('font-size', '10px')
+
+			g.append('text.lab')
+				.attr('y',CHART_H+40)
+				.attr('x', CHART_W/2)
+				.html('log LAB length');
+
+
+		}
+
+		function plotNameVariationUniqueness(allRamps)
+		{
+			var CHART_W = 300;
+			var CHART_H = 200;
+			var X_OFFSET = CHART_W + 30
+			var Y_OFFSET = 0;
+
+			var COLORS = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#444444','#b15928'];
+
+
+			var xMin = Number.MAX_VALUE;
+			var xMax = 0;
+			var yMin = Number.MAX_VALUE;
+			var yMax = 0;
+
+			for (var j=0; j<allRamps.length; j++)
+			{
+				xMax = Math.max(allRamps[j].nameUniqueness, xMax);
+				xMin = Math.min(allRamps[j].nameUniqueness, xMin);
+
+				yMax = Math.max(yMax, allRamps[j].maxNameLength);
+				yMin = Math.min(yMin, allRamps[j].maxNameLength);
+			}
+
+			var xLogScale = d3.scaleLinear()
+				.domain([xMin, xMax])
+				.range([0, CHART_W]);
+			var yScale = d3.scaleLinear()
+				.domain([yMin, yMax])
+				.range([CHART_H, 0]);
+
+			var g = d3.select("svg.main").append('g')
+			g.attr('transform', 'translate(' + (CHART_W + 3*180) + ',10)');
+
+			var xAxis = d3.axisBottom(xLogScale);
+			g.append('g')
+				.attr('transform', 'translate(0,'+CHART_H + ')')
+				.call(xAxis);
+
+			var yAxis = d3.axisLeft(yScale);
+			g.append('g')
+				.call(yAxis);
+			g.selectAll('circle').data(allRamps)
+				.enter().append('circle')
+				.attr('cx', function(d) { return xLogScale(d.nameUniqueness); })
+				.attr('cy', function(d) { return yScale(d.maxNameLength); })
+				.attr('r', 8)
+				.attr('fill', function(d, i) { return COLORS[i];})
+				.attr('class', function(d) { return 'circle_' + d.name;});
+
+			g.selectAll('text.annotation').data(allRamps)
+				.enter().append('text')
+				.attr('x', function(d) { return xLogScale(d.nameUniqueness)+5; })
+				.attr('y', function(d) { return yScale(d.maxNameLength); })
+				.html(function(d) { return d.name})
+				.style('fill', "#aaaaaa")
+				.style('font-size', '10px')
+				
+			g.append('text')
+				.attr('y',CHART_H+40)
+				.attr('x', CHART_W/2)
+				.html('name uniqueness');
+		}
+
+
+		function getRamps(names)
+		{
+			var ramps = [];
+			for (var i=0; i<names.length; i++) {
+				ramps.push({
+					name: names[i],
+					colormap: getColorPreset(names[i])
+				});
+			}
+			return ramps;
+		}
+
+		function plotRamps()
+		{
+			if (!rampNames) return;
+			var ramps = getRamps(rampNames);
+			simulateNameSteps(ramps, 4, 30);
+
+			// remove earlier graphs
+			d3.select('svg.main').selectAll('*').remove();
+
+			// plot
+			plotNameVariation(ramps);
+			plotNameVariationLABLength(ramps);
+			plotNameVariationUniqueness(ramps);
+			plotRampStats();
+		}
+
+		// ==================================
+		//      start here
+		// ==================================
+		var dataCanvas = d3.select("#dataCanvas");
+		var dataW = +dataCanvas.attr('width');
+		var dataH = +dataCanvas.attr('height');
+
+		// create a default cubehelix
+		var colormap = makeCubehelix();
+
+		// shader lists
+		shaderList = [
+			{name: 'vis',	path: '../design/src/shaders/vis.frag'},
+			{name: 'vertex',	path: '../design/src/shaders/vertex.vert'},
+		];
+
+
+		var field = new ScalarField(dataW, dataH);
+		var vis = new ScalarVis(field, dataCanvas.node(), colormap);
+		
+		seedNoise();
+		makeNoise(field);
+		vis.vis();
+
+
+
+		makeUI();
+
+		// compute color length for a bunch of ramps
+		var rampNames = [
+
+			'rainbowcie',
+			'rainbowjet',
+			'turbo',
+			'spectral',
+			'coolwarm',
+			'greyred',
+			'viridis',
+			'plasma',
+			'redpurple',
+			'reds',
+			'blues',
+			'cubehelix1'
+		];
+
+		plotRamps();
+
+
+
+		function plotRampStats()
+		{
+			var data = [];
+			/*
+			var STEP_START = 0.1/6;
+			var STEP_S = 0.1/12;
+			var STEP = 0.1/2.5;
+			var STEP_P = 0.1/6;
+			*/
+
+			
+			var maxY = 0, maxLab = 0;
+			for (var p=0+STEP; p<=1-STEP; p+=STEP_P)
+			{
+				var localNVar = 0, samples = 0, localLabDiff = 0;
+				for (var k=0, s=STEP_START; k<STEP_SAMPLES; /*s<=STEP;*/ s+= STEP_S, samples++, k++)
+				{
+					var l = (STEP - STEP_START) * (k/(STEP_SAMPLES-1)) + STEP_START;
+					s = l;
+					var n = p;
+					var c0=colormap.mapValue(n);
+					var c_1 = colormap.mapValue(n-s);
+					var c_2 = colormap.mapValue(n+s);
+
+					var l0 = d3.lab(c0);
+					var l1 = d3.lab(c_1);
+					var l2 = d3.lab(c_2);
+
+					// compute local differences
+					var labDiff = 
+						Math.sqrt(Math.pow(l0.b-l1.b, 2) +
+						Math.pow(l0.a-l1.a, 2) +
+						Math.pow(l0.l-l1.l, 2));
+
+					labDiff += Math.sqrt(Math.pow(l0.b-l2.b, 2) +
+						Math.pow(l0.a-l2.a, 2) +
+						Math.pow(l0.l-l2.l, 2))
+
+
+					// compute name variation
+					localLabDiff += labDiff;
+					localNVar += getLocalNameVariation([c_1, c0, c_2]);
+						//= Math.max(localNVar, getLocalNameVariation([c_1, c0, c_2]));
+				}
+				console.log("samples: " + samples);
+				localNVar /= samples;
+				localLabDiff /= samples;
+				data.push({
+					x: p,
+					name: localNVar,
+					lab: localLabDiff
+				});
+				maxY = Math.max(maxY, localNVar);
+				maxLab = Math.max(maxLab, localLabDiff);
+
+			}
+
+			var svg = d3.select("#svgScaleStats");
+			var w = +svg.attr('width');
+			var h = +svg.attr('height');
+			svg.selectAll('*').remove();
+
+			var xxScale = d3.scaleLinear().domain([0,1]).range([0,w]);
+			var yyScale = d3.scaleLinear().domain([0,maxY]).range([h,0]);
+			var yyyScale = d3.scaleLinear().domain([0, maxLab]).range([h, 0])
+			var lineGenerator = d3.line()
+				.x(function(d) { return xxScale(d.x); })
+				.y(function(d) { return yyScale(d.name); })
+			svg.append('path')
+				.attr('d', lineGenerator(data))
+				.attr('fill', 'none')
+				.attr('stroke', 'red')
+				.attr('stroke-width', '1px');
+			lineGenerator.y(function(d) { return yyyScale(d.lab)});
+
+			svg.append('path')
+				.attr('d', lineGenerator(data))
+				.attr('fill', 'none')
+				.attr('stroke', 'blue')
+				.attr('stroke-width', '1px');
+
+
+		}
+
+		d3.select(document).on('keydown', function() {
+			
+		})
+
+		d3.select("#scaleSVG").on('mouseout', function() {
+			vis.setContour(-1);
+		})
+		d3.select("#scaleSVG").on('mousemove', function() 
+		{
+
+
+			var c = d3.select(this);
+			var w = +c.attr('width')
+			var h = +c.attr('height');
+			var m = d3.mouse(this);
+			var n = Math.min(1, Math.max(0, m[0]/w));
+
+			vis.setContour(n);
+
+			var localNVar = 0, samples = 0;
+			for (var s=STEP_START; s<=STEP; s+= STEP_S, samples++)
+			{
+				var c0=colormap.mapValue(n);
+				var c_1 = colormap.mapValue(n-STEP);
+				var c_2 = colormap.mapValue(n+STEP);
+				
+				// compute name variation
+				localNVar += getLocalNameVariation([c_1, c0, c_2]);
+			}
+			localNVar /= samples;
+
+			// place two markers
+			var svg =  d3.select(this);
+			svg.selectAll("*").remove();
+
+			svg.append('line')
+				.attr('x1', (n-STEP)*w)
+				.attr('x2', (n-STEP)*w)
+				.attr('y1', 0)
+				.attr('y2', h)
+				.style('stroke', 'black')
+				.style('stroke-width', '2px')
+
+			svg.append('line')
+				.attr('x1', (n+STEP)*w)
+				.attr('x2', (n+STEP)*w)
+				.attr('y1', 0)
+				.attr('y2', h)
+				.style('stroke', 'black')
+				.style('stroke-width', '2px')
+
+
+			console.log("name variation: " + localNVar +', samples: ' + samples);
+		})
+
+	</script>
+</body>
+</html>
