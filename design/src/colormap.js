@@ -553,7 +553,7 @@ var COLOR_PRESETS =
 		greenpink: ['#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221'].reverse(),
 		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
 
-		orangegreen: ['#d38812', '#f2b756', '#fed39a', '#fbe3d3', '#f3f4ef', '#edffe3', '#dfffba', '#c3ff84', '#94d059'],
+		orangegreen: ['#d38812', '#f2b756', '#fed39a', '#fbe3d3', '#f3f4ef', '#edffe3', '#dfffba', '#c3ff84', '#94d059'].reverse(),
 
 		purpleorange: ['#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788'].reverse(),
 		purpleorangeFull: ['#7f3b08','#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788','#2d004b'].reverse(),
