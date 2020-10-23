@@ -554,6 +554,7 @@ var COLOR_PRESETS =
 		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
 
 		orangegreen: ['#d38812', '#f2b756', '#fed39a', '#fbe3d3', '#f3f4ef', '#edffe3', '#dfffba', '#c3ff84', '#94d059'].reverse(),
+		bluebrownBrewer: ['#d8b365', '#f6e8c3', '#f5f5f5', '#c7eae5', '#5ab4ac'].reverse(),
 
 		purpleorange: ['#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788'].reverse(),
 		purpleorangeFull: ['#7f3b08','#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788','#2d004b'].reverse(),
@@ -3297,3 +3298,24 @@ function cie2000Diff(c1, c2)
 
 	return Math.sqrt(deltaE00_2);
 }
+
+function trimColormap(preset, cutPercent)
+{
+	var thePreset = COLOR_PRESETS[preset];
+	var newPreset = [];
+
+	var cut = Math.floor(.5 + (cutPercent/2) * thePreset.length);
+	if (cut > 0) {
+		for (var k=0, i=cut; i<thePreset.length-cut; i++, k++) {
+			var e = thePreset[i];
+			newPreset.push({
+				r: e.r,
+				b: e.b,
+				g: e.g,
+				x: k/(thePreset.length-cut*2-1)
+			});
+		}
+		COLOR_PRESETS[preset]=newPreset;
+	}
+}
+
