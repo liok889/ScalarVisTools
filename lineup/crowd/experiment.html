@@ -25,7 +25,7 @@
 	<script src="../sim.js"></script>
 	<script src="../lineup_experiment.js"></script>
 	<script src="../utils.js"></script>
-	<script src="block_seeds.js"></script>
+	<!--<script src="block_seeds.js"></script>-->
 
 	<style>
 		body {
@@ -157,6 +157,54 @@
 
 
 	<script>
+
+		var EXPECTED_BLOCK_SEEDS = {
+		    "mapDiscrete": 
+		    [
+		    	/*
+		        {
+		            "center": 0.06,
+		            "p": 0.67,
+		            "correlation": 0.07,
+		            "expectation": 0.14077406070518209,
+		            "std": 0.03499712693147202
+		        },
+		        */
+
+				{
+		            "center": 0.0635,
+		            "p": 0.70,
+		            "correlation": 0.07,
+		            "expectation": 0.1485983954149872,
+		            "std": 0.03484861875257573
+		        }
+
+		    
+		    ],
+
+		    "mapSmooth":
+		    [
+		    	/*
+		        {
+		            "center": 0.07325,
+		            "p": 0.67,
+		            "correlation": 0.07,
+		            "expectation": 0.16262364695309575,
+		            "std": 0.03926666068869135
+		        },
+		        */
+
+				{
+		            "center": 0.078,
+		            "p": 0.70,
+		            "correlation": 0.07,
+		            "expectation": 0.17003971069037296,
+		            "std": 0.03831321403306914
+		        }
+
+		    ],
+		}
+
 		var WIDTH=350;
 		var HEIGHT=250;
 		var TRAINING = false;
@@ -207,8 +255,8 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'e';
-		var VIS_COMBINATION = 'abcd';
+		var COLOR_COMBINATION = 'edf';
+		var VIS_COMBINATION = 'a';
 
 		var RANDOMIZE_COLOR = true;
 		var RANDOMIZE_VIS = true;
@@ -613,10 +661,11 @@
 					{
 						var seedType = (block.vis == 'mapDiscrete' || block.vis == 'mapSmooth') ? 'map' : 'field';
 						console.log('seedType: ' + seedType);
-						if (EXPECTED_BLOCK_SEEDS[seedType]) 
+						var seed = EXPECTED_BLOCK_SEEDS[seedType] || EXPECTED_BLOCK_SEEDS[block.vis];
+						if (seed) 
 						{
 							console.log("using EXPECTED_BLOCK_SEEDS for " + block.vis);
-							theSeed = EXPECTED_BLOCK_SEEDS[seedType];
+							theSeed = seed;
 						}
 					}
 
@@ -704,7 +753,10 @@
 						d3.select("#confirm").style('visibility', 'hidden');
 						flashAnswer();
 					}
-					else {
+					else 
+					{
+						console.log("ENTER");
+
 						// register response
 						var b = blocks[blockNum];
 
@@ -758,6 +810,10 @@
 
 						}
 
+						// clear old answer
+						lineup.clearAnswer();
+
+						// hide lineup
 						d3.select("#confirm").style('visibility', 'hidden');
 						d3.select("#incorrect").style('visibility', 'hidden');
 s
@@ -855,7 +911,7 @@ s
 		{
 			var blockCount = blocks.length;
 
-			//checkData();
+			checkData();
 			
 			var data2send = JSON.stringify(
 			{

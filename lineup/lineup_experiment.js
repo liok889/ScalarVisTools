@@ -84,6 +84,13 @@ LineupExperiment.prototype.getAnswer = function() {
     return this.answer;
 }
 
+LineupExperiment.prototype.clearAnswer = function() {
+    this.answer = null;
+    if (this.tdSelection) {
+        this.tdSelection.style('background-color', null);
+    }
+}
+
 LineupExperiment.prototype.highlightCorrect = function(show)
 {
     this.domSelection.selectAll('td').style('background-color', null);

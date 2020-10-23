@@ -35,7 +35,7 @@
 	<svg class="main" width="600" height="400"></svg>
 
 	<script>
-		var SAMPLES = 10;
+		var SAMPLES = 9;
 		var colormap = null;
 		var CIRCLE_R=3;
 
@@ -247,7 +247,7 @@
 
 					nS /= s;
 					nV /= s-1;
-					labLen /= s-1;
+					//labLen /= s-1;
 					ramp.nameSalience.push({value: nS, samples: s});
 					ramp.nameVariation.push({value: nV, samples: s});
 					ramp.labLength.push({value: labLen, samples: s});
@@ -374,6 +374,8 @@
 				}
 			}
 			data=filteredData;
+
+
 			var maxSalience = d3.max(data, function(d) { return d.nameSalience });
 			var minSalience = d3.min(data, function(d) { return d.nameSalience });
 
