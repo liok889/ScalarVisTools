@@ -1,4 +1,5 @@
 var BLUR=false;
+var SCALAR_UPPER_PERCENTILE = 1-.01/5;
 
 // disable renderer caching, forcing new canvases each time
 ALL_SAMPLERS = [];
@@ -21,7 +22,8 @@ function ScalarSample(w, h, canvas, model, colormap)
     this.canvas = canvas;
 
     // add myself to the model
-    if (model) {
+    if (model) 
+    {
         this.setModel(model);
     }
 
@@ -144,7 +146,12 @@ ScalarSample.prototype.sampleModel = function(_fidelity, model)
     if (!model) {
         model = this.model;
     }
-    model.sampleModel(fidelity, this.field);
+
+    var upperPercentile = undefined;
+    if (typeof SCALAR_UPPER_PERCENTILE !== 'undefined') {
+        upperPercentile = SCALAR_UPPER_PERCENTILE;
+    }
+    model.sampleModel(fidelity, this.field, upperPercentile);
 }
 
 ScalarSample.prototype.sampleAndVis = function(_fidelity)

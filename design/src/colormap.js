@@ -554,7 +554,9 @@ var COLOR_PRESETS =
 		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
 
 		orangegreen: ['#d38812', '#f2b756', '#fed39a', '#fbe3d3', '#f3f4ef', '#edffe3', '#dfffba', '#c3ff84', '#94d059'].reverse(),
-		bluebrownBrewer: ['#d8b365', '#f6e8c3', '#f5f5f5', '#c7eae5', '#5ab4ac'].reverse(),
+		//bluebrownBrewer: ['#d8b365', '#f6e8c3', '#f5f5f5', '#c7eae5', '#5ab4ac'].reverse(),
+
+		bluebrownBrewer: ['#bf812d', '#dfc27d', '#f6e8c3', '#f5f5f5', '#c7eae5', '#80cdc1', '#35978f'].reverse(),
 
 		purpleorange: ['#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788'].reverse(),
 		purpleorangeFull: ['#7f3b08','#b35806','#e08214','#fdb863','#fee0b6','#f7f7f7','#d8daeb','#b2abd2','#8073ac','#542788','#2d004b'].reverse(),

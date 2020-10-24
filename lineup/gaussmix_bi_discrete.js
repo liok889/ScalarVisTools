@@ -432,7 +432,7 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
     this.updateCDFMap = true;
 }
 
-GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
+GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field, fieldUpperPercentile)
 {
 	var discreteMap = this.discreteMap;
     var pdf = this.pdf.view;
@@ -566,9 +566,15 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
     // normalize discrete map / field
     discreteMap.normalize();
 
-    if (_field) {
-    	_field.normalize();
-    	_field.updated();
+    if (_field) 
+    {
+    	if (fieldUpperPercentile) {
+    		_field.normalizeToPercentile(fieldUpperPercentile)
+    	}
+    	else
+    	{
+    		_field.normalize();
+    	}
     }
 }
 

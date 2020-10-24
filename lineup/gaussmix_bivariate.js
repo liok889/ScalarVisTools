@@ -699,7 +699,7 @@ GaussMixBivariate.prototype.putOnTop = function()
     }
 }
 
-GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
+GaussMixBivariate.prototype.sampleModel = function(iterations, _field, upperPercentile)
 {
     if (this.updateCDFMap) {
         this.computeCDFMap();
@@ -786,6 +786,11 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field)
 
         //view[ R*w + C ] += 1.0;
     }
-    _field.normalize();
-    _field.updated();
+    if (upperPercentile) {
+        _field.normalizeToPercentile(upperPercentile);
+    }
+    else
+    {
+        _field.normalize();
+    }
 }

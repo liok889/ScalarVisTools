@@ -210,7 +210,7 @@
 		var TRAINING = false;
 		var FINISHED_REDICTED_URL = null;	// 'strategy.html'
 
-		var SAMPLE_FIDELITY=18000 * 3//14000;
+		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 4;
 
@@ -221,8 +221,8 @@
 		];
 
 		var ALL_VIS_TYPES = [
-			'mapDiscrete',
 			'mapSmooth',
+			'mapDiscrete',
 			'fieldDiscrete',
 			'fieldSmooth'
 		];
@@ -337,6 +337,18 @@
 			}
 			else
 			{
+				// set sampling fidelity
+				// these values are calibrated for a 350 x 250 stimuli based on pilots
+				if (visType == 'fieldSmooth' || visType == 'mapSmooth')
+				{
+					SAMPLE_FIDELITY = 30000 * 3;
+					N = SAMPLE_FIDELITY
+				}
+				else
+				{
+					SAMPLE_FIDELITY = 18000 * 3;
+					N = SAMPLE_FIDELITY
+				}
 
 				CUR_VIS_TYPE = visType;
 				setRepresentationType(visType);
