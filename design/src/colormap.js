@@ -547,11 +547,21 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 
 var COLOR_PRESETS = 
 {
+
+		tealbeige: ['#e6ebb4', '#c8d991', '#a6da93', '#83d99e', '#62d1a7', '#44bea6', '#359f96', '#387372', '#353836'].reverse(),
+		pinkpurple: ['#fcebe2', '#facac3', '#f9aeb9', '#f992b1', '#f872a5', '#ef4d9f', '#d01e91', '#9e0077', '#7d0078'].reverse(),
+
+		greenmelon: ["#e6ebb4", "#c8d991", "#a6da93", "#83d99e", "#62d1a7", "#44bea6", "#359f96", "#387372", "#353836"].reverse(),
+		redmelon: ["#d13d6b", "#d8595c", "#dd704c", "#e18739", "#e3a227", "#e0c135", "#dcdd64", "#daeb96", "#dee7bd"],
+
 		bluebrown: ['#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e'].reverse(),
 		bluebrownFull: ['#543005','#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e','#003c30'].reverse(),
-
+		bluered: ['#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac'].reverse(),
+		
+		
 		greenpink: ['#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221'].reverse(),
 		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
+		greenpinkBrewer: ['#c5147e', '#d964a2', '#ea9dcb', '#fbd0e8', '#f6f8f6', '#def4c7', '#bbe792', '#86c950', '#42931d'].reverse(),
 
 		orangegreen: ['#d38812', '#f2b756', '#fed39a', '#fbe3d3', '#f3f4ef', '#edffe3', '#dfffba', '#c3ff84', '#94d059'].reverse(),
 		//bluebrownBrewer: ['#d8b365', '#f6e8c3', '#f5f5f5', '#c7eae5', '#5ab4ac'].reverse(),
@@ -1166,6 +1176,30 @@ var COLOR_PRESETS =
 			return out
 		}) (),
 
+		inferno: (function()
+		{
+			var out = [];
+			for (var i=0; i<=100; i++) {
+				var c = d3.interpolateInferno(i/100);
+				var rgb = d3.color(c);
+				out.push([rgb.r, rgb.g, rgb.b]);
+			}
+			return out
+		}) (),
+
+
+		plasmaShort: (function()
+		{
+			var out = [];
+			for (var i=0; i<=100; i++) {
+				var k = (i/100) * (.9) + .1
+				var c = d3.interpolatePlasma(k);
+				var rgb = d3.color(c);
+				out.push([rgb.r, rgb.g, rgb.b]);
+			}
+			return out
+		}) (),
+
 		redpurple: [
 			[255,247,243],
 			[253,224,221],
@@ -1626,7 +1660,7 @@ mellowrainbow: [
          }
       ].reverse(),
 
-      palerainbow: [
+      bluegreen: [
          {
             "x": "0",
             "o": "1",

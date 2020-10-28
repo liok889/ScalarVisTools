@@ -1,5 +1,6 @@
 var BLUR=false;
-var SCALAR_UPPER_PERCENTILE = 1-.01/5;
+var SCALAR_UPPER_PERCENTILE = 1-.01/10;
+var HISTOGRAM_BINS = 60;
 
 // disable renderer caching, forcing new canvases each time
 ALL_SAMPLERS = [];
@@ -78,7 +79,6 @@ ScalarSample.prototype.dispose = function()
     this.canvas = null;
     this.w = null;
     this.h = null;
-
 }
 
 ScalarSample.prototype.setColorMap = function(colormap)
@@ -174,7 +174,18 @@ ScalarSample.prototype.vis = function()
     else {
         this.visualizer.run(BLUR ? 'blur' : 'vis');
     }
+}
 
+ScalarSample.prototype.computeValueHistogram = function(_bins)
+{
+
+    var field = this.field;
+    var hist = field.calcAmplitudeFrequency(_bins || HISTOGRAM_BINS);
+    var histSum = d3.sum(hist);
+    for (var i=0; i<hist.length; i++) {
+        hist[i] /= histSum;
+    }
+    return hist;
 }
 
 ScalarSample.prototype.initVisPipeline = function()

@@ -991,8 +991,11 @@ ScalarField.prototype.calcAmplitudeFrequency = function(_bins)
 
 		for (var c=0, cLen=this.getMaskedW(); c<cLen; c++)
 		{
-			var b = Math.min(BINS-1, Math.floor(view[R+c] * BINS));
-			histogram[b]++;
+			var v = view[R+c];
+			if (v != SCALAR_EMPTY) {
+				var b = Math.min(BINS-1, Math.floor(v * BINS));
+				histogram[b]++;
+			}
 		}
 	}
 

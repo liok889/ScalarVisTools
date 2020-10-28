@@ -32,7 +32,10 @@
 	<p><div style="width: 400px; height: 150px; border: solid 1px black" id="colorsDiv">
 	</div>
 	<p><button onclick="loadDSRamps()">Load more color ramps</button>
-	<svg class="main" width="600" height="400"></svg>
+	<button onclick="PLOT_TYPE='lab'; plotSalienceV(PLOT_TYPE)">Salience v. Lab</button>
+	<button onclick="PLOT_TYPE='name'; plotSalienceV(PLOT_TYPE)">Salience v. Name</button>
+
+	<p><svg class="main" width="600" height="400"></svg>
 
 	<script>
 		var SAMPLES = 9;
@@ -141,7 +144,7 @@
 			d3.select("#ramp_" + name).attr('r', '7px');
 		}
 
-
+		var PLOT_TYPE = 'lab';
 		var RAMPS = [
 
 			"bluebrown2",
@@ -293,7 +296,7 @@
 		{
 			var header = ['nameVariation', 'nameSalience', 'labLength'];
 			var data = getRampStats(SAMPLES, header);
-			header = ['name', 'salLevel', 'design'].concat(header);
+			header = ['name', 'salLevel', 'design'].concat(header).concat(['LLength', 'ABLength', 'totalL', 'salienceModel']);
 
 			data.forEach(function(d) 
 			{
@@ -305,7 +308,8 @@
 					d.salLevel = 'low';
 				}
 
-				d.design = RAMP_PROPERTIES_MAP[d.name].design;
+				var properties = RAMP_PROPERTIES_MAP[d.name]
+				d.design = properties ? properties.design : 'unknown';
 			})
 
 
@@ -335,12 +339,54 @@
 				// merge with list of ramps
 				RAMPS = RAMPS.concat(names);
 				computeColormapStats();
-				plotSalienceVLab();
+				plotSalienceV(PLOT_TYPE);
 				if (callback) {
 					callback(data);
 				}
 			})
 		}
+
+		function salienceModel(cmap)
+		{
+			var ideal = [], W = 0;
+			var minSal = Number.MAX_VALUE, maxSal = Number.MIN_VALUE, sal = [], relSal = [];
+
+			for (var i=0; i<SAMPLES; i++) 
+			{
+				var x = i / (SAMPLES-1);
+				var c = d3.lab(cmap.mapValue( x ));
+				var salience = nameSalience(c);
+				minSal = Math.min(minSal, salience);
+				maxSal = Math.max(maxSal, salience);
+
+				// salience at this location
+				sal.push(salience);
+
+				// ideal distribution
+				var w = Math.exp( -Math.pow(5*(1-x), 2) ) + Math.exp( -Math.pow(5*(x), 2) );
+				ideal.push(w);
+				W += w;
+			}
+
+			var totSal = 0;
+			for (var i=0; i<SAMPLES; i++)
+			{
+				var rSal = (sal[i] - minSal)/(maxSal-minSal);
+				relSal.push(rSal);
+				totSal += rSal;
+			}
+
+			// subtract the two distributions
+			var diff = 0;
+			for (var i=0; i<SAMPLES; i++) 
+			{
+				relSal[i] /= totSal;
+				ideal[i] /= W;
+				diff += Math.abs( relSal[i] - ideal[i] );
+			}
+			return 1-diff / 2;
+		}
+
 
 		function getRampStats(samples, stats)
 		{
@@ -367,9 +413,11 @@
 				statPack.push(rPack)
 			}
 
+			
+
 			// compute labLength at a higher sampling rate
 			statPack.forEach(function(d) {
-				var samps=30, labLength = 0;
+				var samps=30, labLength = 0, LLength=0, ABLength=0, totalL = 0;
 				var cmap = getColorPreset(d.name);
 				for (var i=0; i<samps-1; i++) 
 				{
@@ -378,12 +426,26 @@
 
 					var lab1 = d3.lab(c1), lab2 = d3.lab(c2);
 					labLength += Math.sqrt(
-						Math.pow(lab1.l-lab2.l, 2),
-						Math.pow(lab1.a-lab2.a, 2),
+						Math.pow(lab1.l-lab2.l, 2) +
+						Math.pow(lab1.a-lab2.a, 2) +
 						Math.pow(lab1.b-lab2.b, 2)
 					);
+					LLength += Math.abs(lab1.l-lab2.l);	
+					ABLength += Math.sqrt( 
+						Math.pow(lab1.a-lab2.a, 2) + 
+						Math.pow(lab1.b-lab2.b, 2)
+					)
+					totalL += lab1.l;
+					if (i==samps-2) {
+						totalL += lab2.l;
+					}
 				}
+				d.totalL = totalL / samps;
+
+				d.salienceModel = salienceModel(cmap);
 				d.labLength = labLength;
+				d.LLength = LLength;
+				d.ABLength = ABLength;
 			});
 
 			return statPack;
@@ -394,7 +456,7 @@
 
 	<script>
 		var MEDIAN_SAL = null;
-		function plotSalienceVLab()
+		function plotSalienceV(plotType)
 		{
 			var CHART_W = 400;
 			var CHART_H = 250;
@@ -427,7 +489,7 @@
 			var minLabLength = d3.min(data, function(d) { return d.labLength });
 
 			// find median line to plot a reference line
-			var medianSalience = 0, medianLabLength = 0, medianNameVariation;
+			var medianSalience = 0, medianLabLength = 0, medianNameVariation, medianX = 0;
 			data.sort(function(a,b){return a.nameSalience-b.nameSalience})
 			medianSalience = data[ Math.ceil(data.length/2) ].nameSalience;
 
@@ -439,9 +501,12 @@
 
 			MEDIAN_SAL = medianSalience;
 
+			var xMin = plotType == 'lab' ? minLabLength : minNameVariation;
+			var xMax = plotType == 'lab' ? maxLabLength : maxNameVariation;
+
 			var xScale = d3.scaleLinear();
 			xScale
-				.domain([minNameVariation, maxNameVariation])
+				.domain([xMin, xMax])
 				.range([0, CHART_W]);
 
 			var yScale = d3.scaleLinear();
@@ -489,7 +554,7 @@
 
 			circles
 				.transition().duration(500)
-				.attr('cx', function(d) { return xScale(d.nameVariation); })
+				.attr('cx', function(d) { return xScale(plotType == 'lab' ? d.labLength : d.nameVariation); })
 				.attr('cy', function(d) { return yScale(d.nameSalience); })
 				.attr('id', function(d) { return 'ramp_' + d.name });
 				
@@ -666,13 +731,13 @@
 		}
 
 		var rampStats = computeColormapStats();
-		plotSalienceVLab();
+		plotSalienceV(PLOT_TYPE);
 
 	</script>
 
 	<script>
 		RAMP_PROPERTIES=[{"colormapid":"1","colormap":"bluebrown","design":"divergent","nameVariation":"0.332121","labLength":"164.944","nameSalience":"0.246948","salLevel":"low"}, {"colormapid":"2","colormap":"bluebrownFull","design":"divergent","nameVariation":"0.433275","labLength":"199.476","nameSalience":"0.317681","salLevel":"low"}, {"colormapid":"3","colormap":"greenpink","design":"divergent","nameVariation":"0.259046","labLength":"179.296","nameSalience":"0.334042","salLevel":"low"}, {"colormapid":"4","colormap":"greenpinkFull","design":"divergent","nameVariation":"0.325887","labLength":"211.392","nameSalience":"0.334577","salLevel":"low"}, {"colormapid":"5","colormap":"purpleorange","design":"divergent","nameVariation":"0.354916","labLength":"197.525","nameSalience":"0.294538","salLevel":"low"}, {"colormapid":"6","colormap":"purpleorangeFull","design":"divergent","nameVariation":"0.468799","labLength":"226.722","nameSalience":"0.34303","salLevel":"low"}, {"colormapid":"7","colormap":"greenpurple","design":"divergent","nameVariation":"0.274151","labLength":"172.558","nameSalience":"0.33306","salLevel":"low"}, {"colormapid":"8","colormap":"greenpurpleFull","design":"divergent","nameVariation":"0.300947","labLength":"209.961","nameSalience":"0.369485","salLevel":"high"}, {"colormapid":"9","colormap":"bluegreenyellow","design":"multihue","nameVariation":"0.261199","labLength":"181.506","nameSalience":"0.285993","salLevel":"low"}, {"colormapid":"10","colormap":"blueyellowred","design":"divergent","nameVariation":"0.433286","labLength":"243.934","nameSalience":"0.345195","salLevel":"low"}, {"colormapid":"11","colormap":"bluebrown2","design":"divergent","nameVariation":"0.530242","labLength":"233.059","nameSalience":"0.238836","salLevel":"low"}, {"colormapid":"12","colormap":"greyscale","design":"singlehue","nameVariation":"0.16043","labLength":"100","nameSalience":"0.554569","salLevel":"high"}, {"colormapid":"13","colormap":"rainbow","design":"rainbow","nameVariation":"0.579509","labLength":"453.808","nameSalience":"0.532953","salLevel":"high"}, {"colormapid":"14","colormap":"rainbowFull","design":"rainbow","nameVariation":"0.613679","labLength":"546.012","nameSalience":"0.492415","salLevel":"high"}, {"colormapid":"15","colormap":"rainbowcie","design":"rainbow","nameVariation":"0.579509","labLength":"453.808","nameSalience":"0.532953","salLevel":"high"}, {"colormapid":"16","colormap":"rainbowjet","design":"rainbow","nameVariation":"0.596876","labLength":"502.001","nameSalience":"0.568882","salLevel":"high"}, {"colormapid":"17","colormap":"cubehelix","design":"multihue","nameVariation":"0.769633","labLength":"271.028","nameSalience":"0.400924","salLevel":"high"}, {"colormapid":"18","colormap":"singlehue","design":"singlehue","nameVariation":"0.148256","labLength":"102.472","nameSalience":"0.388119","salLevel":"high"}, {"colormapid":"19","colormap":"multihue","design":"multihue","nameVariation":"0.261199","labLength":"181.506","nameSalience":"0.285993","salLevel":"low"}, {"colormapid":"20","colormap":"bodyheat","design":"multihue","nameVariation":"0.480033","labLength":"238.497","nameSalience":"0.434877","salLevel":"high"}, {"colormapid":"21","colormap":"extendedBlackBody","design":"multihue","nameVariation":"0.763277","labLength":"384.353","nameSalience":"0.507732","salLevel":"high"}, {"colormapid":"22","colormap":"kindlmann","design":"multihue","nameVariation":"0.599438","labLength":"363.492","nameSalience":"0.439289","salLevel":"high"}, {"colormapid":"23","colormap":"spectralFull","design":"divergent","nameVariation":"0.518123","labLength":"261.685","nameSalience":"0.225598","salLevel":"low"}, {"colormapid":"24","colormap":"coolwarmMoreland","design":"divergent","nameVariation":"0.35489","labLength":"188.317","nameSalience":"0.342492","salLevel":"low"}, {"colormapid":"25","colormap":"blueyellow","design":"saturation","nameVariation":"0.349935","labLength":"237.737","nameSalience":"0.428705","salLevel":"high"}, {"colormapid":"26","colormap":"rainbowhcl","design":"rainbow","nameVariation":"0.679108","labLength":"413.606","nameSalience":"0.474233","salLevel":"high"}, {"colormapid":"27","colormap":"rainbowhcl100","design":"rainbow","nameVariation":"0.405589","labLength":"171.657","nameSalience":"0.248621","salLevel":"low"}, {"colormapid":"28","colormap":"rainbowhcl80","design":"rainbow","nameVariation":"0.522816","labLength":"292.786","nameSalience":"0.324445","salLevel":"low"}, {"colormapid":"29","colormap":"rainbowhcl90","design":"rainbow","nameVariation":"0.416736","labLength":"264.826","nameSalience":"0.304224","salLevel":"low"}, {"colormapid":"30","colormap":"d3rainbow","design":"rainbow","nameVariation":"0.526249","labLength":"403.879","nameSalience":"0.383384","salLevel":"high"}, {"colormapid":"31","colormap":"d3sinebow","design":"rainbow","nameVariation":"0.583802","labLength":"512.954","nameSalience":"0.431074","salLevel":"high"}, {"colormapid":"32","colormap":"viridis","design":"multihue","nameVariation":"0.343127","labLength":"217.308","nameSalience":"0.363626","salLevel":"high"}, {"colormapid":"33","colormap":"plasma","design":"multihue","nameVariation":"0.430031","labLength":"224.82","nameSalience":"0.452371","salLevel":"high"}, {"colormapid":"34","colormap":"redpurple","design":"multihue","nameVariation":"0.18518","labLength":"142.764","nameSalience":"0.452281","salLevel":"high"}, {"colormapid":"35","colormap":"greyred","design":"divergent","nameVariation":"0.321324","labLength":"163.895","nameSalience":"0.386172","salLevel":"high"}, {"colormapid":"36","colormap":"coolwarm","design":"divergent","nameVariation":"0.302927","labLength":"231.547","nameSalience":"0.375824","salLevel":"high"}, {"colormapid":"37","colormap":"reds","design":"singlehue","nameVariation":"0.149133","labLength":"87.823","nameSalience":"0.182363","salLevel":"low"}, {"colormapid":"38","colormap":"purples","design":"singlehue","nameVariation":"0.0676139","labLength":"63.7887","nameSalience":"0.431935","salLevel":"high"}, {"colormapid":"39","colormap":"blues","design":"singlehue","nameVariation":"0.149466","labLength":"109.442","nameSalience":"0.319422","salLevel":"low"}, {"colormapid":"40","colormap":"spectral","design":"divergent","nameVariation":"0.498764","labLength":"218.967","nameSalience":"0.264213","salLevel":"low"}, {"colormapid":"41","colormap":"turbo","design":"rainbow","nameVariation":"0.655666","labLength":"411.05","nameSalience":"0.407244","salLevel":"high"}, {"colormapid":"42","colormap":"mellowrainbow","design":"rainbow","nameVariation":"0.475796","labLength":"266.397","nameSalience":"0.358053","salLevel":"high"}, {"colormapid":"43","colormap":"palerainbow","design":"rainbow","nameVariation":"0.271116","labLength":"201.587","nameSalience":"0.273077","salLevel":"low"}, {"colormapid":"44","colormap":"fiveMellowWave","design":"wave","nameVariation":"0.425382","labLength":"242.291","nameSalience":"0.286704","salLevel":"low"}, {"colormapid":"45","colormap":"blueorange","design":"divergent","nameVariation":"0.711326","labLength":"391.168","nameSalience":"0.338266","salLevel":"low"}, {"colormapid":"46","colormap":"threewave","design":"wave","nameVariation":"0.652454","labLength":"380.026","nameSalience":"0.351976","salLevel":"low"}, {
-				colormap: "orangegreen", design: "divergent"}, {colormap: "bluebrownBrewer", design: "divergent"}];
+				colormap: "orangegreen", design: "divergent"}, {colormap: "bluebrownBrewer", design: "divergent"}, {colormap: "greenmelon", design: "multihue"}, {colormap: "redmelon", design: "multihue"}, {colormap: "bluered", design: "divergent"}];
 		RAMP_PROPERTIES_MAP={};
 		RAMP_PROPERTIES.forEach(function(ramp) 
 		{
