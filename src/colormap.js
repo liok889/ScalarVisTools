@@ -1,4 +1,5 @@
 
+
 function ColorMap(colorset, interpType)
 {
 	if (isFunction(colorset))

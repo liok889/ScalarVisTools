@@ -78,7 +78,11 @@
 			var terms = c3.terms;
 			var dist = [];
 
-			for (var w=0; w<terms.length; w++) {
+			for (var w=0; w<terms.length; w++) 
+			{
+				var name = terms[w];
+				var probability = c3.terms.prob(name, i);
+
 				dist.push({
 					term: terms[w],
 					p: c3.terms.prob(w, i)
@@ -200,17 +204,20 @@
 
 			}
 			svgSalCurve.selectAll('path').remove();
+			
 			svgSalCurve.append('path')
 				.attr('d', lineGen(curve2))
 				.style('fill', 'none')
 				.style('stroke', '#b52700')
 				.style('stroke-width', '2px');
-
+			
+			/*
 			svgSalCurve.append('path')
 				.attr('d', lineGen(curve))
 				.style('fill', 'none')
 				.style('stroke', '#0064b5')
 				.style('stroke-width', '2px');
+			*/
 
 
 
@@ -823,6 +830,7 @@
 	</script>
 
 	<script>
+		var names = [];
 		d3.select("#scaleCanvas")
 			.on('mousemove', function() 
 			{
@@ -835,6 +843,7 @@
 				var c = colormap.mapValue(I);
 				var dist = termDistribution(c).slice(0, 25);
 
+				names = termDistribution(c);
 
 				var svg = d3.select("#mainSVG");
 				svg.selectAll('g.extra').remove();
@@ -855,7 +864,7 @@
 						.attr('y', function(d) { return (1-d.p/maxP)*BAR_H })
 						.attr('width', BAR_W)
 						.attr('height', function(d) { return (d.p/maxP)*BAR_H; })
-						.style('fill', function(d, i) { return i==0 ? '#0050b3' : 'steelblue' })
+						.style('fill', function(d, i) { return i==0 ? '#ff9900' : '#aaaaaa' })
 						.style('stroke', 'none');
 
 					grp.append('text')
