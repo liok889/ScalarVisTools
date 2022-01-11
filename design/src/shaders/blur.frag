@@ -4,12 +4,13 @@ uniform sampler2D colormap;
 uniform vec2 pitch;
 
 const float GAUSS_WEIGHT=1.0/16.0;
-
 const vec3 BLUR_KERNEL1 = vec3(1.0, 2.0, 1.0);
 const vec3 BLUR_KERNEL2 = vec3(2.0, 4.0, 2.0);
 
+
 void main()
 {
+
 	vec3 data1 = vec3(
 		texture2D(scalarField, oTexCoord + vec2(-1.0, -1.0) * pitch).x,
 		texture2D(scalarField, oTexCoord + vec2(-1.0,  0.0) * pitch).x,
@@ -34,15 +35,17 @@ void main()
 		dot(data3, BLUR_KERNEL1)
 	);
 
+
 	/*
 	float val=0.0;
-	for (int r=-1; r<=1; r++) {
-		for (int c=-1; c<=1; c++) {
+	for (int r=-2; r<=2; r++) {
+		for (int c=-2; c<=2; c++) {
 			val += texture2D(scalarField, oTexCoord + vec2(float(c),float(r)) * pitch).r;
 		}
 	}
-	val /= 3.0*3.0;
+	val *= 1.0 / (5.0*5.0);
 	*/
+
 
 
 	vec2 colormapCoord = vec2(val, 0.5);

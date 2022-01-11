@@ -46,7 +46,7 @@ biGauss.prototype.eval = function(x, y)
     var e = this.rhoExpConst * (stX*stX -2 * this.rho * stXY + stY*stY);
     var a = this.rhoSqrConst * (1/(this.sX * this.sY))
 
-    return 10.0 * a * Math.exp( e );
+    return this.scaler * a * Math.exp( e );
 }
 
 GaussMixBivariate.prototype = new GaussMix();
@@ -489,6 +489,23 @@ GaussMixBivariate.prototype.computeCDFs = function()
             pdf[I] = P;
             cdf[I] = cummDensity;
         }
+    }
+
+    if (minDensity < 0)
+    {
+        var k = -minDensity;
+        cummDensity = 0;
+        // loop again to shift densities to ensure all are positives
+        for (var r=0, I=0; r<h; r++)
+        {
+            for (var c=0; c<w; c++, I++)
+            {
+                pdf[I] += k;
+                cummDensity += pdf[I];
+                cdf[I] = cummDensity;
+            }
+        }
+        minDensity = 0;
     }
 
     this.maxDensity = maxDensity;

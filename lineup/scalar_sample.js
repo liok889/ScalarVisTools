@@ -1,4 +1,5 @@
 var BLUR=false;
+var BLUR_STAGE = 7;
 var SCALAR_UPPER_PERCENTILE = 1-.01/10;
 var HISTOGRAM_BINS = 60;
 
@@ -7,10 +8,12 @@ ALL_SAMPLERS = [];
 
 var CALLBACK_SAMPLE = true;
 
+
 var shaderList = [
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
     {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
-    {name: 'blur',		path: 'design/src/shaders/blur.frag'}
+    {name: 'blur',		path: 'design/src/shaders/medianBlur.frag'},
+    {name: 'blurOff',   path: 'design/src/shaders/medianBlurOffscreen.frag'}
 ];
 
 function ScalarSample(w, h, canvas, model, colormap)
@@ -23,7 +26,7 @@ function ScalarSample(w, h, canvas, model, colormap)
     this.canvas = canvas;
 
     // add myself to the model
-    if (model) 
+    if (model)
     {
         this.setModel(model);
     }
@@ -38,10 +41,10 @@ function ScalarSample(w, h, canvas, model, colormap)
         (function(me) {
             me.visualizer = new ColorAnalysis(
                 me.field, me.canvas,
-                function() 
+                function()
                 {
-                    console.log('initVisPipeline'); 
-                    me.initVisPipeline(); 
+                    console.log('initVisPipeline');
+                    me.initVisPipeline();
                 }, shaderList
             );
         })(this);
@@ -107,9 +110,9 @@ ScalarSample.prototype.setModel = function(_model, dontVis)
 
     this.model = _model;
     (function(me) {
-        me.callbackID = me.model.addCallback(function() 
+        me.callbackID = me.model.addCallback(function()
         {
-            if (CALLBACK_SAMPLE || me.callbackSample) 
+            if (CALLBACK_SAMPLE || me.callbackSample)
             {
                 console.log('callback sampling');
                 me.sampleModel();
@@ -210,6 +213,7 @@ ScalarSample.prototype.initVisPipeline = function()
 
     // blur + vis
     var blur = new GLPipeline(this.visualizer.glCanvas);
+    /*
     blur.addStage({
         uniforms: {
             scalarField: {},
@@ -217,9 +221,33 @@ ScalarSample.prototype.initVisPipeline = function()
             pitch: {value: [1/this.field.w, 1/this.field.h]}
         },
         inTexture: 'scalarField',
-        fragment: this.visualizer.shaders['blur'],
+        fragment: this.visualizer.shaders[BLUR_STAGE > 1 ? 'blurOff' : 'blur'],
         vertex: this.visualizer.shaders['vertex']
     });
+    */
+
+    // for multi-stage blurring, add a final medianBlur
+    for (var i=1; i<=BLUR_STAGE; i++)
+    {
+        var blurShader;
+        if (i == BLUR_STAGE) {
+            blurShader = 'blur';
+        }
+        else {
+            blurShader = 'blurOff';
+        }
+
+        blur.addStage({
+            uniforms: {
+                scalarField: {},
+                colormap: {},
+                pitch: {value: [1/this.field.w, 1/this.field.h]}
+            },
+            inTexture: 'scalarField',
+            fragment: this.visualizer.shaders[blurShader],
+            vertex: this.visualizer.shaders['vertex']
+        });
+    }
 
 
     this.visualizer.pipelines = {
