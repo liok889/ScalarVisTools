@@ -1,6 +1,6 @@
 var BLUR=false;
-var BLUR_STAGE = 7;
-var SCALAR_UPPER_PERCENTILE = 1-.01/10;
+var BLUR_STAGE = 25;
+var SCALAR_UPPER_PERCENTILE = 1-.017/1;
 var HISTOGRAM_BINS = 60;
 
 // disable renderer caching, forcing new canvases each time
@@ -12,8 +12,8 @@ var CALLBACK_SAMPLE = true;
 var shaderList = [
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
     {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
-    {name: 'blur',		path: 'design/src/shaders/medianBlur.frag'},
-    {name: 'blurOff',   path: 'design/src/shaders/medianBlurOffscreen.frag'}
+    {name: 'blur',		path: 'design/src/shaders/blur7.frag'},
+    {name: 'blurOff',   path: 'design/src/shaders/blur7Offscreen.frag'}
 ];
 
 function ScalarSample(w, h, canvas, model, colormap)

@@ -14,7 +14,7 @@ GaussMixWithNoise.prototype.addCluster = function(dontUpdate)
     var padY = this.h * .07;
 
     // cluster width / height as 15%
-    var clusterSize = Math.min(this.w, this.h) * .3;
+    var clusterSize = Math.min(this.w, this.h) * .4;
     var minClusterDist = clusterSize * .9
 
     var W = this.w - padX*2;
@@ -97,7 +97,7 @@ GaussMixWithNoise.prototype.addCluster = function(dontUpdate)
 
 GaussMixWithNoise.prototype.init = function()
 {
-    var MIN_CLUSTER = 5;
+    var MIN_CLUSTER = 4;
     var MAX_CLUSTER = 8;
 
     this.clusters = [];

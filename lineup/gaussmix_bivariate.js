@@ -495,7 +495,8 @@ GaussMixBivariate.prototype.computeCDFs = function()
     {
         var k = -minDensity;
         cummDensity = 0;
-        // loop again to shift densities to ensure all are positives
+
+        // loop again to shift densities to ensure all positive probabilities
         for (var r=0, I=0; r<h; r++)
         {
             for (var c=0; c<w; c++, I++)
