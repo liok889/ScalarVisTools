@@ -1,3 +1,90 @@
+var EXPECTED_BLOCK_SEEDS = {
+            "mapDiscrete": 
+            [
+                /*
+                {
+                    "center": 0.06,
+                    "p": 0.67,
+                    "correlation": 0.07,
+                    "expectation": 0.14077406070518209,
+                    "std": 0.03499712693147202
+                },
+                */
+
+                {
+                    "center": 0.0635,
+                    "p": 0.70,
+                    "correlation": 0.07,
+                    "expectation": 0.1485983954149872,
+                    "std": 0.03484861875257573
+                }
+            ],
+
+            "mapSmooth":
+            [
+                /*
+                {
+                    "center": 0.07325,
+                    "p": 0.67,
+                    "correlation": 0.07,
+                    "expectation": 0.16262364695309575,
+                    "std": 0.03926666068869135
+                },
+
+                {
+                    "center": 0.078,
+                    "p": 0.70,
+                    "correlation": 0.07,
+                    "expectation": 0.17003971069037296,
+                    "std": 0.03831321403306914
+                }
+                
+
+                {
+                    "center": 0.07,
+                    "p": 0.66,
+                    "correlation": 0.07,
+                    "expectation": 0.15857201371591031,
+                    "std": 0.03677607998738302
+                }
+                */
+
+                {
+                    "center": 0.0635,
+                    "p": 0.70,
+                    "correlation": 0.07,
+                    "expectation": 0.1485983954149872,
+                    "std": 0.03484861875257573
+                }
+
+            ],
+
+            "fieldSmooth":
+            [
+                {
+                    "center": 0.07,
+                    "p": 0.70,
+                    "correlation": 0.07,
+                    "expectation": 0.16206799327670435,
+                    "std": 0.03491464751592346
+                }
+
+            ],
+
+            "fieldDiscrete":
+            [
+                {
+                    "center": 0.07,
+                    "p": 0.70,
+                    "correlation": 0.07,
+                    "expectation": 0.16206799327670435,
+                    "std": 0.03491464751592346
+                }
+
+            ]
+};
+
+/*
 var EXPECTED_BLOCK_SEEDS = 
 {
     field:  [
@@ -234,3 +321,4 @@ var EXPECTED_BLOCK_SEEDS =
         },
     ],
 }
+*/
