@@ -1,5 +1,5 @@
 var BLUR=false;
-var BLUR_STAGE = 25;
+var BLUR_STAGE = 35;
 var SCALAR_UPPER_PERCENTILE = 1-.017/1;
 var HISTOGRAM_BINS = 60;
 
@@ -13,7 +13,10 @@ var shaderList = [
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
     {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
     {name: 'blur',		path: 'design/src/shaders/blur7.frag'},
-    {name: 'blurOff',   path: 'design/src/shaders/blur7Offscreen.frag'}
+    {name: 'blurOff',   path: 'design/src/shaders/blur7Offscreen.frag'},
+    {name: 'median', path: 'design/src/shaders/medianBlur.frag'},
+    {name: 'medianOff', path: 'design/src/shaders/medianBlurOffscreen.frag'}
+
 ];
 
 function ScalarSample(w, h, canvas, model, colormap)
@@ -231,7 +234,10 @@ ScalarSample.prototype.initVisPipeline = function()
     {
         var blurShader;
         if (i == BLUR_STAGE) {
-            blurShader = 'blur';
+            blurShader = 'median';
+        }
+        else if (i > BLUR_STAGE/1) {
+            blurShader = 'medianOff';
         }
         else {
             blurShader = 'blurOff';

@@ -228,6 +228,10 @@
 
 			lineupExp.randomLineup(N, d3.select('#lineupTable'));
 			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
+
+			var stats = lineupExp.getComputationTime();
+			console.log("\tsampling: " + stats.samplingTime);
+			console.log("\tvis: " + stats.visTime);
 		}
 
 		function randomModel()

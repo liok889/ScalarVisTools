@@ -110,6 +110,15 @@ LineupExperiment.prototype.highlightCorrect = function(show)
     }
     // 00cc66
 }
+
+LineupExperiment.prototype.getComputationTime = function()
+{
+    return {
+        samplingTime: this.lineup.samplingTime,
+        visTime: this.lineup.visTime
+    };
+}
+
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDecoy)
 {
     var SEL_BORDER = "#ff623b"//"solid 4px #fcbd00";
@@ -163,7 +172,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             lineup.answer = "0";
             lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         });
-        
+
         dom.selectAll('div.nullOption').on('click', function()
         {
             if (noDecoy && lineup.correct) lineup.correct();
@@ -209,9 +218,9 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
     var converged = false;
     var distance = null;
     var iterations = 0;
-    
+
     this.answer = null;
-  
+
     for (var round=0; !converged && round<LINEUP_MAX_ROUNDS; round++)
     {
         for (var trial=0; !converged && trial<LINEUP_MAX_TRIAL; trial++, iterations++)
@@ -219,25 +228,25 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
             this.randomModel();
             distance = this.modelDecoyDistance();
 
-            if (!expectation) 
+            if (!expectation)
             {
                 console.log("no expectaiton. Converged");
                 converged = true;
             }
             else
             {
-                if (range && distance >= expectation[0] && distance <= expectation[1]) 
+                if (range && distance >= expectation[0] && distance <= expectation[1])
                 {
                     converged = true;
                 }
-                if (Math.abs(distance-expectation) <= tolerance) 
+                if (Math.abs(distance-expectation) <= tolerance)
                 {
                     converged = true;
                 }
             }
         }
 
-        if (!converged) 
+        if (!converged)
         {
             tolerance *= 2;
         }
