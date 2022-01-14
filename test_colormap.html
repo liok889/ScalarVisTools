@@ -25,7 +25,8 @@
 <body>
 	
 	<div>
-		<canvas width="350" height="40" id="scaleCanvas"></canvas stlye="border: solid 1px black">
+		<canvas width="300" height="30" id="scaleCanvas" style="border: solid 1px white"></canvas><br>
+		<svg width="300" height="50" id="scaleSVG" style="border: solid 1px #cccccc"></svg>
 	</div>
 
 	<p><b>Color samples</b>
@@ -35,7 +36,7 @@
 	<button onclick="PLOT_TYPE='lab'; plotSalienceV(PLOT_TYPE)">Salience v. Lab</button>
 	<button onclick="PLOT_TYPE='name'; plotSalienceV(PLOT_TYPE)">Salience v. Name</button>
 
-	<p><svg class="main" width="600" height="400"></svg>
+	<p><svg id="mainSVG" class="main" width="600" height="400"></svg>
 
 	<script>
 		var SAMPLES = 9;
@@ -71,6 +72,26 @@
 			return cmap[s];
 		}
 
+		function termDistribution(c)
+		{
+			var i = index(c);
+			var terms = c3.terms;
+			var dist = [];
+
+			for (var w=0; w<terms.length; w++) 
+			{
+				var name = terms[w];
+				var probability = c3.terms.prob(name, i);
+
+				dist.push({
+					term: terms[w],
+					p: c3.terms.prob(w, i)
+				})
+			}
+			dist.sort(function(a, b) { return b.p-a.p});
+			return dist;
+		}
+
 		function nameSalience(c) 
 		{
 			var minE = -4.5;
@@ -101,7 +122,7 @@
 			colormap.drawColorScale(
 				w, h,			// dimensions
 				w,				// # of steps
-				'horizontal',	// direction
+				'horizontal',	// direction 
 				canvas.node());
 
 			var str = ""; 
@@ -142,6 +163,65 @@
 
 			d3.select('#colorsDiv').html(str);
 			d3.select("#ramp_" + name).attr('r', '7px');
+
+			var svgSalCurve = d3.select("#scaleSVG");
+			var W = svgSalCurve.attr('width');
+			var H = svgSalCurve.attr('height');
+
+			// draw a curve representing salience and name distance
+			var lineGen =  d3.line()
+				.x(function(d) { return d.x*W; })
+				.y(function(d) { return (1-d.y)*H; })
+
+			var samples = 20, curve = [], maxSal=.9;
+			for (var s=0; s<samples; s++) 
+			{
+				var x = s/(samples-1);
+				var c = d3.color(colormap.mapValue(x));
+				var sal = nameSalience(c);
+				curve.push({
+					x: x,
+					y: sal/maxSal
+				})
+
+			}
+
+			samples = 9;
+			var curve2 = [], maxDist = 1.1;
+			for (var s=1; s<samples; s++) 
+			{
+				var x1 = s/(samples-1);
+				var x0 = (s-1)/(samples-1);
+
+				var c1 = d3.color(colormap.mapValue(x1));
+				var c0 = d3.color(colormap.mapValue(x0));
+				var distance = nameDistance(c1, c0);
+				curve2.push({
+					x: x1,
+					y: distance / maxDist
+				});
+
+
+			}
+			svgSalCurve.selectAll('path').remove();
+			
+			svgSalCurve.append('path')
+				.attr('d', lineGen(curve2))
+				.style('fill', 'none')
+				.style('stroke', '#b52700')
+				.style('stroke-width', '2px');
+			
+			/*
+			svgSalCurve.append('path')
+				.attr('d', lineGen(curve))
+				.style('fill', 'none')
+				.style('stroke', '#0064b5')
+				.style('stroke-width', '2px');
+			*/
+
+
+
+
 		}
 
 		var PLOT_TYPE = 'lab';
@@ -467,7 +547,7 @@
 			// filter only to include scales with at least 2.1 log-LAB length
 			var filteredData = [];
 			for (var i=0; i<data.length; i++) {
-				if (Math.log(data[i].labLength) >= 2.1) {
+				if (Math.log(data[i].labLength) >= 4.7) {
 					filteredData.push(data[i]);
 				}
 			}
@@ -477,6 +557,8 @@
 			// take the log of lab length
 			data.forEach(function(d) {
 				d.labLength = Math.log(d.labLength);
+				//d.nameSalience = d.nameSalience / d.labLength;
+				//d.nameSalience = Math.log(d.nameSalience);
 			});
 
 			var maxSalience = d3.max(data, function(d) { return d.nameSalience });
@@ -492,6 +574,8 @@
 			var medianSalience = 0, medianLabLength = 0, medianNameVariation, medianX = 0;
 			data.sort(function(a,b){return a.nameSalience-b.nameSalience})
 			medianSalience = data[ Math.ceil(data.length/2) ].nameSalience;
+			medianSalience = d3.sum(data, function(d) { return d.nameSalience}) / data.length;
+
 
 			data.sort(function(a,b){return a.labLength-b.labLength})
 			medianLabLength = data[ Math.ceil(data.length/2) ].labLength;
@@ -743,6 +827,55 @@
 		{
 			RAMP_PROPERTIES_MAP[ramp.colormap]=ramp;
 		});
+	</script>
+
+	<script>
+		var names = [];
+		d3.select("#scaleCanvas")
+			.on('mousemove', function() 
+			{
+				var BAR_W = 3*2;
+				var BAR_H = 20*2;
+
+				var m = d3.mouse(this);
+				var I =
+					m[0] / +d3.select("#scaleCanvas").attr('width')
+				var c = colormap.mapValue(I);
+				var dist = termDistribution(c).slice(0, 25);
+
+				names = termDistribution(c);
+
+				var svg = d3.select("#mainSVG");
+				svg.selectAll('g.extra').remove();
+
+				var g = svg.append('g');
+				
+				g
+					.attr('class', 'extra')
+					.attr('transform', 'translate(10, 330)');
+				
+				//console.log("coord: " + I + ", color: " + c);
+
+				(function(grp, dist, maxP) 
+				{
+					var selection = grp.selectAll('rect.bar').data(dist).enter().append('rect');
+					selection
+						.attr('x', function(d, i) { return i*BAR_W })
+						.attr('y', function(d) { return (1-d.p/maxP)*BAR_H })
+						.attr('width', BAR_W)
+						.attr('height', function(d) { return (d.p/maxP)*BAR_H; })
+						.style('fill', function(d, i) { return i==0 ? '#ff9900' : '#aaaaaa' })
+						.style('stroke', 'none');
+
+					grp.append('text')
+						.attr('x', 0).attr('y', 0)
+						.html(dist[0].term)
+						.style('fill', 'black')
+						.style('font-size', '12px')
+						.attr('transform', 'translate(0,-5),rotate(-10)')
+
+				})(g, dist, dist[0].p)
+			});
 	</script>
 
 </body>

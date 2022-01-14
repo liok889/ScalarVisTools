@@ -24,7 +24,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
     }
 
     // initialize random canvases
-    for (var i=0; i<n; i++) 
+    for (var i=0; i<n; i++)
     {
         this.canvases.push(null);
     }
@@ -36,7 +36,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
     {
         var canvas = this.canvases[i];
         if (!canvas) {
-        
+
             canvas = document.createElement(canvasType);
 
             if (canvasType == 'svg')
@@ -50,7 +50,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
                 canvas.width = w;
                 canvas.height = h;
             }
-        
+
             canvas.id="sample" + i;
             this.canvases[i] = ( canvas );
         }
@@ -74,16 +74,27 @@ Lineup.prototype.getCorrectAnswer = function() {
     return this.correctSample;
 }
 
-Lineup.prototype.sample = function(samplingRate, noDecoy) 
+Lineup.prototype.sample = function(samplingRate, noDecoy)
 {
     if (noDecoy) {
         console.log('sampling no decoy (fidelity: ' + samplingRate + ')');
     }
+
+    var samplingTime = 0, visTime = 0;
+
     for (var i=0; i<this.samplers.length; i++)
     {
+        var start = Date.now();
         this.samplers[i].sampleModel(samplingRate, noDecoy ? this.realModel : undefined);
+        samplingTime += Date.now() - start;
+
+        start = Date.now();
         this.samplers[i].vis();
+        visTime += Date.now() - start;
     }
+
+    this.samplingTime = samplingTime;
+    this.visTime = visTime;
 }
 
 var LINEUP_PADDING = 6;
@@ -120,14 +131,14 @@ Lineup.prototype.layoutCanvases = function(table)
         var rs = d3.range(rows);
         table.selectAll('tr').data(rs)
             .enter().append('tr')
-            .each(function(d, thisRow) 
+            .each(function(d, thisRow)
             {
-                (function(rowNum, thisRow) 
+                (function(rowNum, thisRow)
                 {
                     d3.select(thisRow).selectAll('td').data(d3.range(cols))
                         .enter().append('td').each(function(d, i) {
                             var index = i + rowNum*cols;
-                            if (index < n) 
+                            if (index < n)
                             {
                                 var canvas = randomCanvases[index];
                                 if (!canvas) {
@@ -146,7 +157,7 @@ Lineup.prototype.layoutCanvases = function(table)
                             }
                         });
 
-                    if (rowNum==0 && nullOption) 
+                    if (rowNum==0 && nullOption)
                     {
                         var w_div = +d3.select(randomCanvases[0]).attr('width')
                         var w = 25 + w_div;
@@ -199,12 +210,12 @@ function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
         this.canvasType = CANVAS_TYPE;
     }
     var samplerType = ScalarSample;
-    if (typeof SAMPLER_TYPE !== 'undefined') 
+    if (typeof SAMPLER_TYPE !== 'undefined')
     {
         samplerType = SAMPLER_TYPE;
     }
 
-    (function(_table, canvases, canvasType) 
+    (function(_table, canvases, canvasType)
     {
         var selectionSize = table.selectAll(canvasType).size();
         if (selectionSize != n) {
@@ -237,12 +248,12 @@ function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
 
 LineupFixed.prototype = Object.create(Lineup.prototype);
 
-LineupFixed.prototype.randomAssignCorrect = function() 
+LineupFixed.prototype.randomAssignCorrect = function()
 {
     // generate random number
     var correctIndex = Math.floor(Math.random() * this.canvases.length);
-    
-    for (var i=0; i<this.n; i++) 
+
+    for (var i=0; i<this.n; i++)
     {
         var dontVis = true;
         if (i == correctIndex) {
@@ -256,8 +267,7 @@ LineupFixed.prototype.randomAssignCorrect = function()
     this.correctSample = correctIndex;
 }
 
-LineupFixed.prototype.layoutCanvases = function() 
+LineupFixed.prototype.layoutCanvases = function()
 {
     this.randomAssignCorrect();
 }
-
