@@ -1,5 +1,56 @@
 var FLASH_TIME=700;
 
+function flashCrosshair()
+{
+	function flashOne()
+	{
+		d3.selectAll('.cross2')
+			.style('stroke', 'red')
+			.style('stroke-width', '3px')
+			.style('opacity', 1.0)
+
+		d3.selectAll('cross')
+			.style('stroke-width', '3px')
+			.style('opacity', 1.0)
+	}
+	function flashZero()
+	{
+		d3.selectAll('.cross2')
+			.style('stroke', null)
+			.style('stroke-width', null)
+			.style('opacity', null)
+
+		d3.selectAll('cross')
+			.style('stroke-width', null)
+			.style('opacity', null)
+
+	}
+	d3.select('#visCanvas')
+		.style('visibility', 'hidden')
+
+	setTimeout(function() {
+		flashOne();
+		setTimeout(function() {
+			flashZero();
+			setTimeout(function() {
+				flashOne();
+				setTimeout(function() {
+					flashZero();
+					setTimeout(function() {
+						flashOne();
+						setTimeout(function() {
+							flashZero();
+							d3.select('#visCanvas')
+								.style('visibility', null);
+						}, 100)
+					}, 100)
+				},100)
+			}, 100)
+		}, 100);
+	}, 100);
+}
+
+
 function ValueEstimation(blocks, canvas, scaleCanvas, svgVis, svgScale)
 {
 	this.blocks = blocks;
@@ -41,12 +92,21 @@ function ValueEstimation(blocks, canvas, scaleCanvas, svgVis, svgScale)
 			totalAll++;
 		}
 	}
+	this.trialsComplete = 0;
 	this.totalAll = totalAll;
 	this.totalTrials = totalTrials;
 	this.totalEngagements = totalEngagements;
 	this.trialSequence = -1;
 
 	this.nextTrial();
+
+	d3.select(document)
+		.on('keydown', function() {
+			if(d3.event.keyCode === 32 || d3.event.keyCode === 13)
+			{
+				flashCrosshair();
+			}
+		});
 }
 
 function makeCubehelix(start, rots, hues)
@@ -228,6 +288,7 @@ ValueEstimation.prototype.nextTrial = function()
 	
 	// render trial
 	this.renderTrial();
+	this.trialsComplete++;
 
 	// false means we're not done yet
 	return false;
@@ -325,9 +386,12 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 	var ENGAGMENT_TOLERANCE = .15;
 	var ACTUAL_TEROLERANCE = .20;
 
+	var engagementCount = 0;
 	var engagementCorrect = 0;
 	var actualCorrect = 0;
 	var stimulusNo = 0;
+	var avgError = 0;
+	var avgEngError = 0;
 
 
 	// count success in engagement checks
@@ -365,6 +429,8 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 				{
 					engagementCorrect++;
 				}
+				avgEngError += Math.abs(trial.responseDiff);
+				engagementCount++;
 			}
 			else {
 				stimulusNo++;
@@ -372,42 +438,56 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 				{
 					actualCorrect++;
 				}
+				avgError += Math.abs(trial.responseDiff);
+			
+
+				// compute local distance
+
+				// add to data
+				data.push({
+					blockNum: b+1,
+					trialNum: t+1,
+					rep: vRecord.reps,
+					stimulusNum: stimulusNo,
+					requestedValue: trial.value,
+					value: trial.valueAtLocation,
+					response: trial.response,
+					responseTime: trial.responseTime,
+					error: trial.responseDiff,
+					absError: Math.abs(trial.responseDiff),
+					colormap: block.colormap,
+					localNameVariation: vRecord.localNameVariation
+				});
 			}
-
-			// compute local distance
-
-			// add to data
-			data.push({
-				blockNum: b+1,
-				trialNum: t+1,
-				rep: vRecord.reps,
-				stimulusNum: stimulusNo,
-				requestedValue: trial.value,
-				value: trial.valueAtLocation,
-				response: trial.response,
-				responseTime: trial.responseTime,
-				error: trial.responseDiff,
-				absError: Math.abs(trial.responseDiff),
-				colormap: block.colormap,
-				localNameVariation: vRecord.localNameVariation
-			});
 		}
 	}
 	this.theData = data;
 
-	var data2send = JSON.stringify(
-	{
+
+	var dataPacket = {
 		experimentalData: this.theData,
 		engagementCorrect: engagementCorrect,
 		engagementTotal: this.totalEngagements,
-		engagementAccuracy: this.totalEngagements > 0 ? (engagementCorrect / this.totalEngagements) : 1.0,
+		engagementAccuracy:  1-(engagementCount > 0 ? (avgEngError / engagementCount) : 0),
+			//this.totalEngagements > 0 ? (engagementCorrect / this.totalEngagements) : 1.0,
 
 		stimulusCorrect: actualCorrect,
 		stimulusTotal: this.totalTrials,
-		stimulusAccuracy: actualCorrect / this.totalTrials
-	});
+		stimulusAccuracy: 1-(avgError / this.totalTrials)
+			//actualCorrect / this.totalTrials
+	}
+	var data2send = JSON.stringify(dataPacket);
 
-	var DATA_URL = "php/store_data.php";
+	console.log('engagementCount: ' + engagementCount);
+	console.log('engagementAccuracy: ' + dataPacket.engagementAccuracy);
+	console.log('engagementTotal: ' + dataPacket.engagementTotal);
+	console.log('avgEngagementError: ' + (avgEngError));
+	console.log('avgError: ' + (avgError));
+
+	console.log('stimulusAccuracy: ' + (data2send.stimulusAccuracy));
+
+
+	var DATA_URL = "crowd/php/store_data.php";
 
 	(function(experiment, trial, _data2send, _callback) {
 		$.ajax({
@@ -420,6 +500,7 @@ ValueEstimation.prototype.sendData = function(callback, TRIALS)
 			success: function(data)
 			{
 				console.log("sendData SUCCESS");
+				console.log(data);
 				if (_callback)
 					_callback(true);
 			},
@@ -658,15 +739,16 @@ ValueEstimation.prototype.addInputEvents = function()
 					exp.disableInput();
 					d3.select(exp.canvas).style('visibility', 'hidden');
 					d3.select('#crosshair').style('visibility', 'hidden');
-					d3.select("#prompt").html("Experiment complete. Saving data...");
+					d3.select("#prompt").html("Experiment complete. Saving data (takes a minute)...");
 					if (TRAINING)
 					{
-						window.location.href = "debrief.html";
+						window.location.href = "crowd/debrief.html";
 					}
 					else
 					{
 						exp.sendData(function(status) {
 							d3.select("#prompt").html('send status: ' + status);
+							window.location.href = "crowd/strategy.html"
 						});
 					}
 
