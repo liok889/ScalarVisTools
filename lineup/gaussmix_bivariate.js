@@ -518,12 +518,20 @@ GaussMixBivariate.prototype.computeCDFs = function()
 }
 
 // construct map
-GaussMixBivariate.prototype.computeCDFMap = function(pixelMap)
+GPU_CDF_MAP = true;
+GaussMixBivariate.prototype.computeCDFMap = function()
 {
     var cdf = this.cdf.view;
     var cummDensity = this.cummDensity;
     var cdfMap = this.cdfMap;
     var cdfMapLen = this.cdfMap.length;
+
+    var gpuMap = null;
+    if (GPU_CDF_MAP) {
+        gpuMap = new ScalarField(this.w, this.h);
+        this.gpuMap = gpuMap;
+        gpuMap = gpuMap.view;
+    }
 
     for (var i=0, last=0, p=0, step=cummDensity/cdfMapLen; i<cdfMapLen; i++, p+=step)
     {
@@ -532,8 +540,15 @@ GaussMixBivariate.prototype.computeCDFMap = function(pixelMap)
             last++;
         }
         cdfMap[i] = last;
-        //cdfMap[i]= pixelMap ? pixelMap(last) : last;
+        if (GPU_CDF_MAP) {
+            gpuMap[last] += step;
+        }
     }
+
+    if (this.gpuMap) {
+        console.log("gpumap: " + this.gpuMap.getMinMax());
+    }
+
     this.updateCDFMap = false;
 }
 
@@ -752,8 +767,9 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field, upperPerc
         var C = I % w;
         var R = Math.floor(I/w);
 
-        // find splat boundary
-
+        // SPLATTING: find splat boundary
+        // ===============================
+        /*
         var R0 = Math.max(0, R-SPLAT_SIZE), R1 = Math.min(h_1, R+SPLAT_SIZE);
         var C0 = Math.max(0, C-SPLAT_SIZE), C1 = Math.min(w_1, C+SPLAT_SIZE);
         var cummP=0;
@@ -778,31 +794,9 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field, upperPerc
                 view[ r*w + c ] += splat[k] * cummP;
             }
         }
-
-
-        /*
-        for (var S=0, r=-SPLAT_SIZE; r<=SPLAT_SIZE; r++)
-        {
-            var _R = R+r;
-            if (_R<0 && _R>=h) {
-                S+=SPLAT_SIZE*2+1;
-                continue;
-            }
-            else
-            {
-                _R*=w;
-                for (var c=-SPLAT_SIZE; c<=SPLAT_SIZE; c++, S++)
-                {
-                    var _C = C+c;
-                    if (_C>=0 && _C<w) {
-                        view[ _R + _C ] += BI_SPLAT[S];
-                    }
-                }
-            }
-        }
         */
 
-        //view[ R*w + C ] += 1.0;
+        view[ R*w + C ] += 1.0;
     }
     if (upperPercentile) {
         _field.normalizeToPercentile(upperPercentile);

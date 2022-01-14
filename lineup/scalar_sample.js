@@ -1,6 +1,6 @@
 var BLUR=false;
-var BLUR_STAGE = 35;
-var SCALAR_UPPER_PERCENTILE = 1-.017/1;
+var BLUR_STAGE = 25;
+var SCALAR_UPPER_PERCENTILE = 1-.001/1;
 var HISTOGRAM_BINS = 60;
 
 // disable renderer caching, forcing new canvases each time
@@ -11,6 +11,7 @@ var CALLBACK_SAMPLE = true;
 
 var shaderList = [
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
+    {name: 'visWithMax',		path: 'design/src/shaders/visWithMax.frag'},
     {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
     {name: 'blur',		path: 'design/src/shaders/blur7.frag'},
     {name: 'blurOff',   path: 'design/src/shaders/blur7Offscreen.frag'},
@@ -216,43 +217,69 @@ ScalarSample.prototype.initVisPipeline = function()
 
     // blur + vis
     var blur = new GLPipeline(this.visualizer.glCanvas);
-    /*
-    blur.addStage({
-        uniforms: {
-            scalarField: {},
-            colormap: {},
-            pitch: {value: [1/this.field.w, 1/this.field.h]}
-        },
-        inTexture: 'scalarField',
-        fragment: this.visualizer.shaders[BLUR_STAGE > 1 ? 'blurOff' : 'blur'],
-        vertex: this.visualizer.shaders['vertex']
-    });
-    */
 
     // for multi-stage blurring, add a final medianBlur
     for (var i=1; i<=BLUR_STAGE; i++)
     {
         var blurShader;
-        if (i == BLUR_STAGE) {
-            blurShader = 'median';
-        }
-        else if (i > BLUR_STAGE/1) {
-            blurShader = 'medianOff';
+        if (i == BLUR_STAGE)
+        {
+            // add a CPU computation stages
+            var cpuStage = {
+                cpuComputation: function(buffer) {
+                    var minValue = Number.MAX_VALUE;
+                    var maxValue = Number.MIN_VALUE;
+                    for (var i=0, len=buffer.length; i<len; i++)
+                    {
+                        var v = buffer[i];
+                        if (v > maxValue) {
+                            maxValue = v;
+                        }
+                        else if (v < minValue) {
+                            minValue = v;
+                        }
+                    }
+                    console.log("GPU buffer max: " + maxValue + ', min: ' + minValue);
+                    return {
+                        maxValue: maxValue,
+                        minValue: minValue
+                    };
+                }
+            }
+            blur.addStage(cpuStage);
+
+            // add a standard vis stage
+            blurShader = 'visWithMax';
+            blur.addStage({
+                uniforms: {
+                    scalarField: {},
+                    colormap: {},
+                    contour: {value: -1},
+                    maxValue: {
+                        value: null,
+                        cpuComputation: true,
+                        index: 0, id: 'maxValue'
+                    }
+                },
+                inTexture: 'scalarField',
+                fragment: this.visualizer.shaders[blurShader],
+                vertex: this.visualizer.shaders['vertex']
+            });
         }
         else {
             blurShader = 'blurOff';
-        }
 
-        blur.addStage({
-            uniforms: {
-                scalarField: {},
-                colormap: {},
-                pitch: {value: [1/this.field.w, 1/this.field.h]}
-            },
-            inTexture: 'scalarField',
-            fragment: this.visualizer.shaders[blurShader],
-            vertex: this.visualizer.shaders['vertex']
-        });
+            blur.addStage({
+                uniforms: {
+                    scalarField: {},
+                    colormap: {},
+                    pitch: {value: [1/this.field.w, 1/this.field.h]}
+                },
+                inTexture: 'scalarField',
+                fragment: this.visualizer.shaders[blurShader],
+                vertex: this.visualizer.shaders['vertex']
+            });
+        }
     }
 
 

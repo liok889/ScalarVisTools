@@ -134,6 +134,7 @@ GLPipeline.prototype.flipBuffers = function() {
 
 GLPipeline.prototype.run = function()
 {
+	this.cpuReturnValues = [];
 	for (var i=0, len=this.stages.length; i < len; i++)
 	{
 		var stage = this.stages[i];
@@ -143,14 +144,25 @@ GLPipeline.prototype.run = function()
 		{
 			var buffer = glCanvasToBuffer(this.destCanvas);
 			var retValue = stage.cpuComputation(buffer);
+			this.cpuReturnValues.push(retValue);
 		}
 		else {
 			// GLSL stage
+			// scan uniforms and see if any of them need results from CPU compute
+			for (var uniformID in stage.shader.uniforms) {
+				var uniform = stage.shader.uniforms[uniformID];
+				if (uniform.cpuComputation) {
+					var retValue = this.cpuReturnValues[uniform.index];
+					var value = retValue[uniform.id];
+					uniform.value = value;
+				}
+			}
 
 			// set shader to take texture from the previous stage
 			if (i>0)
 			{
 				var u = stage.shader.uniforms;
+
 				var inTex = stage.inTexture;
 				if (inTex === undefined || inTex === null) {
 					throw ("No inTexture defiend for stage " + i);
@@ -234,7 +246,7 @@ function glCanvasToBuffer(source)
 	var w = gl.drawingBufferWidth;
 	var h = gl.drawingBufferHeight;
 
-	var pixels = new Float32Array(w * h);
-	gl.readPixels(0, 0, w, h, gl.ALPHA, gl.FLOAT, pixels);
+	var pixels = new Float32Array(w * h * 4);
+	gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, pixels);
 	return pixels;
 }

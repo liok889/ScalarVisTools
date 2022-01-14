@@ -245,12 +245,18 @@ ColorAnalysis.prototype.run = function(analysis)
 	for (var i=0; i<pipeline.getStageCount(); i++)
 	{
 		var s = pipeline.getStage(i);
-		var u = s.getUniforms();
+		if (s.cpuComputation) {
+			// skip uniforms since this is a cpu computation stage
+			continue;
+		}
+		else {
+			var u = s.getUniforms();
 
-		// does this stage require a colormap?
-		if (u.colormap) {
-			// if so, give it the current colormap associated with the scalar field
-			u.colormap.value = this.field.gpuColormapTexture;
+			// does this stage require a colormap?
+			if (u.colormap) {
+				// if so, give it the current colormap associated with the scalar field
+				u.colormap.value = this.field.gpuColormapTexture;
+			}
 		}
 	}
 

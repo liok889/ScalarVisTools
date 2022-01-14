@@ -60,14 +60,14 @@ function swap(vec, i, j)
   vec[j] = t;
 }
 
-function partition(vec, left, right, pivot) 
+function partition(vec, left, right, pivot)
 {
   swap(vec, pivot, left); // No-op if pivot is the first one
   pivot = left;
   i = left;
   j = right + 1;
 
-  while (i < j) 
+  while (i < j)
   {
     while (++i < j && vec[i] < vec[pivot]);
     while (--j >= i && vec[j] >= vec[pivot]); // Beware: tricky indices
@@ -80,7 +80,7 @@ function partition(vec, left, right, pivot)
   return j;
 }
 
-function quickSelect(vec, left, right, k) 
+function quickSelect(vec, left, right, k)
 {
 
   if (left == right)
@@ -88,14 +88,14 @@ function quickSelect(vec, left, right, k)
 
   // Calculate the median of medians and return its index in the original vector
   var N = right - left + 1;
-  function findMedian(subgroup) 
+  function findMedian(subgroup)
   {
     subgroup.sort(function(x,y){return x-y});
     return subgroup[Math.floor(subgroup.length / 2)];
   };
 
   var medians = [];
-  for (var i = 0, len=Math.floor((N+4)/5); i < len; ++i) 
+  for (var i = 0, len=Math.floor((N+4)/5); i < len; ++i)
   {
     var elements = 5;
     if (i * 5 + 5 > N) {
@@ -229,18 +229,18 @@ ScalarField.prototype.duplicate = function()
 	return newScalar;
 }
 
-ScalarField.prototype.zero = function() 
+ScalarField.prototype.zero = function()
 {
 	for (var i=0, len=this.w*this.h; i<len; i++) {
 		this.view[i] = 0;
 	}
 }
 
-ScalarField.prototype.zeroLeaveEmpty = function() 
+ScalarField.prototype.zeroLeaveEmpty = function()
 {
 	var view = this.view;
 	var empty = SCALAR_EMPTY
-	for (var i=0, len=this.w*this.h; i<len; i++) 
+	for (var i=0, len=this.w*this.h; i<len; i++)
 	{
 		if (view[i] != empty) {
 			view[i] = 0;
@@ -409,7 +409,7 @@ ScalarField.prototype.scale = function(newW, newH, cropW, cropH)
 
 ScalarField.prototype.getMinMax = function()
 {
-	if (!this.minax)
+	if (!this.minmax)
 	{
 		var m0 = Number.MAX_VALUE;
 		var m1 = Number.MIN_VALUE;
@@ -430,6 +430,15 @@ ScalarField.prototype.getMinMax = function()
 		this.minmax = [m0, m1]
 	}
 	return this.minmax;
+}
+
+ScalarField.prototype.randomize = function()
+{
+	var view = this.view;
+	for (i=0, len=this.view.length; i<len; i++) {
+		view[i] = Math.random();
+	}
+	this.minmax = null;
 }
 
 ScalarField.prototype.getSubregionStats = function(x, y, w, h)
@@ -559,10 +568,10 @@ ScalarField.prototype.normalize = function(__minmax)
 			var m1 = minmax[1];
 			var _len = 1.0 / len;
 
-			for (var i=0, len=this.w*this.h; i < len; i++) 
+			for (var i=0, len=this.w*this.h; i < len; i++)
 			{
 				var v = view[i];
-				if (v != SCALAR_EMPTY) 
+				if (v != SCALAR_EMPTY)
 				{
 					var nV = (v-m0) * _len;
 					view[i] = nV > 1 ? 1 : (nV < 0 ? 0 : nV);
@@ -584,16 +593,16 @@ ScalarField.prototype.normalizeToPercentile = function(upperPercentile)
 	var kthOrder = Math.floor(upperPercentile * view.length);
 	kthOrder = Math.max(1, Math.min(view.length, kthOrder));
 
-	var sortedView = this.doublePrecision ? 
-		new Float64Array(this.buffer.slice(0)) : 
+	var sortedView = this.doublePrecision ?
+		new Float64Array(this.buffer.slice(0)) :
 		new Float32Array(this.buffer.slice(0));
 
 	/*
 	var minValue = Number.MAX_VALUE;
-	for (var i=0, len=view.length; i<len; i++) 
+	for (var i=0, len=view.length; i<len; i++)
 	{
 		var v = view[i];
-		if (v !== SCALAR_EMPTY && v < minValue) 
+		if (v !== SCALAR_EMPTY && v < minValue)
 		{
 			minValue = v;
 		}
@@ -605,7 +614,7 @@ ScalarField.prototype.normalizeToPercentile = function(upperPercentile)
 	var minValue = Number.MAX_VALUE;
 	for (var i=0, len=sortedView.length; i<len; i++) {
 		var v = sortedView[i];
-		if (v !== SCALAR_EMPTY) 
+		if (v !== SCALAR_EMPTY)
 		{
 			minValue = v;
 			break;
