@@ -158,8 +158,8 @@
 
 	<script>
 		// dimensions of samples
-		var WIDTH=250;
-		var HEIGHT=250;
+		var WIDTH=200;
+		var HEIGHT=200;
 		var ROTATE = false;
 		var OFFSET = 10;
 		var MODEL_TYPE = GaussMixWithNoise;
@@ -202,10 +202,12 @@
 		function setSamplers()
 		{
 			mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
+			mainSample.highFidelity = true;
 			mainSample.setSamplingFidelity(goodN);
 			mainSample.setModel(lineupExp.getMain());
 
 			decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
+			decoySample.highFidelity = true;
 			decoySample.setSamplingFidelity(goodN);
 			decoySample.setModel(lineupExp.getDecoy());
 		}

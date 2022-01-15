@@ -19,7 +19,7 @@ GaussMixWithNoise.prototype.addCluster = function(dontUpdate)
 
     var W = this.w - padX*2;
     var H = this.h - padY*2;
-    console.log("add cluster: " + W + ', ' + H)
+    //console.log("add cluster: " + W + ', ' + H)
 
     var generated = true, x, y;
     do

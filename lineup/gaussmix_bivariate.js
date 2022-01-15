@@ -1,6 +1,6 @@
 // somewhere between 2 and 5 seems (visually) like a reasonable tradeoff
 var BI_MAP_SIZE=2;
-var DOUBLE_PRECISION=true;
+var DOUBLE_PRECISION=false;
 
 function GaussMixBivariate(w, h, svg)
 {
@@ -51,6 +51,10 @@ biGauss.prototype.eval = function(x, y)
 
 GaussMixBivariate.prototype = new GaussMix();
 GaussMixBivariate.prototype.constructor = GaussMixBivariate;
+
+GaussMixBivariate.prototype.getPDF = function() {
+    return this.pdf;
+}
 
 GaussMixBivariate.prototype.dispose = function()
 {
@@ -509,16 +513,20 @@ GaussMixBivariate.prototype.computeCDFs = function()
         minDensity = 0;
     }
 
+    //console.log('normalize PDF');
+    //this.pdf.normalize();
+
     this.maxDensity = maxDensity;
     this.minDensity = minDensity;
     this.cummDensity = cummDensity;
 
     // construct map
+    this.pdf.updated();
     this.updateCDFMap = true;
 }
 
 // construct map
-GPU_CDF_MAP = true;
+GPU_CDF_MAP = false;
 GaussMixBivariate.prototype.computeCDFMap = function()
 {
     var cdf = this.cdf.view;

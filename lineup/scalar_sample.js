@@ -2,6 +2,7 @@ var BLUR=false;
 var BLUR_STAGE = 25;
 var SCALAR_UPPER_PERCENTILE = 1-.001/1;
 var HISTOGRAM_BINS = 60;
+var GPU_SAMPLING = true;
 
 // disable renderer caching, forcing new canvases each time
 ALL_SAMPLERS = [];
@@ -10,6 +11,8 @@ var CALLBACK_SAMPLE = true;
 
 
 var shaderList = [
+    {name: 'pdfSample', path: 'design/src/shaders/pdfSample.glsl'},
+    {name: 'pdfPlot', path: 'design/src/shaders/pdfPlot.glsl'},
     {name: 'vis',		path: 'design/src/shaders/vis.frag'},
     {name: 'visWithMax',		path: 'design/src/shaders/visWithMax.frag'},
     {name: 'vertex',	path: 'design/src/shaders/vertex.vert'},
@@ -22,7 +25,6 @@ var shaderList = [
 
 function ScalarSample(w, h, canvas, model, colormap)
 {
-    console.log('scalar sample constructor');
     this.w = w;
     this.h = h;
     this.field = new ScalarField(w, h);
@@ -118,7 +120,7 @@ ScalarSample.prototype.setModel = function(_model, dontVis)
         {
             if (CALLBACK_SAMPLE || me.callbackSample)
             {
-                console.log('callback sampling');
+                //console.log('callback sampling');
                 me.sampleModel();
                 if (me.canvas || me.svg) {
                     me.vis();
@@ -141,24 +143,52 @@ ScalarSample.prototype.setSamplingFidelity = function(fidelity)
 
 ScalarSample.prototype.sampleModel = function(_fidelity, model)
 {
-    var fidelity = !isNaN(_fidelity) ? _fidelity : this.localN;
-    if (!fidelity || isNaN(fidelity)) {
-        if (typeof N === 'undefined') {
-            fidelity = 0;
-        }
-        else {
-            fidelity = N;
-        }
-    }
-    if (!model) {
-        model = this.model;
-    }
+    if (GPU_SAMPLING)
+    {
+        // copy pdf over to field
+        var pdf = this.model.getPDF().view;
+        var field = this.field.view;
+        var minP = Number.MAX_VALUE, maxP = Number.MIN_VALUE;
 
-    var upperPercentile = undefined;
-    if (typeof SCALAR_UPPER_PERCENTILE !== 'undefined') {
-        upperPercentile = SCALAR_UPPER_PERCENTILE;
+        for (var i=0, len=field.length; i<len; i++)
+        {
+            var p = pdf[i];
+            field[i] = p;
+            if (p < minP) {
+                minP = p;
+            }
+            else if (p > maxP) {
+                maxP = p;
+            }
+        }
+        var _lenP = 1 / (maxP-minP);
+        for (var i=0, len=field.length; i<len; i++) {
+            field[i] = (field[i] - minP) * _lenP
+        }
+
+        this.field.updated();
     }
-    model.sampleModel(fidelity, this.field, upperPercentile);
+    else {
+
+        var fidelity = !isNaN(_fidelity) ? _fidelity : this.localN;
+        if (!fidelity || isNaN(fidelity)) {
+            if (typeof N === 'undefined') {
+                fidelity = 0;
+            }
+            else {
+                fidelity = N;
+            }
+        }
+        if (!model) {
+            model = this.model;
+        }
+
+        var upperPercentile = undefined;
+        if (typeof SCALAR_UPPER_PERCENTILE !== 'undefined') {
+            upperPercentile = SCALAR_UPPER_PERCENTILE;
+        }
+        model.sampleModel(fidelity, this.field, upperPercentile);
+    }
 }
 
 ScalarSample.prototype.sampleAndVis = function(_fidelity)
@@ -179,7 +209,12 @@ ScalarSample.prototype.vis = function()
         this.callVisFlag = true;
     }
     else {
-        this.visualizer.run(BLUR ? 'blur' : 'vis');
+        if (this.highFidelity && GPU_SAMPLING) {
+            this.visualizer.run('plotPDF');
+        }
+        else {
+            this.visualizer.run(BLUR ? 'blur' : 'vis');
+        }
     }
 }
 
@@ -202,7 +237,109 @@ ScalarSample.prototype.initVisPipeline = function()
         return;
     }
 
-    // standard vis
+    var plotPDF = new GLPipeline(this.visualizer.glCanvas);
+    plotPDF.addStage({
+        uniforms:
+        {
+            scalarField: {},
+            colormap: {},
+        },
+        inTexture: 'scalarField',
+        fragment: this.visualizer.shaders['pdfPlot'],
+        vertex: this.visualizer.shaders['vertex']
+    });
+
+    var sampleAndVis = new GLPipeline(this.visualizer.glCanvas);
+    sampleAndVis.addStage({
+        uniforms:
+        {
+            scalarField: {},
+            randomSeed: {value: -1.0},
+        },
+        inTexture: 'scalarField',
+        fragment: this.visualizer.shaders['pdfSample'],
+        vertex: this.visualizer.shaders['vertex']
+    });
+
+    // blur
+    for (var i=1, stageCount = BLUR_STAGE-1; i<=stageCount; i++)
+    {
+        var blurShader;
+        if (i == stageCount)
+        {
+            // add a CPU computation stages
+            var cpuStage = {
+                cpuComputation: function(buffer) {
+                    var minValue = Number.MAX_VALUE;
+                    var maxValue = Number.MIN_VALUE;
+                    for (var i=0, len=buffer.length; i<len; i++)
+                    {
+                        var v = buffer[i];
+                        if (v > maxValue) {
+                            maxValue = v;
+                        }
+                        else if (v < minValue) {
+                            minValue = v;
+                        }
+                    }
+                    return {
+                        maxValue: maxValue,
+                        minValue: minValue
+                    };
+                }
+            }
+            sampleAndVis.addStage(cpuStage);
+
+            // add a standard vis stage
+            blurShader = 'visWithMax';
+            sampleAndVis.addStage({
+                uniforms: {
+                    scalarField: {},
+                    colormap: {},
+                    contour: {value: -1},
+                    maxValue: {
+                        value: null,
+                        cpuComputation: true,
+                        index: 0, id: 'maxValue'
+                    }
+                },
+                inTexture: 'scalarField',
+                fragment: this.visualizer.shaders[blurShader],
+                vertex: this.visualizer.shaders['vertex']
+            });
+        }
+        /*
+        else if (i == stageCount-1)
+        {
+            blurShader = 'medianOff';
+            sampleAndVis.addStage({
+                uniforms: {
+                    scalarField: {},
+                    colormap: {},
+                    pitch: {value: [1/this.field.w, 1/this.field.h]}
+                },
+                inTexture: 'scalarField',
+                fragment: this.visualizer.shaders[blurShader],
+                vertex: this.visualizer.shaders['vertex']
+            });
+        }
+        */
+        else {
+            blurShader = 'blurOff';
+            sampleAndVis.addStage({
+                uniforms: {
+                    scalarField: {},
+                    colormap: {},
+                    pitch: {value: [1/this.field.w, 1/this.field.h]}
+                },
+                inTexture: 'scalarField',
+                fragment: this.visualizer.shaders[blurShader],
+                vertex: this.visualizer.shaders['vertex']
+            });
+        }
+    }
+
+
     var vis = new GLPipeline(this.visualizer.glCanvas);
     vis.addStage({
         uniforms: {
@@ -239,7 +376,6 @@ ScalarSample.prototype.initVisPipeline = function()
                             minValue = v;
                         }
                     }
-                    console.log("GPU buffer max: " + maxValue + ', min: ' + minValue);
                     return {
                         maxValue: maxValue,
                         minValue: minValue
@@ -284,7 +420,8 @@ ScalarSample.prototype.initVisPipeline = function()
 
 
     this.visualizer.pipelines = {
-        vis: vis,
+        plotPDF: plotPDF,
+        vis: GPU_SAMPLING ? sampleAndVis : vis,
         blur: blur
     };
 

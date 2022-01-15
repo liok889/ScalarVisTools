@@ -156,6 +156,9 @@ GLPipeline.prototype.run = function()
 					var value = retValue[uniform.id];
 					uniform.value = value;
 				}
+				else if (uniformID == 'randomSeed') {
+					uniform.value = Math.random();
+				}
 			}
 
 			// set shader to take texture from the previous stage

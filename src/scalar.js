@@ -757,6 +757,13 @@ ScalarField.prototype.generatePicture = function()
 
 ScalarField.prototype.createGPUTexture = function(colorDif)
 {
+	// remove old texture
+	if (this.gpuTexture)
+	{
+		this.gpuTexture.dispose();
+		this.gpuTexture = undefined;
+	}
+
 	if (this.doublePrecision || this.bytesPerPixel!=4)
 	{
 		console.warn("ScalarField.createGPUTexture: double precision detected, which generally can't be GL texturized.")
@@ -793,6 +800,7 @@ ScalarField.prototype.updated = function()
 		this.gpuTexture.dispose();
 		this.gpuTexture = undefined;
 	}
+	this.minmax = undefined;
 }
 
 ScalarField.prototype.generatePictureGL = function(canvas, COLOR_DIFF)

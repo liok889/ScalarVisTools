@@ -27,6 +27,8 @@ ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 	this.field = field;
 	this.shaders = {};
 	this.pipelines = null;
+	this.additionalTextures = [];
+
 
 	// list of canvases to copy results to at the end of analysis (optional)
 	this.copyList = [];
@@ -79,6 +81,13 @@ ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 	})(this, _readyCallback, _shaderList)
 }
 
+ColorAnalysis.prototype.addTexture = function(name, field)
+{
+	this.additionalTextures.push({
+		name: name,
+		field: field
+	});
+}
 ColorAnalysis.prototype.clearCanvas = function() {
 	var gl = this.glCanvas.getContext('webgl');
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -256,6 +265,21 @@ ColorAnalysis.prototype.run = function(analysis)
 			if (u.colormap) {
 				// if so, give it the current colormap associated with the scalar field
 				u.colormap.value = this.field.gpuColormapTexture;
+			}
+
+			// other textures?
+			for (var t=0; t<this.additionalTextures.length; t++)
+			{
+				var text = this.additionalTextures[t];
+				var textName = text.name;
+				if (u[textName])
+				{
+					if (!text.field.gpuTexture)
+					{
+						text.field.createGPUTexture();
+					}
+					u[textName].value = text.field.gpuTexture;
+				}
 			}
 		}
 	}
