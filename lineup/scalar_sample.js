@@ -1,5 +1,5 @@
 var BLUR=false;
-var BLUR_STAGE = 25;
+var BLUR_STAGE = 15;
 var SCALAR_UPPER_PERCENTILE = 1-.001/1;
 var HISTOGRAM_BINS = 60;
 var GPU_SAMPLING = true;
@@ -284,7 +284,8 @@ ScalarSample.prototype.initVisPipeline = function()
                     }
                     return {
                         maxValue: maxValue,
-                        minValue: minValue
+                        minValue: minValue,
+                        normTerm: 1.0 / (maxValue-minValue)
                     };
                 }
             }
@@ -297,10 +298,16 @@ ScalarSample.prototype.initVisPipeline = function()
                     scalarField: {},
                     colormap: {},
                     contour: {value: -1},
-                    maxValue: {
+                    minValue: {
                         value: null,
                         cpuComputation: true,
-                        index: 0, id: 'maxValue'
+                        index: 0, id: 'minValue'
+                    },
+
+                    normTerm: {
+                        value: null,
+                        cpuComputation: true,
+                        index: 0, id: 'normTerm'
                     }
                 },
                 inTexture: 'scalarField',
