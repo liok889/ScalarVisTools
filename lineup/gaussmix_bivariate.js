@@ -64,9 +64,9 @@ biGauss.prototype.eval = function(x, y)
     var stXY = stX * stY;
 
     var e = this.rhoExpConst * (stX*stX -2 * this.rho * stXY + stY*stY);
-    var a = this.rhoSqrConst * (1/(this.sX * this.sY))
+    //var a = this.rhoSqrConst * (1/(this.sX * this.sY))
 
-    return this.scaler * a * Math.exp( e );
+    return this.scaler * Math.exp( e ); // * a;
 }
 
 GaussMixBivariate.prototype = new GaussMix();
@@ -304,7 +304,14 @@ GaussMixBivariate.prototype.plotModelCurves = function()
         return;
     }
 
-    var ellipses = this.svg.selectAll('ellipse').data(this.models)
+    var visibleModels = [];
+    for (var i=0; i<this.models.length; i++) {
+        var m = this.models[i];
+        if (!m.invisible) {
+            visibleModels.push(m);
+        }
+    }
+    var ellipses = this.svg.selectAll('ellipse').data(visibleModels)
     ellipses.exit().remove();
 
     var enter = ellipses.enter().append('ellipse')
@@ -336,7 +343,7 @@ GaussMixBivariate.prototype.plotModelCurves = function()
         })
         .attr('fill', 'none');
 
-    var lines = this.svg.selectAll('line').data(this.models)
+    var lines = this.svg.selectAll('line').data(visibleModels)
     lines.exit().remove();
     enter = lines.enter().append('line');
     lines = lines.merge(enter);
@@ -383,7 +390,7 @@ GaussMixBivariate.prototype.plotModelCurves = function()
         });
 
     // plots centers
-    var centers = this.svg.selectAll('circle.center').data(this.models)
+    var centers = this.svg.selectAll('circle.center').data(visibleModels)
     centers.exit().remove();
     enter = centers.enter().append('circle')
         .attr('class', 'center');
