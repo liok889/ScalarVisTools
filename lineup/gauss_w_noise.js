@@ -354,7 +354,7 @@ GaussMixWithNoise.prototype.init = function()
     // figure out how many clusters we need
 
     // create clusters, large and small
-    var restart = false, success=false, iter=0, MAX_ITER=100;
+    var restart = false, success=false, iter=0, MAX_ITER=200;
     do {
         restart = false;
         var clusterCount = Math.floor(.5 + Math.random() * (LARGE_MAX_CLUSTERS-LARGE_MIN_CLUSTERS)) + LARGE_MIN_CLUSTERS;
