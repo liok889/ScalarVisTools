@@ -123,6 +123,9 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
         y: [Number.MAX_VALUE, Number.MIN_VALUE]
     };
 
+    // make is a negative cluster?
+    this.negative = Math.random() < .5 ? true : false;
+
     var theoreticalRange = [0, 0];
 
     var centroid = {x: this.x, y: this.y};
@@ -130,11 +133,11 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
     for (var g=0; g<gaussCount; g++)
     {
         // gauss center: perturb up to 50% of clusterSize around cluster center
-        var mx = this.x + (Math.random()*2-1) * .2 * this.clusterSize;
-        var my = this.y + (Math.random()*2-1) * .2 * this.clusterSize;
+        var mx = this.x + (Math.random()*2-1) * .3 * this.clusterSize;
+        var my = this.y + (Math.random()*2-1) * .3 * this.clusterSize;
 
         // standard deviation
-        var MIN_SIGMA = .5 * this.clusterSize * .5;
+        var MIN_SIGMA = .5 * this.clusterSize * .75;
         var MAX_SIGMA = .5 * this.clusterSize * 1.5;
 
         var sigmaX = Math.random()*(MAX_SIGMA-MIN_SIGMA) + MIN_SIGMA;
@@ -148,18 +151,13 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
         centroid.y += (my - this.y) / gaussCount;
 
         // correlation for gaussians (limit to -0.3 to 0.3)
-        var rho = (Math.random()*2-1) *0;
+        var rho = (Math.random()*2-1) * .6;
         //var amp = Math.random() * (amplitude[1]-amplitude[0]) + amplitude[0];
         var amp = amplitude[0];
+        if (this.negative) {
+            amp *= -1;
+        }
 
-        // make is a negative cluster?
-        if (Math.random() < .5) {
-            amp *= -1.0;
-            this.negative = true;
-        }
-        else {
-            this.negative = false;
-        }
         // gaussian
         var gauss = new biGauss(mx, my, sigmaX, sigmaY, rho, amp);
 
@@ -176,11 +174,16 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
     this.valueRange = theoreticalRange;
 
     // noise range
-    var noiseMid = Math.random() * .8 + .1;
-    var noiseRange = (this.valueRange[1]-this.valueRange[0]) * .2;
-    this.noiseRange = [noiseMid - noiseRange, noiseMid + noiseRange];
-    this.noiseAmplitude = this.valueRange[1] * .4;
+    var valRange = this.valueRange[1]-this.valueRange[0];
+    var noiseMid = /*(Math.random() * .2 + .7)*/ .7 * valRange;
+    var noiseRingSize = valRange * .1;
 
+
+    var sign = this.negative ? -1.0 : 1.0;
+    this.noiseRange = [noiseMid - sign * noiseRingSize, noiseMid + sign * noiseRingSize];
+    this.noiseAmplitude = this.valueRange[1] * .0775/1.2;
+    this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
+    this.noiseRingSize = noiseRingSize;
 }
 
 ClusterOfGauss.prototype.eval = function(x, y)
@@ -192,16 +195,23 @@ ClusterOfGauss.prototype.eval = function(x, y)
         v += g.eval(x, y);
     }
 
-
     // add noise?
-    /*
-    if (this.noiseRange) {
-        if (v >= this.noiseRange[0] && v <= this.noiseRange[1]) {
-            v += this.noiseAmplitude;
+    var noise = this.noiseRange;
+
+    if (noise)
+    {
+        var angle = Math.atan2(y-this.cY, x-this.cX)
+        var sine = Math.cos(angle*2) * this.noiseRingSize;
+        var noiseRange = [noise[0]+sine, noise[1]+sine];
+
+        if (v >= (noiseRange[0]) && v <= (noiseRange[1]))
+        {
+            var n = (v-noiseRange[0]) / (noiseRange[1]-noiseRange[0]);
+            var s = Math.sin(n*Math.PI*2);
+
+            v += this.noiseAmplitude * s;
         }
     }
-    */
-
 
     return v;
 }
@@ -217,12 +227,17 @@ ClusterOfGauss.prototype.copy = function()
     c.valueRange = this.valueRange;
     c.noiseRange = this.noiseRange;
     c.noiseAmplitude = this.noiseAmplitude;
+    c.negative = this.negative;
+    c.noisePerturb = this.noisePerturb;
+    c.noiseRingSize = this.noiseRingSize;
 
     return c;
 }
 
 ClusterOfGauss.prototype.perturb = function()
 {
+    this.noiseRange[0] += this.noisePerturb * .95;
+    this.noiseRange[1] += this.noisePerturb * .95;
 }
 
 function GaussMixWithNoise(w, h, svg)
@@ -236,19 +251,20 @@ GaussMixWithNoise.prototype.constructor = GaussMixBivariate;
 
 GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 {
+    var MAX_ITERATIONS = 100;
     // padding as 7% of width/height
-    var padX = this.w * .07;
-    var padY = this.h * .07;
+    var padX = this.w * .05;
+    var padY = this.h * .05;
 
     // cluster width / height as 15%
     var clusterSize = Math.min(this.w, this.h) * (_clusterSize ? _clusterSize : .4);
-    var minClusterDist = clusterSize * .9
+    var minClusterDist = clusterSize * 1.2; /* clusterSize * .9 */
 
     var W = this.w - padX*2;
     var H = this.h - padY*2;
     //console.log("add cluster: " + W + ', ' + H)
 
-    var generated = true, x, y;
+    var generated = true, x, y, iter=0;
     do
     {
         // generate cluster centroid
@@ -260,27 +276,27 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
         for (var i=0; i<this.clusters.length; i++)
         {
             var c = this.clusters[i];
-            var d = Math.sqrt(Math.pow(c.x-x, 2) + Math.pow(c.y-y, 2));
+            var d = Math.sqrt(Math.pow(c.cX-x, 2) + Math.pow(c.cY-y, 2));
             if (d < minClusterDist)
             {
                 // too close
                 generated = false;
-                continue;
+                break;
             }
             else {
                 generated = true;
             }
         }
-    } while(!generated)
+        iter++;
+    } while(++iter < MAX_ITERATIONS && !generated)
 
     if (!generated)
     {
-        console.error("Could not generate cluster that is far enough from the rest.")
         return null;
     }
 
     // how many gaussians?
-    var MIN_GAUSS = 3;
+    var MIN_GAUSS = 4;
     var MAX_GAUSS = 4;
     var gaussCount = MIN_GAUSS + Math.floor(.5 + Math.random() * (MAX_GAUSS-MIN_GAUSS));
     var cluster = new ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
@@ -320,8 +336,8 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 GaussMixWithNoise.prototype.init = function()
 {
     // large clusters: low frequency / high-amplitude
-    var LARGE_MIN_CLUSTERS = 6;
-    var LARGE_MAX_CLUSTERS = 6;
+    var LARGE_MIN_CLUSTERS = 5;
+    var LARGE_MAX_CLUSTERS = 5;
 
     // small clusters: dictate high-frequency features of the data
     var SMALL_MIN_CLUSTERS = 10;
@@ -338,21 +354,29 @@ GaussMixWithNoise.prototype.init = function()
     // figure out how many clusters we need
 
     // create clusters, large and small
-    var clusterCount = Math.floor(.5 + Math.random() * (LARGE_MAX_CLUSTERS-LARGE_MIN_CLUSTERS)) + LARGE_MIN_CLUSTERS;
-    for (var i=0; i<clusterCount; i++)
-    {
-        var cluster = this.addCluster(LARGE_CLUSTER_SIZE, LARGE_CLUSTER_AMPLITUDE);
-    }
+    var restart = false, success=false, iter=0, MAX_ITER=100;
+    do {
+        restart = false;
+        var clusterCount = Math.floor(.5 + Math.random() * (LARGE_MAX_CLUSTERS-LARGE_MIN_CLUSTERS)) + LARGE_MIN_CLUSTERS;
+        for (var i=0; i<clusterCount; i++)
+        {
+            var cluster = this.addCluster(LARGE_CLUSTER_SIZE, LARGE_CLUSTER_AMPLITUDE);
+            if (!cluster)
+            {
+                restart = true;
+                this.clusters = [];
+                this.models = [];
+                break;
+            }
+        }
+        if (!restart) {
+            success = true;
+        }
+    } while(restart && ++iter <= MAX_ITER);
 
-    /*
-    clusterCount = Math.floor(.5 + Math.random() * (SMALL_MAX_CLUSTERS-SMALL_MIN_CLUSTERS)) + SMALL_MIN_CLUSTERS;
-    for (var i=0; i<clusterCount; i++)
-    {
-        var cluster = this.addCluster(SMALL_CLUSTER_SIZE, SMALL_CLUSTER_AMPLITUDE);
-        this.clusters.push(cluster);
+    if (!success) {
+        console.error("Could not generate cluster after " + iter + " tries");
     }
-    */
-
 
     //this.models.sort(function(a,b) { return a.scaler-b.scaler });
 
