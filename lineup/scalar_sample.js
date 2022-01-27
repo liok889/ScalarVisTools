@@ -1,5 +1,5 @@
 var BLUR=false;
-var BLUR_STAGE = 5;
+var BLUR_STAGE = 9;
 var SCALAR_UPPER_PERCENTILE = 1-.001/1;
 var HISTOGRAM_BINS = 60;
 var GPU_SAMPLING = true;

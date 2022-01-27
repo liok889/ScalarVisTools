@@ -173,17 +173,6 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
     this.spatialRange = clusterRange;
     this.valueRange = theoreticalRange;
 
-    // noise range
-    var valRange = this.valueRange[1]-this.valueRange[0];
-    var noiseMid = /*(Math.random() * .2 + .7)*/ .7 * valRange;
-    var noiseRingSize = valRange * .1;
-
-
-    var sign = this.negative ? -1.0 : 1.0;
-    this.noiseRange = [noiseMid - sign * noiseRingSize, noiseMid + sign * noiseRingSize];
-    this.noiseAmplitude = this.valueRange[1] * .0775/1.2;
-    this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
-    this.noiseRingSize = noiseRingSize;
 }
 
 ClusterOfGauss.prototype.eval = function(x, y)
@@ -236,8 +225,31 @@ ClusterOfGauss.prototype.copy = function()
 
 ClusterOfGauss.prototype.perturb = function()
 {
-    this.noiseRange[0] += this.noisePerturb * .95;
-    this.noiseRange[1] += this.noisePerturb * .95;
+    if (this.noiseRange)
+    {
+        this.noiseRange[0] += this.noisePerturb * .95;
+        this.noiseRange[1] += this.noisePerturb * .95;
+    }
+}
+
+ClusterOfGauss.prototype.createNoise = function()
+{
+    // noise range
+    var valRange = this.valueRange[1]-this.valueRange[0];
+
+    // where the contour is located
+    var noiseContour = .7 * valRange;   // old: valRange
+
+    // thickness of the contour
+    var noiseRingSize = valRange * .1;
+
+    var sign = this.negative ? -1.0 : 1.0;
+    this.noiseRange = [noiseContour - sign * noiseRingSize, noiseContour + sign * noiseRingSize];
+
+
+    this.noiseAmplitude = sign * this.valueRange[1] * .0665;
+    this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
+    this.noiseRingSize = noiseRingSize;
 }
 
 function GaussMixWithNoise(w, h, svg)
@@ -258,7 +270,7 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 
     // cluster width / height as 15%
     var clusterSize = Math.min(this.w, this.h) * (_clusterSize ? _clusterSize : .4);
-    var minClusterDist = clusterSize * 1.2; /* clusterSize * .9 */
+    var minClusterDist = clusterSize * 1.0; /* clusterSize * .9 */
 
     var W = this.w - padX*2;
     var H = this.h - padY*2;
@@ -296,8 +308,8 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
     }
 
     // how many gaussians?
-    var MIN_GAUSS = 4;
-    var MAX_GAUSS = 4;
+    var MIN_GAUSS = 3;
+    var MAX_GAUSS = 3;
     var gaussCount = MIN_GAUSS + Math.floor(.5 + Math.random() * (MAX_GAUSS-MIN_GAUSS));
     var cluster = new ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
 
@@ -336,8 +348,11 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 GaussMixWithNoise.prototype.init = function()
 {
     // large clusters: low frequency / high-amplitude
-    var LARGE_MIN_CLUSTERS = 5;
-    var LARGE_MAX_CLUSTERS = 5;
+    var LARGE_MIN_CLUSTERS = 6;
+    var LARGE_MAX_CLUSTERS = 6;
+
+    // how many of the clusters have noise?
+    var NOISE_RATIO = 2/3;
 
     // small clusters: dictate high-frequency features of the data
     var SMALL_MIN_CLUSTERS = 10;
@@ -351,22 +366,51 @@ GaussMixWithNoise.prototype.init = function()
     this.clusters = [];
     this.models = [];
 
-    // figure out how many clusters we need
 
     // create clusters, large and small
     var restart = false, success=false, iter=0, MAX_ITER=200;
     do {
         restart = false;
+
+        // determine which clusters should have noise on them
         var clusterCount = Math.floor(.5 + Math.random() * (LARGE_MAX_CLUSTERS-LARGE_MIN_CLUSTERS)) + LARGE_MIN_CLUSTERS;
+        var noiseCount = Math.floor(clusterCount * NOISE_RATIO + .5);
+        var noiseList = [];
+        for (var i=0; i<clusterCount; i++) {
+            noiseList.push(i)
+        }
+
+        // permute noise list
+        for (var i=0; i<50; i++) {
+            var r=Math.floor(Math.random() * clusterCount);
+            var s=Math.floor(Math.random() * clusterCount);
+            if (r!=s) {
+                var t = noiseList[r];
+                noiseList[r]=noiseList[s];
+                noiseList[s]=t;
+            }
+        }
+
+        // top noiseCount are the ones with noise
+        var hasNoise = {};
+        for (var i=0;i<noiseCount; i++) {
+            hasNoise[noiseList[i]] = true;
+        }
+
         for (var i=0; i<clusterCount; i++)
         {
             var cluster = this.addCluster(LARGE_CLUSTER_SIZE, LARGE_CLUSTER_AMPLITUDE);
+
             if (!cluster)
             {
                 restart = true;
                 this.clusters = [];
                 this.models = [];
                 break;
+            }
+            else if (hasNoise[i])
+            {
+                cluster.createNoise();
             }
         }
         if (!restart) {

@@ -10,7 +10,7 @@ uniform float randomSeed;
 
 const float PHI = 1.61803398874989484820459;  // Golden Ratio
 const float P = 1.0 / 1.1;
-const int SAMPLES = 10;
+const int SAMPLES = 20;
 const float W = 1.0 / float(SAMPLES);
 
 
