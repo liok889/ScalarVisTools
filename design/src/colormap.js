@@ -545,7 +545,7 @@ ColorMap.prototype.drawColorScale = function(w, h, steps, orientation, canvas, i
 	return internalCanvas;
 }
 
-var COLOR_PRESETS = 
+var COLOR_PRESETS =
 {
 
 		tealbeige: ['#e6ebb4', '#c8d991', '#a6da93', '#83d99e', '#62d1a7', '#44bea6', '#359f96', '#387372', '#353836'].reverse(),
@@ -557,8 +557,8 @@ var COLOR_PRESETS =
 		bluebrown: ['#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e'].reverse(),
 		bluebrownFull: ['#543005','#8c510a','#bf812d','#dfc27d','#f6e8c3','#f5f5f5','#c7eae5','#80cdc1','#35978f','#01665e','#003c30'].reverse(),
 		bluered: ['#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac'].reverse(),
-		
-		
+
+
 		greenpink: ['#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221'].reverse(),
 		greenpinkFull: ['#8e0152','#c51b7d','#de77ae','#f1b6da','#fde0ef','#f7f7f7','#e6f5d0','#b8e186','#7fbc41','#4d9221','#276419'].reverse(),
 		greenpinkBrewer: ['#c5147e', '#d964a2', '#ea9dcb', '#fbd0e8', '#f6f8f6', '#def4c7', '#bbe792', '#86c950', '#42931d'].reverse(),
@@ -741,7 +741,7 @@ var COLOR_PRESETS =
             "b": "0.098039"
          }
       ],
-     
+
 		greyscale: [
 			[0, 0, 0],
 			[255, 255, 255]
@@ -852,7 +852,7 @@ var COLOR_PRESETS =
 		],
 		*/
 
-		
+
 		cubehelix: [
 			[0.000, 0.000, 0.000],
 			[0.017, 0.006, 0.016],
@@ -956,7 +956,7 @@ var COLOR_PRESETS =
 			[0.982, 0.995, 0.986],
 			[0.9999, 0.9999, 0.9999]
 		],
-		
+
 		/*
 		bluegreenyellow: [
 			[255,255,217],
@@ -996,7 +996,7 @@ var COLOR_PRESETS =
 			[8,29,88],
 		].reverse(),
 		*/
-		
+
 		bodyheat: [
 			[0, 0, 0, 0],
 			[178, 34, 34, 0.39],
@@ -1088,7 +1088,7 @@ var COLOR_PRESETS =
 			[252, 252, 0]
 		],
 
-		rainbowhcl: function(t) 
+		rainbowhcl: function(t)
 		{
 			t = 1-t;
 			t *= .9;
@@ -1103,7 +1103,7 @@ var COLOR_PRESETS =
 			return c;
 		},
 
-		rainbowhcl100: function(t) 
+		rainbowhcl100: function(t)
 		{
 			t = 1-t;
 			t *= .9;
@@ -1118,7 +1118,7 @@ var COLOR_PRESETS =
 			return c;
 		},
 
-		rainbowhcl80: function(t) 
+		rainbowhcl80: function(t)
 		{
 			t = 1-t;
 			t *= .9;
@@ -1133,7 +1133,7 @@ var COLOR_PRESETS =
 			return c;
 		},
 
-		rainbowhcl90: function(t) 
+		rainbowhcl90: function(t)
 		{
 			t = 1-t;
 			t *= .9;
@@ -3032,7 +3032,7 @@ function getColorPreset(preset, m0, m1, brandNew)
 		if (Array.isArray(colorScheme))
 		{
 			colorset = [];
-			for (var i=0, cLen = colorScheme.length; i<cLen; i++) 
+			for (var i=0, cLen = colorScheme.length; i<cLen; i++)
 			{
 				var v = len*(i/(cLen-1));
 				var c = colorScheme[i];
@@ -3073,8 +3073,8 @@ function getColorPreset(preset, m0, m1, brandNew)
 					if (r % 1 != 0) r = Math.min(255, Math.floor(.5 + r * 255));
 					if (g % 1 != 0) g = Math.min(255, Math.floor(.5 + g * 255));
 					if (b % 1 != 0) b = Math.min(255, Math.floor(.5 + b * 255));
-					
-					
+
+
 					var value;
 					if (c.v !== undefined) {
 						value = +c.v;
@@ -3105,11 +3105,11 @@ function getColorPreset(preset, m0, m1, brandNew)
 		}
 		else if (isFunction(colorScheme))
 		{
-			for (var s = 0, samples=100; s<samples; s++) 
+			for (var s = 0, samples=100; s<samples; s++)
 			{
 				var n = s/(samples-1);
 				var theColor = colorScheme(n);
-			    
+
 
 				colorset.push({
 					value: s/(samples-1),
@@ -3367,4 +3367,3 @@ function trimColormap(preset, cutPercent)
 		COLOR_PRESETS[preset]=newPreset;
 	}
 }
-

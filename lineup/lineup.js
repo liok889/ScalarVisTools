@@ -1,3 +1,69 @@
+function renderLineup(width, height, table, rows, cols, n, randomCanvases, canvasType, nullOption)
+{
+    // remove everything in the table
+    table.selectAll('*').remove();
+    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
+
+    var rs = d3.range(rows);
+    table.selectAll('tr').data(rs)
+        .enter().append('tr')
+        .each(function(d, thisRow)
+        {
+            (function(rowNum, thisRow)
+            {
+                d3.select(thisRow).selectAll('td').data(d3.range(cols))
+                    .enter().append('td').each(function(d, i) {
+                        var index = i + rowNum*cols;
+                        if (index < n)
+                        {
+                            var canvas = randomCanvases[index];
+                            if (!canvas) {
+                                var c = d3.select(this).append(canvasType);
+                                c
+                                    .attr('width', width)
+                                    .attr('height', height)
+                                    .attr('id', "sample" + index);
+
+                                randomCanvases[canvas] = c;
+                            }
+
+                            this.appendChild( randomCanvases[index] );
+                            d3.select(randomCanvases[index])
+                                .attr('class', 'index' + index);
+                        }
+                    });
+
+                if (rowNum==0 && nullOption)
+                {
+                    var w_div = +d3.select(randomCanvases[0]).attr('width')
+                    var w = 25 + w_div;
+                    var h = +d3.select(randomCanvases[0]).attr('height');
+                    var tdNull = d3.select(thisRow).append('td')
+                        .attr('rowSpan', rows)
+                        .attr('width', w);
+
+                    var div = tdNull.append('div')
+                        .style('margin', '0 auto')
+                        .style('width', w + 'px');
+                    div.append('div')
+                        .style('margin-top', ((rows*h)/2-h/1) + 'px')
+                        .style('margin-left', 'auto')
+                        .style('margin-right', 'auto')
+                        .attr('class', 'nullOption')
+                        .style('text-align', 'center')
+                        .style('vertical-align', 'middle')
+                        .style('width', w_div + 'px')
+                        .style('height', h + 'px')
+                        .style('border', 'solid 1px black')
+                        .style('font-size', '35px')
+                        .style('color', "#bbbbbb")
+                        .style('font-weight', 'bold')
+                        .html('no discernible difference between images');
+                }
+            })(d, this);
+        });
+}
+
 function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
 {
     // total number of exposures (n-1 actual + 1 decoy)
@@ -117,76 +183,14 @@ Lineup.prototype.layoutCanvases = function(table)
         canvasType = CANVAS_TYPE;
     }
 
-
-    // remove everything in the table
-    table.selectAll('*').remove();
-    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
-
     // how many rows
     var rows = 2;
     var cols = Math.ceil(this.n/2);
-
-    (function(width, height, table, rows, cols, n, randomCanvases, nullOption)
-    {
-        var rs = d3.range(rows);
-        table.selectAll('tr').data(rs)
-            .enter().append('tr')
-            .each(function(d, thisRow)
-            {
-                (function(rowNum, thisRow)
-                {
-                    d3.select(thisRow).selectAll('td').data(d3.range(cols))
-                        .enter().append('td').each(function(d, i) {
-                            var index = i + rowNum*cols;
-                            if (index < n)
-                            {
-                                var canvas = randomCanvases[index];
-                                if (!canvas) {
-                                    var c = d3.select(this).append(canvasType);
-                                    c
-                                        .attr('width', width)
-                                        .attr('height', height)
-                                        .attr('id', "sample" + index);
-
-                                    randomCanvases[canvas] = c;
-                                }
-
-                                this.appendChild( randomCanvases[index] );
-                                d3.select(randomCanvases[index])
-                                    .attr('class', 'index' + index);
-                            }
-                        });
-
-                    if (rowNum==0 && nullOption)
-                    {
-                        var w_div = +d3.select(randomCanvases[0]).attr('width')
-                        var w = 25 + w_div;
-                        var h = +d3.select(randomCanvases[0]).attr('height');
-                        var tdNull = d3.select(thisRow).append('td')
-                            .attr('rowSpan', rows)
-                            .attr('width', w);
-
-                        var div = tdNull.append('div')
-                            .style('margin', '0 auto')
-                            .style('width', w + 'px');
-                        div.append('div')
-                            .style('margin-top', ((rows*h)/2-h/1) + 'px')
-                            .style('margin-left', 'auto')
-                            .style('margin-right', 'auto')
-                            .attr('class', 'nullOption')
-                            .style('text-align', 'center')
-                            .style('vertical-align', 'middle')
-                            .style('width', w_div + 'px')
-                            .style('height', h + 'px')
-                            .style('border', 'solid 1px black')
-                            .style('font-size', '35px')
-                            .style('color', "#bbbbbb")
-                            .style('font-weight', 'bold')
-                            .html('no discernible difference between images');
-                    }
-                })(d, this);
-            });
-    })(this.w, this.h, table, rows, cols, this.n, randomCanvases, this.nullOption);
+    renderLineup(
+        this.w, this.h, table,
+        rows, cols, this.n,
+        randomCanvases, canvasType, this.nullOption
+    );
     this.table = table;
 }
 

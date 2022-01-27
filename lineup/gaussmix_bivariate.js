@@ -615,10 +615,6 @@ GaussMixBivariate.prototype.computeCDFMap = function()
         }
     }
 
-    if (this.gpuMap) {
-        console.log("gpumap: " + this.gpuMap.getMinMax());
-    }
-
     this.updateCDFMap = false;
 }
 
@@ -868,6 +864,7 @@ GaussMixBivariate.prototype.sampleModel = function(iterations, _field, upperPerc
 
         view[ R*w + C ] += 1.0;
     }
+
     if (upperPercentile) {
         _field.normalizeToPercentile(upperPercentile);
     }

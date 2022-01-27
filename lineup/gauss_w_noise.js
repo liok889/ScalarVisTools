@@ -205,7 +205,7 @@ ClusterOfGauss.prototype.eval = function(x, y)
     if (this.noiseEnabled)
     {
         var angle = Math.atan2(y-this.cY, x-this.cX)
-        var sine = Math.cos(angle*2) * this.noiseRingSize;
+        var sine = Math.cos(angle*1.2) * this.noiseRingSize;
         var noiseRange = [this.noiseRange[0]+sine, this.noiseRange[1]+sine];
 
         if (v >= noiseRange[0] && v <= noiseRange[1])
@@ -270,7 +270,6 @@ ClusterOfGauss.prototype.createNoise = function()
     this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
     this.noiseRingSize = noiseRingSize;
     this.noiseEnabled = true;
-    this._noise = "noise";
 }
 
 function GaussMixWithNoise(w, h, svg)
@@ -282,21 +281,24 @@ function GaussMixWithNoise(w, h, svg)
 GaussMixWithNoise.prototype = new GaussMixBivariate();
 GaussMixWithNoise.prototype.constructor = GaussMixBivariate;
 
-GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
+GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude, clusterList)
 {
     var MAX_ITERATIONS = 100;
+
     // padding as 7% of width/height
     var padX = this.w * .05;
     var padY = this.h * .05;
 
     // cluster width / height as 15%
     var clusterSize = Math.min(this.w, this.h) * (_clusterSize ? _clusterSize : .4);
-    var minClusterDist = clusterSize * 1.0; /* clusterSize * .9 */
+    var minClusterDist = clusterSize * 1.0;
 
     var W = this.w - padX*2;
     var H = this.h - padY*2;
-    //console.log("add cluster: " + W + ', ' + H)
 
+    if (!clusterList) {
+        clusterList = this.clusters;
+    }
     var generated = true, x, y, iter=0;
     do
     {
@@ -306,9 +308,9 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 
         // scan list of clusters and make sure we're not too close
         // to an existing cluster
-        for (var i=0; i<this.clusters.length; i++)
+        for (var i=0; i<clusterList.length; i++)
         {
-            var c = this.clusters[i];
+            var c = clusterList[i];
             var d = Math.sqrt(Math.pow(c.cX-x, 2) + Math.pow(c.cY-y, 2));
             if (d < minClusterDist)
             {
@@ -360,8 +362,8 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
     }
     */
 
-    this.models.push(cluster);
-    this.clusters.push(cluster);
+    clusterList.push(cluster);
+
     return cluster;
 
 }
@@ -369,19 +371,15 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
 GaussMixWithNoise.prototype.init = function()
 {
     // large clusters: low frequency / high-amplitude
-    var LARGE_MIN_CLUSTERS = 6;
-    var LARGE_MAX_CLUSTERS = 6;
+    var MIN_CLUSTERS = 6;
+    var MAX_CLUSTERS = 6;
 
     // how many of the clusters have noise?
     var NOISE_RATIO = 2/3;
 
-    // small clusters: dictate high-frequency features of the data
-    var SMALL_MIN_CLUSTERS = 10;
-    var SMALL_MAX_CLUSTERS = 12;
-
-    var LARGE_CLUSTER_SIZE = 0.4;   // 40% of min(width,height)
+    var CLUSTER_SIZE = 0.4;   // 40% of min(width,height)
     var SMALL_CLUSTER_SIZE = 0.05;
-    var LARGE_CLUSTER_AMPLITUDE = [1.0, 1.0];
+    var CLUSTER_AMPLITUDE = [1.0, 1.0];
     var SMALL_CLUSTER_AMPLITUDE = [.01/1.5, .01/1.5];
 
     this.clusters = [];
@@ -393,10 +391,12 @@ GaussMixWithNoise.prototype.init = function()
     do {
         restart = false;
 
+        // how many clusters to create
+        var clusterCount = Math.floor(.5 + Math.random() * (MAX_CLUSTERS-MIN_CLUSTERS)) + MIN_CLUSTERS;
+
         // determine which clusters should have noise on them
-        var clusterCount = Math.floor(.5 + Math.random() * (LARGE_MAX_CLUSTERS-LARGE_MIN_CLUSTERS)) + LARGE_MIN_CLUSTERS;
         var noiseCount = Math.floor(clusterCount * NOISE_RATIO + .5);
-        var noiseList = [];
+        var noiseList = [], noiseClusters = [];
         for (var i=0; i<clusterCount; i++) {
             noiseList.push(i)
         }
@@ -420,30 +420,46 @@ GaussMixWithNoise.prototype.init = function()
 
         for (var i=0; i<clusterCount; i++)
         {
-            var cluster = this.addCluster(LARGE_CLUSTER_SIZE, LARGE_CLUSTER_AMPLITUDE);
+            var cluster = this.addCluster(CLUSTER_SIZE, CLUSTER_AMPLITUDE);
 
             if (!cluster)
             {
                 restart = true;
-                this.clusters = [];
-                this.models = [];
                 break;
             }
-            else if (hasNoise[i])
+
+            // add cluster
+            this.models.push(cluster);
+
+            if (hasNoise[i])
             {
                 // create a new noise cluster
-                var noise = cluster.copy();
+                var noise = this.addCluster(1.3*CLUSTER_SIZE, CLUSTER_AMPLITUDE, noiseClusters)
+                if (!noise) {
+                    restart = true;
+                    break;
+                }
+
+                // or copy existing ones (this aligns the boundaries of the noise with the cluster)
+                //var noise = cluster.copy();
+
+                // addd noise and disable
                 noise.createNoise();
                 noise.disableDensity();
 
                 this.models.push(noise);
-                //cluster.createNoise();
             }
         }
+
         if (!restart) {
             success = true;
         }
-    } while(restart && ++iter <= MAX_ITER);
+        else {
+            // reset model and try again
+            this.clusters = [];
+            this.models = [];
+        }
+    } while(!success && ++iter <= MAX_ITER);
 
     if (!success) {
         console.error("Could not generate cluster after " + iter + " tries");
