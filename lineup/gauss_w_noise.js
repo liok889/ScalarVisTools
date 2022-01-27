@@ -172,37 +172,52 @@ function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
     this.cY = centroid.y;
     this.spatialRange = clusterRange;
     this.valueRange = theoreticalRange;
-
+    this.densityEnabled = true;
+    this.noiseEnabled = false;
 }
+ClusterOfGauss.prototype.enableNoise = function()
+{
+    this.noiseEnabled = true;
+}
+
+ClusterOfGauss.prototype.disableDensity = function()
+{
+    this.densityEnabled = false;
+}
+
 
 ClusterOfGauss.prototype.eval = function(x, y)
 {
-    var v = 0;
+    var v = 0, density = 0, noise = 0;
     for (var models = this.members, i=0, len = this.members.length; i<len; i++)
     {
         var g = models[i];
         v += g.eval(x, y);
     }
 
-    // add noise?
-    var noise = this.noiseRange;
+    // add density?
+    if (this.densityEnabled)
+    {
+        density += v;
+    }
 
-    if (noise)
+    // add noise?
+    if (this.noiseEnabled)
     {
         var angle = Math.atan2(y-this.cY, x-this.cX)
         var sine = Math.cos(angle*2) * this.noiseRingSize;
-        var noiseRange = [noise[0]+sine, noise[1]+sine];
+        var noiseRange = [this.noiseRange[0]+sine, this.noiseRange[1]+sine];
 
-        if (v >= (noiseRange[0]) && v <= (noiseRange[1]))
+        if (v >= noiseRange[0] && v <= noiseRange[1])
         {
             var n = (v-noiseRange[0]) / (noiseRange[1]-noiseRange[0]);
             var s = Math.sin(n*Math.PI*2);
 
-            v += this.noiseAmplitude * s;
+            density += this.noiseAmplitude * s;
         }
     }
 
-    return v;
+    return density;
 }
 
 ClusterOfGauss.prototype.copy = function()
@@ -219,17 +234,21 @@ ClusterOfGauss.prototype.copy = function()
     c.negative = this.negative;
     c.noisePerturb = this.noisePerturb;
     c.noiseRingSize = this.noiseRingSize;
-
+    c.noiseEnabled = this.noiseEnabled;
+    c.densityEnabled = this.densityEnabled;
+    c.cX = this.cX;
+    c.cY = this.cY;
     return c;
 }
 
 ClusterOfGauss.prototype.perturb = function()
 {
-    if (this.noiseRange)
+    if ( this.noiseEnabled)
     {
         this.noiseRange[0] += this.noisePerturb * .95;
         this.noiseRange[1] += this.noisePerturb * .95;
     }
+
 }
 
 ClusterOfGauss.prototype.createNoise = function()
@@ -250,6 +269,8 @@ ClusterOfGauss.prototype.createNoise = function()
     this.noiseAmplitude = sign * this.valueRange[1] * .0665;
     this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
     this.noiseRingSize = noiseRingSize;
+    this.noiseEnabled = true;
+    this._noise = "noise";
 }
 
 function GaussMixWithNoise(w, h, svg)
@@ -320,7 +341,6 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
         this.models.push(g);
     }
     */
-    this.models.push(cluster);
 
     /*
     // gabor patch
@@ -340,6 +360,7 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude)
     }
     */
 
+    this.models.push(cluster);
     this.clusters.push(cluster);
     return cluster;
 
@@ -410,7 +431,13 @@ GaussMixWithNoise.prototype.init = function()
             }
             else if (hasNoise[i])
             {
-                cluster.createNoise();
+                // create a new noise cluster
+                var noise = cluster.copy();
+                noise.createNoise();
+                noise.disableDensity();
+
+                this.models.push(noise);
+                //cluster.createNoise();
             }
         }
         if (!restart) {
@@ -437,40 +464,5 @@ GaussMixWithNoise.prototype.copyTo = function(newModel, dontUpdate)
         newModel.h = this.h;
     }
 
-    // copy copy clusters
-    /*
-    newModel.clusters = [];
-    for (var i=0, clusters=this.clusters; i<clusters.length; i++)
-    {
-        var c=clusters[i];
-        var newC = {
-            x: c.x,
-            y: c.y,
-            members: [],
-            children: [],
-            negative: c.negative;
-        };
-
-        newModel.clusters.push()
-    }
-    */
-
     return GaussMixBivariate.prototype.copyTo.call(this, newModel, dontUpdate);
-
-    /*
-    newModel.models = [];
-    newModel.isCopy = "yes, a copy";
-    for (var i=0; i<this.models.length; i++)
-    {
-        var m = this.models[i];
-        newModel.models.push(
-            new biGauss(m.mX, m.mY, m.sX, m.sY, m.rho, m.scaler)
-        );
-    }
-    if (!dontUpdate) {
-        console.log("updating new model")
-        newModel.updateModel();
-    }
-    return newModel;
-    */
 }
