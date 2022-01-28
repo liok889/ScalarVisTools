@@ -17,8 +17,10 @@
 	<script src="lineup/gauss_w_noise.js"></script>
 	<script src="lineup/scalar_sample.js"></script>
 	<script src="lineup/lineup.js"></script>
+	<script src="lineup/lineup_two.js"></script>
 	<script src="lineup/sim.js"></script>
 	<script src="lineup/lineup_experiment.js"></script>
+	<script src="lineup/lineup_experiment_two.js"></script>
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
@@ -188,7 +190,8 @@
 		var LINEUP_N = 4;
 
 		// one "main" and one decoy model
-		var lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+		var lineupExp = new LineupExperiment(
+			WIDTH, HEIGHT, LINEUP_N,
 			d3.select("#mainModelSVG"),
 			d3.select("#decoyModelSVG")
 		);

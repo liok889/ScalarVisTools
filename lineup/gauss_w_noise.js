@@ -277,9 +277,8 @@ function GaussMixWithNoise(w, h, svg)
     GaussMixBivariate.call(this, w, h, svg);
 }
 
-// chain
-GaussMixWithNoise.prototype = new GaussMixBivariate();
-GaussMixWithNoise.prototype.constructor = GaussMixBivariate;
+// chain with parent class
+GaussMixWithNoise.prototype = Object.create(GaussMixBivariate.prototype);
 
 GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude, clusterList)
 {

@@ -171,13 +171,24 @@ Lineup.prototype.layoutCanvases = function(table)
     if (!table) {
         table = this.table;
     }
-    var randomCanvases = this.canvases.slice();
-    var decoyCanvas = randomCanvases.pop();
+    this.table = table;
+
+    this.randomizeSamples();
+    this.placeLineupInDOM();
+}
+
+Lineup.prototype.randomizeSamples = function()
+{
+    this.randomizedCanvases = this.canvases.slice();
+    var decoyCanvas = this.randomizedCanvases.pop();
 
     // reinsert
-    var insertPos = Math.floor( Math.random() * (randomCanvases.length+1) );
-    randomCanvases.splice(insertPos, 0, decoyCanvas);
+    var insertPos = Math.floor( Math.random() * (this.randomizedCanvases.length+1) );
+    this.randomizedCanvases.splice(insertPos, 0, decoyCanvas);
+}
 
+Lineup.prototype.placeLineupInDOM = function()
+{
     var canvasType = 'canvas';
     if (typeof CANVAS_TYPE === 'string') {
         canvasType = CANVAS_TYPE;
@@ -187,11 +198,10 @@ Lineup.prototype.layoutCanvases = function(table)
     var rows = 2;
     var cols = Math.ceil(this.n/2);
     renderLineup(
-        this.w, this.h, table,
+        this.w, this.h, this.table,
         rows, cols, this.n,
-        randomCanvases, canvasType, this.nullOption
+        this.randomizedCanvases, canvasType, this.nullOption
     );
-    this.table = table;
 }
 
 function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
