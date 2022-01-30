@@ -187,10 +187,10 @@
 		// number of samples per pixel
 		var goodN = 10*WIDTH*HEIGHT;
 		var N=22000;
-		var LINEUP_N = 4;
+		var LINEUP_N = 6;
 
 		// one "main" and one decoy model
-		var lineupExp = new LineupExperiment(
+		var lineupExp = new LineupExperimentTwo(
 			WIDTH, HEIGHT, LINEUP_N,
 			d3.select("#mainModelSVG"),
 			d3.select("#decoyModelSVG")

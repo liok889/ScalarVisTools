@@ -185,6 +185,7 @@ Lineup.prototype.randomizeSamples = function()
     // reinsert
     var insertPos = Math.floor( Math.random() * (this.randomizedCanvases.length+1) );
     this.randomizedCanvases.splice(insertPos, 0, decoyCanvas);
+    this.correctSample = insertPos;
 }
 
 Lineup.prototype.placeLineupInDOM = function()

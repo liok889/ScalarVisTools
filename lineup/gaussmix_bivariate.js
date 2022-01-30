@@ -69,8 +69,7 @@ biGauss.prototype.eval = function(x, y)
     return this.scaler * Math.exp( e ); // * a;
 }
 
-GaussMixBivariate.prototype = new GaussMix();
-GaussMixBivariate.prototype.constructor = GaussMixBivariate;
+GaussMixBivariate.prototype = Object.create(GaussMix.prototype);
 
 GaussMixBivariate.prototype.getPDF = function() {
     return this.pdf;

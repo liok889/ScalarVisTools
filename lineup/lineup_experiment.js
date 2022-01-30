@@ -98,8 +98,8 @@ LineupExperiment.prototype.highlightCorrect = function(show)
 
     var correctID = '#sample' + this.lineup.getCorrectAnswer();
     var td = d3.select(correctID).node().parentNode;
-    if (this.trialHasDecoy) {
-
+    if (this.trialHasDecoy)
+    {
         d3.select(td)
             .style('background-color', show ? '#aaaaaa' : null);
     }
@@ -121,7 +121,7 @@ LineupExperiment.prototype.getComputationTime = function()
 
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDecoy)
 {
-    var SEL_BORDER = "#ff623b"//"solid 4px #fcbd00";
+    var SEL_BORDER = "#ff623b";
 
     // new lineup
     this.trialHasDecoy = noDecoy ? false : true;
@@ -133,44 +133,54 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
     // clear out old selection / answer
     this.answer = null;
-    if (!this.tdSelection) {
-        this.tdSelection = domSelection.selectAll('td')
-    }
 
     var canvasType = 'canvas';
     if (typeof CANVAS_TYPE === 'string') {
         canvasType = CANVAS_TYPE
     }
 
-    if (!this.canvasSelection) {
-        this.canvasSelection = domSelection.selectAll(canvasType)
-    }
-    if (!this.nullSelection) {
-        this.nullSelection = domSelection.selectAll('div.nullOption');
-    }
+    this.tdSelection = domSelection.selectAll('td')
+    this.canvasSelection = domSelection.selectAll(canvasType);
+    this.nullSelection = domSelection.selectAll('div.nullOption');
 
+    // clear earlier selection
     this.tdSelection.style('background-color', null);
 
     // setup callbacks
     (function(lineup, dom, noDecoy, correctAnswer)
     {
-        var canvasType = 'canvas';
-        if (typeof CANVAS_TYPE === 'string') {
-            canvasType = CANVAS_TYPE
-        }
-
-        dom.selectAll(canvasType).on('click', function()
+        lineup.canvasSelection.on('click', function()
         {
-            console.log('click');
-            if (lineup.incorrect) lineup.incorrect();
+            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
+
+            // check if this is the correct answer
+            lineup.answer = '0';
+            console.log('canvasIndex: ' + lineup.canvasIndex + ', correct: ' + correctAnswer);
+
+            if (!Array.isArray(correctAnswer)) {
+                correctAnswer = [correctAnswer];
+            }
+            for (var i=0; i<correctAnswer.length; i++)
+            {
+                if (!noDecoy && correctAnswer[i] == +lineup.canvasIndex)
+                {
+                    lineup.answer = '1';
+                    lineup.answerModel = i;
+                    if (lineup.correct) lineup.correct();
+                    break;
+                }
+            }
+            if (lineup.answer == '0' && lineup.incorrect())
+            {
+                lineup.incorrect()
+            }
+
             if (lineup.canMakeSelection)
             {
                 lineup.tdSelection.style('background-color', null);
                 lineup.nullSelection.style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
-            lineup.answer = "0";
-            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         });
 
         dom.selectAll('div.nullOption').on('click', function()
@@ -184,23 +194,6 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             lineup.canvasIndex = '98';
         });
 
-    })(this, domSelection, noDecoy, this.correctAnswer);
-
-
-    (function(lineup, dom, noDecoy, correctAnswer)
-    {
-        d3.select('#sample' + correctAnswer).on('click', function()
-        {
-            if (lineup.correct) lineup.correct();
-            if (lineup.canMakeSelection)
-            {
-                lineup.tdSelection.style('background-color', null);
-                lineup.nullSelection.style('border', 'solid 1px black');
-                d3.select(this.parentNode).style('background-color', SEL_BORDER);
-            }
-            lineup.answer = noDecoy ? '0' : '1';
-            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
-        })
     })(this, domSelection, noDecoy, this.correctAnswer);
 }
 
