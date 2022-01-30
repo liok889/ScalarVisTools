@@ -223,8 +223,8 @@
 
 			// arm feedbacks
 			lineupExp.setClickFeedback(
-				function() {
-					d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+				function(model) {
+					d3.select("#answer").html('<font color="green"><b>Correct! ' + model + '</b></font>');
 				},
 				function() {
 					d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');

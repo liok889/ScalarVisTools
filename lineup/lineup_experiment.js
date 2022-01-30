@@ -155,7 +155,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
             // check if this is the correct answer
             lineup.answer = '0';
-            console.log('canvasIndex: ' + lineup.canvasIndex + ', correct: ' + correctAnswer);
+            //console.log('canvasIndex: ' + lineup.canvasIndex + ', correct: ' + correctAnswer);
 
             if (!Array.isArray(correctAnswer)) {
                 correctAnswer = [correctAnswer];
@@ -165,8 +165,8 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
                 if (!noDecoy && correctAnswer[i] == +lineup.canvasIndex)
                 {
                     lineup.answer = '1';
-                    lineup.answerModel = i;
-                    if (lineup.correct) lineup.correct();
+                    lineup.answerModel = i+1;
+                    if (lineup.correct) lineup.correct(lineup.answerModel);
                     break;
                 }
             }
@@ -185,7 +185,7 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
         dom.selectAll('div.nullOption').on('click', function()
         {
-            if (noDecoy && lineup.correct) lineup.correct();
+            if (noDecoy && lineup.correct) lineup.correct(0);
             else if (!noDecoy && lineup.incorrect) lineup.incorrect();
 
             lineup.answer = noDecoy ? '1' : '0';
