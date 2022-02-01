@@ -23,14 +23,14 @@ function setRepresentationType(_vis_type)
 			break;
 
 		case 'fieldSmooth':
-			MODEL_TYPE = GaussMixBivariate;
+			MODEL_TYPE = GaussMixWithNoise;
 			SAMPLER_TYPE = ScalarSample;
 			DISCRETE_TYPE = undefined;
 			CANVAS_TYPE = 'canvas';
 			break;
 
 		case 'fieldDiscrete':
-			MODEL_TYPE = GaussMixBiDiscrete;	
+			MODEL_TYPE = GaussMixBiDiscrete;
 			SAMPLER_TYPE = DiscreteSampler;
 			DISCRETE_TYPE = HeatMap;
 			CANVAS_TYPE = 'svg';
@@ -57,7 +57,7 @@ function createLineupElements(table, n, elementType, w, h)
             d3.select(this).selectAll('td').data(d3.range(cols))
                 .enter().append('td').each(function(d, i) {
                     var index = i + rowNum*cols;
-                    if (index < n) 
+                    if (index < n)
                     {
 
                         d3.select(this).append(elementType)
@@ -71,7 +71,7 @@ function createLineupElements(table, n, elementType, w, h)
     table
         .attr('cellspacing', 10)
         .attr('cellpadding', 10);
-        
+
 }
 
 var US_COUNTY_PATHS = 'lineup/maps/us_county_paths.json';
@@ -109,7 +109,7 @@ function qLoadJSON(url, callback)
 var LOAD_ALL_REGARDLESS = false;
 function setBasicMapData(width, height) {
 	loadGlobalMapData({
-		width: width, 
+		width: width,
 		height: height,
 		binSize: HEATMAP_BIN_SIZE
 	});
@@ -117,7 +117,7 @@ function setBasicMapData(width, height) {
 function loadExperimentData(callback)
 {
 	var q = d3.queue();
-	if (LOAD_ALL_REGARDLESS || VIS_TYPE.substr(0,3) == 'map') 
+	if (LOAD_ALL_REGARDLESS || VIS_TYPE.substr(0,3) == 'map')
 	{
 		console.log("load: " + US_COUNTY_PIXEL_MAP);
 		q.defer(qLoadJSON, US_COUNTY_PIXEL_MAP)
@@ -126,12 +126,12 @@ function loadExperimentData(callback)
 		console.log("load: " + US_COUNTY_PATHS);
 		q.defer(qLoadJSON, US_COUNTY_PATHS);
 	}
-		
-	q.awaitAll(function(error, results) 
+
+	q.awaitAll(function(error, results)
 	{
 		var start = new Date();
 
-		if (LOAD_ALL_REGARDLESS || VIS_TYPE == 'mapDiscrete') 
+		if (LOAD_ALL_REGARDLESS || VIS_TYPE == 'mapDiscrete')
 		{
 			var countyPaths = results[1];
 			US_COUNTY_DATA = countyPaths;
@@ -147,7 +147,7 @@ function loadExperimentData(callback)
 			}
 			console.log('map draw time: ' + ((new Date()-start)/1000).toFixed(2) + ' seconds');
 		}
-				
+
 		// load pixel map data
 		var dMapData;
 		if (LOAD_ALL_REGARDLESS || VIS_TYPE.substr(0, 3) == 'map')

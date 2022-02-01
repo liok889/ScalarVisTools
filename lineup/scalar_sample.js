@@ -154,10 +154,14 @@ ScalarSample.prototype.setSamplingFidelity = function(fidelity)
 
 ScalarSample.prototype.sampleModel = function(_fidelity, model)
 {
+    if (!model) {
+        model = this.model;
+    }
+
     if (GPU_SAMPLING)
     {
         // copy pdf over to field
-        var pdf = this.model.getPDF().view;
+        var pdf = model.getPDF().view;
         var field = this.field.view;
         var minP = Number.MAX_VALUE, maxP = Number.MIN_VALUE;
 
@@ -173,8 +177,13 @@ ScalarSample.prototype.sampleModel = function(_fidelity, model)
             }
         }
         var _lenP = 1 / (maxP-minP);
-        for (var i=0, len=field.length; i<len; i++) {
-            field[i] = (field[i] - minP) * _lenP
+        for (var i=0, len=field.length; i<len; i++)
+        {
+            var p = (field[i] - minP) * _lenP;
+            if (model.flipDensity) {
+                p = 1-p;
+            }
+            field[i] = p;
         }
 
         this.field.updated();

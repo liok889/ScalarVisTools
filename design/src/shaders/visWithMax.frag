@@ -6,8 +6,14 @@ uniform float normTerm;
 
 void main()
 {
-	float data = (texture2D(scalarField, oTexCoord).x - minValue) * normTerm;
-
-	vec2 colormapCoord = vec2(data, 0.5);
-	gl_FragColor = texture2D(colormap, colormapCoord);
+	float data = texture2D(scalarField, oTexCoord).x;
+	if (data < -0.5)
+	{
+		gl_FragColor = vec4(1.0);
+	}
+	else
+	{
+		vec2 colormapCoord = vec2((data - minValue) * normTerm, 0.5);
+		gl_FragColor = texture2D(colormap, colormapCoord);
+	}
 }

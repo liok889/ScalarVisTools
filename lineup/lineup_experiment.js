@@ -69,6 +69,7 @@ LineupExperiment.prototype.setClickFeedback = function(correct, incorrect)
 
 LineupExperiment.prototype.randomModel = function()
 {
+    this.decoy.flipDensity = false;
     this.curDistance = null;
     this.main.init();
     this.copyToDecoy();
@@ -155,6 +156,8 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
             // check if this is the correct answer
             lineup.answer = '0';
+            lineup.answerModel = '0';
+
             //console.log('canvasIndex: ' + lineup.canvasIndex + ', correct: ' + correctAnswer);
 
             if (!Array.isArray(correctAnswer)) {
@@ -225,6 +228,12 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
             {
                 console.log("no expectaiton. Converged");
                 converged = true;
+                expectation = 0.0;
+            }
+            else if (expectation < 0)
+            {
+                converged = true;
+                this.decoy.flipDensity = true;
             }
             else
             {
@@ -244,7 +253,6 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
             tolerance *= 2;
         }
     }
-
 
     //console.log("[" + iterations + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;

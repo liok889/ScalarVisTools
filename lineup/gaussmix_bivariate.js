@@ -559,6 +559,8 @@ GaussMixBivariate.prototype.computeCDFs = function()
     if (minDensity < 0)
     {
         var k = -minDensity;
+        minDensity = 0;
+        maxDensity += k;
         cummDensity = 0;
 
         // loop again to shift densities to ensure all positive probabilities
@@ -571,7 +573,7 @@ GaussMixBivariate.prototype.computeCDFs = function()
                 cdf[I] = cummDensity;
             }
         }
-        minDensity = 0;
+
     }
 
     //console.log('normalize PDF');
