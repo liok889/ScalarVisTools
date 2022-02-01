@@ -9,6 +9,7 @@ ALL_SAMPLERS = [];
 
 var CALLBACK_SAMPLE = true;
 
+var SHADER_PATH = '';
 
 var shaderList = [
     {name: 'pdfSample', path: 'design/src/shaders/pdfSample.glsl'},
@@ -40,6 +41,16 @@ function ScalarSample(w, h, canvas, model, colormap)
     // if we're passed a d3 selection, convert to a standard canvas
     if (this.canvas.selectAll) {
         this.canvas = this.canvas.node();
+    }
+
+    // if there's a shader path prefix, add it to all shaders
+    if (SHADER_PATH !== null && SHADER_PATH !== undefined) {
+        for (var i=0; i<shaderList.length; i++)
+        {
+            var shader = shaderList[i];
+            shader.path = SHADER_PATH + shader.path;
+        }
+        SHADER_PATH = null;
     }
 
     if (this.canvas)

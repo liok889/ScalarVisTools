@@ -159,7 +159,7 @@
 	<script>
 
 		var EXPECTED_BLOCK_SEEDS = {
-		    "mapDiscrete": 
+		    "mapDiscrete":
 		    [
 		    	/*
 		        {
@@ -179,7 +179,7 @@
 		            "std": 0.03484861875257573
 		        }
 
-		    
+
 		    ],
 
 		    "mapSmooth":
@@ -214,11 +214,8 @@
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 4;
 
-		shaderList = [
-		    {name: 'vis',		path: '../../design/src/shaders/vis.frag'},
-		    {name: 'vertex',	path: '../../design/src/shaders/vertex.vert'},
-		    {name: 'blur',		path: '../../design/src/shaders/blur.frag'}
-		];
+		// path to shaders
+		SHADER_PATH = "../../";
 
 		var ALL_VIS_TYPES = [
 			'mapSmooth',
@@ -263,7 +260,7 @@
 
 		var BLOCK_SEED = [
 			{ center: 0.030, correlation: 0.07, expectation: 0.110, std: 0.02},
-			
+
 			/*
 			{ center: 0.040, correlation: 0.07, expectation: 0.130, std: 0.04},
 			{ center: 0.050, correlation: 0.07, expectation: 0.160, std: 0.04},
@@ -278,7 +275,7 @@
 			{ center: 0.140, correlation: 0.07, expectation: 0.320, std: 0.05},
 			{ center: 0.165, correlation: 0.07, expectation: 0.340, std: 0.05},
 			*/
-			
+
 		];
 		var trialPerSubblock = 1;
 
@@ -354,7 +351,7 @@
 				setRepresentationType(visType);
 
 				var table = d3.select("#lineupTable");
-				if (lineup) 
+				if (lineup)
 				{
 					// remove old lineup
 					table.selectAll('*').remove();
@@ -374,7 +371,7 @@
 
 				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, table);
 				lineup.enableSelection(true);
-	
+
 				// set feedback
 				lineup.setClickFeedback(showConfirmPrompt, showConfirmPrompt);
 
@@ -406,7 +403,7 @@
 				complete = true;
 				return true;
 			}
-			else 
+			else
 			{
 
 				trialNum = 0;
@@ -439,7 +436,7 @@
 			sendData(undefined, function() {
 				d3.select("#confirm")
 					.html('DONE');
-				if (FINISHED_REDICTED_URL) 
+				if (FINISHED_REDICTED_URL)
 				{
 					window.location.replace(FINISHED_REDICTED_URL);
 				}
@@ -468,7 +465,7 @@
 				// do nothing
 				return true;
 			}
-			else 
+			else
 			{
 				// current block
 				var block = blocks[blockNum];
@@ -484,7 +481,7 @@
 						// display modal
 						var text2;
 						left = (blocks.length-1)-blockNum;
-						
+
 						if (blockNum>1) {
 							d3.select("#modalText1").html("Feel free to take a moment to rest if you prefer.");
 						}
@@ -526,7 +523,7 @@
 				label = Math.floor(.5+100*p) + '% complete';
 				d3.select('#stimulusNum').html(label);
 
-				(function(_block, _trialNum) 
+				(function(_block, _trialNum)
 				{
 					setTimeout(function()
 					{
@@ -552,7 +549,7 @@
 							}
 
 							distance = lineup.modelWithExpectation(subblock.expectation);
-							if (Math.abs(distance-subblock.expectation) > LINEUP_TOLERANCE) 
+							if (Math.abs(distance-subblock.expectation) > LINEUP_TOLERANCE)
 							{
 								console.error("[" + csv.length + "]: exceeded tolerance, e:" + subblock.expectation + ", d: " + distance + ", itr: " + lineup.iterations + ', conv: ' + lineup.converged);
 							}
@@ -621,10 +618,10 @@
 
 		function getCombination(combination, all, randomize)
 		{
-			function resolveIndices(comb) 
+			function resolveIndices(comb)
 			{
 				var indices = [];
-				for (var i=0; i<comb.length; i++) 
+				for (var i=0; i<comb.length; i++)
 				{
 					var index = comb.charCodeAt(i) - 'a'.charCodeAt(0);
 					indices.push(all[index]);
@@ -633,9 +630,9 @@
 			}
 
 			// randomize
-			if (randomize && combination.length > 1) 
+			if (randomize && combination.length > 1)
 			{
-			
+
 				for (var i=0; i<2000; i++)
 				{
 					var r1 = Math.floor(Math.random() * combination.length);
@@ -669,12 +666,12 @@
 					};
 
 					var theSeed = BLOCK_SEED;
-					if (typeof EXPECTED_BLOCK_SEEDS !== 'undefined') 
+					if (typeof EXPECTED_BLOCK_SEEDS !== 'undefined')
 					{
 						var seedType = (block.vis == 'mapDiscrete' || block.vis == 'mapSmooth') ? 'map' : 'field';
 						console.log('seedType: ' + seedType);
 						var seed = EXPECTED_BLOCK_SEEDS[seedType] || EXPECTED_BLOCK_SEEDS[block.vis];
-						if (seed) 
+						if (seed)
 						{
 							console.log("using EXPECTED_BLOCK_SEEDS for " + block.vis);
 							theSeed = seed;
@@ -697,7 +694,7 @@
 						}
 
 						// permutate randomize subblock
-						for (var x=0; x<9000; x++) 
+						for (var x=0; x<9000; x++)
 						{
 							var r1 = Math.floor(Math.random() * block.trialSequence.length);
 							var r2 = Math.floor(Math.random() * block.trialSequence.length);
@@ -709,7 +706,7 @@
 					generatedBlocks.push(block);
 				}
 			}
-			
+
 			blocks = generatedBlocks;
 			trialPerBlock = 0;
 
@@ -741,7 +738,7 @@
 			// trial sequence
 			createTrialSequence();
 
-			
+
 
 			// keyboard events
 			d3.select(document).on('keydown', function()
@@ -765,7 +762,7 @@
 						d3.select("#confirm").style('visibility', 'hidden');
 						flashAnswer();
 					}
-					else 
+					else
 					{
 						console.log("ENTER");
 
@@ -778,14 +775,14 @@
 							engagementCorrect += +lineup.answer;
 							engagementNum++;
 						}
-						else {							
+						else {
 
 							var colormap = b.colormap;
 							var vis = b.vis;
 
 							if (typeof b.trialSequence[trialNum] == 'object')
 							{
-								b = b.trialSequence[trialNum];	
+								b = b.trialSequence[trialNum];
 							}
 
 							/*
@@ -858,17 +855,17 @@
 
 					if (d > LINEUP_TOLERANCE) {
 						console.log("[" + i + "]: gap exceeds limit. expD: " + record.requestedDistance + ", gap: " + Math.abs(record.distance - record.requestedDistance));
-					
+
 					}
-					
+
 					// test and compare against the block seeds
 					var seq = blocks[b].trialSequence;
-					while (seq[t]=='e') 
+					while (seq[t]=='e')
 					{
 						// skip over engagement checks
 						t++;
 					}
-					
+
 					if (seq[t].expectation != record.requestedDistance)
 					{
 						console.log("[" + i + "]: inconsistent, seq: " + seq[t].expectation + ', data: ' + record.requestedDistance);
@@ -876,7 +873,7 @@
 
 					var strMap = "" + record.requestedDistance;
 					var rMap = tMap[strMap];
-					if (!rMap) 
+					if (!rMap)
 					{
 						tMap[strMap] = 1;
 					}
@@ -885,14 +882,14 @@
 						tMap[strMap] = rMap + 1;
 					}
 					record.trialNum = tMap[strMap];
-					
+
 				}
 
 				t++;
-				if (t >= blocks[b].trialSequence.length) 
+				if (t >= blocks[b].trialSequence.length)
 				{
-					b++; 
-					t=0; 
+					b++;
+					t=0;
 					tMap = {};
 				}
 			}
@@ -924,7 +921,7 @@
 			var blockCount = blocks.length;
 
 			checkData();
-			
+
 			var data2send = JSON.stringify(
 			{
 				experimentalData: csv,
@@ -975,15 +972,15 @@
 		function heartbeat()
 		{
 			setTimeout(function() {
-				
+
 				$.post('php/heartbeat.php', {
 					totalComplete: csv.length+1,
 					totalAll: blocks.length * (trialPerBlock + engagementPerBlock)
 				}, function(data, status) {
 					//console.log("heartbeat: " + data + ", status: " + status);
 				});
-				
-				heartbeat();			
+
+				heartbeat();
 			}, 15*1000);
 		}
 
