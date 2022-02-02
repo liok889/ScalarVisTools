@@ -97,17 +97,26 @@ LineupExperiment.prototype.highlightCorrect = function(show)
     this.domSelection.selectAll('td').style('background-color', null);
     d3.select('div.nullOption').style('border', 'solid 1px black');
 
-    var correctID = '#sample' + this.lineup.getCorrectAnswer();
-    var td = d3.select(correctID).node().parentNode;
-    if (this.trialHasDecoy)
+    var correctAnswer = this.lineup.getCorrectAnswer();
+    if (!Array.isArray(correctAnswer))
     {
-        d3.select(td)
-            .style('background-color', show ? '#aaaaaa' : null);
+        correctAnswer = [correctAnswer];
     }
-    else
+
+    for (var i=0; i<correctAnswer.length; i++)
     {
-        d3.select('div.nullOption')
-            .style('border', show ? 'solid 10px #aaaaaa' : 'solid 1px black');
+        var correctID = 'canvas.index' + correctAnswer[i];
+        var td = d3.select(correctID).node().parentNode;
+        if (this.trialHasDecoy)
+        {
+            d3.select(td)
+                .style('background-color', show ? '#aaaaaa' : null);
+        }
+        else
+        {
+            d3.select('div.nullOption')
+                .style('border', show ? 'solid 10px #aaaaaa' : 'solid 1px black');
+        }
     }
     // 00cc66
 }
