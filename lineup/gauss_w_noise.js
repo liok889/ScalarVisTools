@@ -108,6 +108,21 @@ GaborContour.prototype.eval = function(x, y)
     return this.scaler * this.gaborPatch.eval(d, 0) * GABOR_SIGNAL * r;
 }
 
+/* parameters that control noise characteristics */
+/* ============================================= */
+var NOISE_AMP_MULTIPLIER = 1.1;
+
+// how much to expend/contract noise ring by
+var NOISE_PERTURB = 1.75;
+
+var NOISE_THICKNESS = .1;
+
+// complexity of noise shape: 1 is a regular circle; higher is a more complex sinusodial shape
+var NOISE_COMPLEXITY = 1.7;
+
+// number of noise clusters to perturb
+var NOISE_PERTURB_COUNT = 2;
+
 function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
 {
     this.x = x;
@@ -186,6 +201,7 @@ ClusterOfGauss.prototype.disableDensity = function()
 }
 
 
+
 ClusterOfGauss.prototype.eval = function(x, y)
 {
     var v = 0, density = 0, noise = 0;
@@ -205,8 +221,8 @@ ClusterOfGauss.prototype.eval = function(x, y)
     // add noise?
     if (this.noiseEnabled)
     {
-        var angle = Math.atan2(y-this.cY, x-this.cX)
-        var sine = Math.cos(angle*1.2) * this.noiseRingSize;
+        var angle = Math.atan2(y-this.cY, x-this.cX) * NOISE_COMPLEXITY;
+        var sine = Math.cos(angle) * this.noiseRingSize;
         var noiseRange = [this.noiseRange[0]+sine, this.noiseRange[1]+sine];
 
         if (v >= noiseRange[0] && v <= noiseRange[1])
@@ -259,12 +275,19 @@ ClusterOfGauss.prototype.copy = function()
 
 ClusterOfGauss.prototype.perturbNoise = function()
 {
-    if (!this.originalNoiseRange) {
-        this.originalNoiseRange = this.noiseRange.slice();
+    if (this.dontPerturbNoise) {
+        return;
     }
+    else {
 
-    this.noiseRange[0] = this.originalNoiseRange[0] + this.noisePerturb*2 ;
-    this.noiseRange[1] = this.originalNoiseRange[1] + this.noisePerturb*2 ;
+        if (!this.originalNoiseRange) {
+            this.originalNoiseRange = this.noiseRange.slice();
+        }
+
+        var perturbExtent = NOISE_PERTURB;
+        this.noiseRange[0] = this.originalNoiseRange[0] + this.noisePerturb * perturbExtent;
+        this.noiseRange[1] = this.originalNoiseRange[1] + this.noisePerturb * perturbExtent;
+    }
 }
 
 ClusterOfGauss.prototype.perturbDensity = function()
@@ -300,13 +323,13 @@ ClusterOfGauss.prototype.createNoise = function()
     var noiseContour = .7 * valRange;   // old: valRange
 
     // thickness of the contour
-    var noiseRingSize = valRange * .1;
+    var noiseRingSize = valRange * NOISE_THICKNESS;
     this.noiseRingSize = noiseRingSize;
 
     var sign = this.negative ? -1.0 : 1.0;
     this.noiseRange = [noiseContour - sign * noiseRingSize, noiseContour + sign * noiseRingSize];
 
-    this.noiseAmplitude = sign * this.valueRange[1] * .0665;
+    this.noiseAmplitude = sign * this.valueRange[1] * .0665 * NOISE_AMP_MULTIPLIER;
     this.noisePerturb = noiseRingSize * (Math.random()<.5 ? -1 : 1);
     this.noiseEnabled = true;
 }
@@ -316,22 +339,31 @@ function GaussMixWithNoise(w, h, svg)
     GaussMixBivariate.call(this, w, h, svg);
 }
 
+// which model to perturb (1 for gaussian density, 2 for noise)
+var DEFAULT_PERTURB_MODEL = 1;
+
 // chain with parent class
 GaussMixWithNoise.prototype = Object.create(GaussMixBivariate.prototype);
 
-GaussMixWithNoise.prototype.randomPerturb = function(number)
+GaussMixWithNoise.prototype.randomPerturb = function(modelNumber)
 {
     var models = this.models;
+    if (!modelNumber) {
+        modelNumber = DEFAULT_PERTURB_MODEL;
+    }
+
     for (var i=0, len=models.length; i<len; i++)
     {
         var m = models[i];
-        if (number == 1 && m.densityEnabled)
+        if (modelNumber == 1 && m.densityEnabled)
         {
             m.perturbDensity();
         }
-        else if (number == 2 && m.noiseEnabled)
+        else if (modelNumber == 2 && m.noiseEnabled)
         {
-            m.perturbNoise();
+            if (i<NOISE_PERTURB_COUNT) {
+                m.perturbNoise();
+            }
         }
     }
     this.updateModel();
@@ -418,6 +450,7 @@ GaussMixWithNoise.prototype.addCluster = function(_clusterSize, amplitude, clust
 
 }
 
+
 GaussMixWithNoise.prototype.init = function()
 {
     // large clusters: low frequency / high-amplitude
@@ -425,7 +458,8 @@ GaussMixWithNoise.prototype.init = function()
     var MAX_CLUSTERS = 6;
 
     // how many of the clusters have noise?
-    var NOISE_RATIO = 2/3;
+    var NOISE_RATIO = 1/2;
+
 
     var CLUSTER_SIZE = 0.4;   // 40% of min(width,height)
     var SMALL_CLUSTER_SIZE = 0.05;
@@ -452,7 +486,8 @@ GaussMixWithNoise.prototype.init = function()
         }
 
         // permute noise list
-        for (var i=0; i<50; i++) {
+        for (var i=0; i<50; i++)
+        {
             var r=Math.floor(Math.random() * clusterCount);
             var s=Math.floor(Math.random() * clusterCount);
             if (r!=s) {
@@ -496,6 +531,12 @@ GaussMixWithNoise.prototype.init = function()
                 // addd noise and disable
                 noise.createNoise();
                 noise.disableDensity();
+
+                /*
+                if (noiseClusters.length > NOISE_PERTURB_COUNT) {
+                    noiseClusters.dontPerturbNoise = true;
+                }
+                */
 
                 this.models.push(noise);
             }

@@ -249,15 +249,17 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'edf';
+		var COLOR_COMBINATION = 'e';
 		var VIS_COMBINATION = 'd';
 
 		var RANDOMIZE_COLOR = true;
 		var RANDOMIZE_VIS = true;
 
 		var BLOCK_SEED = [
-			{ center: 0.14, correlation: 0.07, /*expectation: 0.110, std: 0.02*/},
-
+			//{ center: 0.14, correlation: 0.07, /*expectation: 0.110, std: 0.02*/},
+			{center: 0, correlation: 0, noisePerturbCount: 1, perturbModel: 2},
+			{center: 0, correlation: 0, noisePerturbCount: 2, perturbModel: 2},
+			{center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2}
 			/*
 			{ center: 0.040, correlation: 0.07, expectation: 0.130, std: 0.04},
 			{ center: 0.050, correlation: 0.07, expectation: 0.160, std: 0.04},
@@ -274,7 +276,7 @@
 			*/
 
 		];
-		var trialPerSubblock = 1;
+		var trialPerSubblock = 2;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -301,7 +303,8 @@
 		var ENGAGEMENT = {
 			center: 0.24,
 			correlation: 0.08,
-			expectation: null //[0.34, 0.6]
+			expectation: -1, //[0.34, 0.6]
+			perturbModel: 1
 		}
 
 		// experiment stats
@@ -324,6 +327,42 @@
 		var DATA_URL = 'php/experimental_data_w_backup.php';
 
 		var CUR_VIS_TYPE = null;
+
+		function updateModelGenParams(params)
+		{
+			if (params.center !== undefined)
+				M_PERTURB = params.center;
+
+			if (params.correlation !== undefined)
+				R_PERTURB = params.correlation;
+
+			if (params.noisePerturbCount !== undefined)
+				NOISE_PERTURB_COUNT = params.noisePerturbCount;
+
+			if (params.noisePerturb !== undefined)
+				NOISE_PERTURB = params.noisePerturb;
+
+			if (params.perturbModel !== undefined)
+				DEFAULT_PERTURB_MODEL = params.perturbModel;
+
+		}
+		function copyModelGenParams(params, _obj)
+		{
+			var obj = {};
+			if (_obj) {
+				obj = _obj
+			};
+
+			obj.center = params.center;
+			obj.correlation = params.correlation;
+			obj.noisePerturbCount = params.noisePerturbCount;
+			obj.noisePerturb = params.noisePerturb;
+			obj.perturbModel = params.perturbModel;
+
+			return obj;
+
+		}
+
 		function changeVisType(visType, callback)
 		{
 			if (visType == CUR_VIS_TYPE) {
@@ -366,7 +405,7 @@
 					})
 				}
 
-				lineup = new LineupExperimentTwo(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
+				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
 				lineup.enableSelection(true);
 
 				// set feedback
@@ -406,8 +445,8 @@
 				trialNum = 0;
 				var block = blocks[blockNum];
 
-				M_PERTURB = block.center;
-				R_PERTURB = block.correlation;
+				// change model generation parameters
+				updateModelGenParams(block);
 
 				// see if the vis is changeing
 				// note: for first time, this will instantiate lineup
@@ -527,15 +566,15 @@
 						if (_block.trialSequence[_trialNum] == 'e')
 						{
 							//console.log("engagement check");
-							M_PERTURB = ENGAGEMENT.center;
-							R_PERTURB = ENGAGEMENT.correlation;
+							//M_PERTURB = ENGAGEMENT.center;
+							//R_PERTURB = ENGAGEMENT.correlation;
+							updateModelGenParams(ENGAGEMENT);
 							lineup.modelWithExpectation(ENGAGEMENT.expectation);
 						}
 						else if ( typeof block.trialSequence[_trialNum] === "object" )
 						{
 							var subblock = block.trialSequence[_trialNum]
-							M_PERTURB = subblock.center;
-							R_PERTURB = subblock.correlation;
+							updateModelGenParams(subblock);
 
 							// if standard deviation included, use it to set tolerance
 							if (subblock.std) {
@@ -557,8 +596,7 @@
 						}
 						else
 						{
-							M_PERTURB = _block.center;
-							R_PERTURB = _block.correlation;
+							updateModelGenParams(_block);
 							distance = lineup.modelWithExpectation(_block.expectation);
 						}
 
@@ -685,6 +723,9 @@
 								correlation: seed.correlation,
 								std: seed.std,
 								expectation: seed.expectation,
+								perturbModel: seed.perturbModel,
+								noisePerturb: seed.noisePerturb,
+								noisePerturbCount: seed.noisePerturbCount,
 								trial: t+1,
 							};
 							block.trialSequence.push(subblock);
@@ -793,7 +834,7 @@
 							}
 
 							var stimNum = csv.length+1
-							csv.push({
+							var record = {
 								blockNum: blockNum+1,
 								trialNum: b.trial,//trialNum+1 - engagementNum,
 								stimulusNum: stimNum,
@@ -808,10 +849,14 @@
 								converged: lineup.converged,
 								iterations: lineup.iterations,
 								responseTime: Date.now()-stimulusReady,
-								center: b.center,
-								correlation: b.correlation,
+								//center: b.center,
+								//correlation: b.correlation,
 								expdistance: lineup.getCurExpectation()
-							});
+							};
+
+							copyModelGenParams(b, record);
+
+							csv.push(record);
 							stimulusCorrect += +lineup.answer;
 							lineup.answer = null;
 
@@ -914,14 +959,14 @@
 			setTimeout(flashTimeout, FLASH_RATE);
 		}
 
+		var THEDATA = null;
 		function sendData(TRIALS, callback)
 		{
 			var blockCount = blocks.length;
 
 			//checkData();
 
-			var data2send = JSON.stringify(
-			{
+			THEDATA = {
 				experimentalData: csv,
 				engagementCorrect: engagementCorrect,
 				engagementTotal: engagementPerBlock * blockCount,
@@ -930,7 +975,8 @@
 				stimulusCorrect: stimulusCorrect,
 				stimulusTotal: blockCount * trialPerBlock,
 				stimulusAccuracy: stimulusCorrect / (blockCount * trialPerBlock)
-			});
+			}
+			var data2send = JSON.stringify(THEDATA);
 
 			console.log("data2send size: " + data2send.length);
 
