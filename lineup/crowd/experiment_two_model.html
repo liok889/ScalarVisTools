@@ -214,7 +214,7 @@
 		var WIDTH=200;
 		var HEIGHT=200;
 		var TRAINING = false;
-		var FINISHED_REDICTED_URL = 'strategy.html';
+		var FINISHED_REDICTED_URL = null; //'strategy.html';
 
 		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
@@ -276,7 +276,7 @@
 			*/
 
 		];
-		var trialPerSubblock = 10;
+		var trialPerSubblock = 2;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -727,6 +727,7 @@
 						{
 							var subblock = {
 								trial: t+1,
+								seed: i,
 							};
 							copyModelGenParams(seed, subblock);
 							block.trialSequence.push(subblock);
@@ -740,6 +741,17 @@
 							var t = block.trialSequence[r2];
 							block.trialSequence[r2] = block.trialSequence[r1];
 							block.trialSequence[r1] = t;
+						}
+
+						// fix trialSequence order
+						var trialMap = {};
+						for (var j=0; j<block.trialSequence.length; j++)
+						{
+							subblock = block.trialSequence[j];
+							if (!trialMap[subblock.seed]) {
+								trialMap[subblock.seed] = 0;
+							}
+							subblock.trial = ++trialMap[subblock.seed];
 						}
 					}
 					generatedBlocks.push(block);
