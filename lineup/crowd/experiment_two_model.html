@@ -834,7 +834,7 @@
 							var stimNum = csv.length+1
 							var record = {
 								blockNum: blockNum+1,
-								trialNum: b.trial,//trialNum+1 - engagementNum,
+								trialNum: b.trial,
 								stimulusNum: stimNum,
 								vis: vis,
 								colormap: colormap,
@@ -847,15 +847,20 @@
 								converged: lineup.converged,
 								iterations: lineup.iterations,
 								responseTime: Date.now()-stimulusReady,
-								//center: b.center,
-								//correlation: b.correlation,
+
 								expdistance: lineup.getCurExpectation(),
+
+								// noise parameters
 								noiseAmplitude: NOISE_AMP_MULTIPLIER,
-								noisePerturb: NOISE_PERTURB
+								noisePerturb: NOISE_PERTURB,
+								noisePerturbCount: NOISE_PERTURB_COUNT,
+
+								center: b.center,
+								correlation: b.correlation,
 
 							};
 
-							copyModelGenParams(b, record);
+							//copyModelGenParams(b, record);
 
 							csv.push(record);
 							stimulusCorrect += +lineup.answer;
