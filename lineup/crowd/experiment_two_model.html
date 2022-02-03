@@ -355,6 +355,10 @@
 
 			obj.center = params.center;
 			obj.correlation = params.correlation;
+			obj.std = params.std;
+			obj.expectation = params.expectation;
+
+			obj.noiseAmplitude = params.noiseAmplitude;
 			obj.noisePerturbCount = params.noisePerturbCount;
 			obj.noisePerturb = params.noisePerturb;
 			obj.perturbModel = params.perturbModel;
@@ -719,15 +723,9 @@
 						for (var t=0; t<trialPerSubblock; t++)
 						{
 							var subblock = {
-								center: seed.center,
-								correlation: seed.correlation,
-								std: seed.std,
-								expectation: seed.expectation,
-								perturbModel: seed.perturbModel,
-								noisePerturb: seed.noisePerturb,
-								noisePerturbCount: seed.noisePerturbCount,
 								trial: t+1,
 							};
+							copyModelGenParams(seed, subblock);
 							block.trialSequence.push(subblock);
 						}
 
@@ -851,7 +849,10 @@
 								responseTime: Date.now()-stimulusReady,
 								//center: b.center,
 								//correlation: b.correlation,
-								expdistance: lineup.getCurExpectation()
+								expdistance: lineup.getCurExpectation(),
+								noiseAmplitude: NOISE_AMP_MULTIPLIER,
+								noisePerturb: NOISE_PERTURB
+
 							};
 
 							copyModelGenParams(b, record);
