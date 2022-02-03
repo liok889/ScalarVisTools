@@ -214,7 +214,7 @@
 		var WIDTH=200;
 		var HEIGHT=200;
 		var TRAINING = false;
-		var FINISHED_REDICTED_URL = null;	// 'strategy.html'
+		var FINISHED_REDICTED_URL = 'strategy.html';
 
 		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
@@ -266,9 +266,9 @@
 			{ center: 0.060, correlation: 0.07, expectation: 0.190, std: 0.04},
 			{ center: 0.070, correlation: 0.07, expectation: 0.210, std: 0.04},
 			{ center: 0.080, correlation: 0.07, expectation: 0.230, std: 0.04},
-			//{ center: 0.090, correlation: 0.07, expectation: 0.240, std: 0.04},
+			{ center: 0.090, correlation: 0.07, expectation: 0.240, std: 0.04},
 			{ center: 0.100, correlation: 0.07, expectation: 0.260, std: 0.04},
-			//{ center: 0.110, correlation: 0.07, expectation: 0.270, std: 0.04},
+			{ center: 0.110, correlation: 0.07, expectation: 0.270, std: 0.04},
 			{ center: 0.120, correlation: 0.07, expectation: 0.285, std: 0.05},
 			{ center: 0.130, correlation: 0.07, expectation: 0.300, std: 0.05},
 			{ center: 0.140, correlation: 0.07, expectation: 0.320, std: 0.05},
@@ -276,7 +276,7 @@
 			*/
 
 		];
-		var trialPerSubblock = 2;
+		var trialPerSubblock = 10;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -1047,6 +1047,7 @@
 		});
 		*/
 		initExperiment();
+		heartbeat();
 
 	</script>
 </body>
