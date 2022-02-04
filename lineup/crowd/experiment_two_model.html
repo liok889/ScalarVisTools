@@ -736,7 +736,7 @@
 						{
 							var subblock = {
 								trial: t+1,
-								seed: i,
+								subblock: i,
 							};
 							copyModelGenParams(seed, subblock);
 							block.trialSequence.push(subblock);
@@ -757,10 +757,10 @@
 						for (var j=0; j<block.trialSequence.length; j++)
 						{
 							subblock = block.trialSequence[j];
-							if (!trialMap[subblock.seed]) {
-								trialMap[subblock.seed] = 0;
+							if (!trialMap[subblock.subblock]) {
+								trialMap[subblock.subblock] = 0;
 							}
-							subblock.trial = ++trialMap[subblock.seed];
+							subblock.trial = ++trialMap[subblock.subblock];
 						}
 					}
 					generatedBlocks.push(block);
