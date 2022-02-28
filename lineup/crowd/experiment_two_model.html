@@ -236,9 +236,10 @@
 			'purples',
 			'reds',
 
-			'redpurple',
-			'viridis',
-			'plasma',
+                        'blueorange',
+                        'viridis',
+                        'plasma',
+                        'rainbowjet',
 
 			'coolwarm',
 			'greyred',
@@ -249,14 +250,13 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'ee';
+		var COLOR_COMBINATION = 'defg';
 		var VIS_COMBINATION = 'd';
 
 		var RANDOMIZE_COLOR = true;
 		var RANDOMIZE_VIS = true;
 
 		var BLOCK_SEED = [
-			//{ center: 0.14, correlation: 0.07, /*expectation: 0.110, std: 0.02*/},
 
 			/*
 			{center: 0, correlation: 0, noisePerturbCount: 1, perturbModel: 2, noisePerturb: 1.6},
@@ -272,35 +272,10 @@
             {center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noisePerturb: 1.9},
 			*/
 
-			{center: .8*1, correlation: 0, perturbModel: 1},
-			{center: .9*1, correlation: 0, perturbModel: 1},
-			{center: .10*1, correlation: 0, perturbModel: 1},
-
-			{center: .11*1, correlation: 0, perturbModel: 1},
-			{center: .12*1, correlation: 0, perturbModel: 1},
-			{center: .13*1, correlation: 0, perturbModel: 1},
-
-			{center: .14*1, correlation: 0, perturbModel: 1},
-			{center: .15*1, correlation: 0, perturbModel: 1},
-			{center: .17*1, correlation: 0, perturbModel: 1},
-
-			/*
-			{ center: 0.040, correlation: 0.07, expectation: 0.130, std: 0.04},
-			{ center: 0.050, correlation: 0.07, expectation: 0.160, std: 0.04},
-			{ center: 0.060, correlation: 0.07, expectation: 0.190, std: 0.04},
-			{ center: 0.070, correlation: 0.07, expectation: 0.210, std: 0.04},
-			{ center: 0.080, correlation: 0.07, expectation: 0.230, std: 0.04},
-			{ center: 0.090, correlation: 0.07, expectation: 0.240, std: 0.04},
-			{ center: 0.100, correlation: 0.07, expectation: 0.260, std: 0.04},
-			{ center: 0.110, correlation: 0.07, expectation: 0.270, std: 0.04},
-			{ center: 0.120, correlation: 0.07, expectation: 0.285, std: 0.05},
-			{ center: 0.130, correlation: 0.07, expectation: 0.300, std: 0.05},
-			{ center: 0.140, correlation: 0.07, expectation: 0.320, std: 0.05},
-			{ center: 0.165, correlation: 0.07, expectation: 0.340, std: 0.05},
-			*/
+			{center: 0.098716, correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: null},
 
 		];
-		var trialPerSubblock = 2;
+		var trialPerSubblock = 9;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -318,7 +293,7 @@
 		// experiment structure
 		// =====================
 		var trialPerBlock = 5;
-		var engagementPerBlock = 3;
+		var engagementPerBlock = 2;
 
 		// preset blocks
 		var blocks = null;
@@ -436,7 +411,7 @@
 					})
 				}
 
-				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
+				lineup = new LineupExperimentTwo(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
 				lineup.enableSelection(true);
 
 				// set feedback
