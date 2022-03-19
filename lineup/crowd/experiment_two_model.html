@@ -252,7 +252,7 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'defg';
+		var COLOR_COMBINATION = 'ddff';
 		var VIS_COMBINATION = 'd';
 
 		var RANDOMIZE_COLOR = true;
@@ -274,10 +274,12 @@
             {center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noisePerturb: 1.9},
 			*/
 
-			{center: 0.098716, correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: null},
+			//{center: 0.098716, correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: null},
+			{center: 0.098716, correlation: 0, noisePerturbCount: 0, noisePerturb: 0, perturbModel: 1},
+			{center: 0       , correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: 2},
 
 		];
-		var trialPerSubblock = 9;
+		var trialPerSubblock = 4;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -413,7 +415,7 @@
 					})
 				}
 
-				lineup = new LineupExperimentTwo(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
+				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
 				lineup.enableSelection(true);
 
 				// set feedback
