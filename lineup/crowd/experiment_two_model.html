@@ -30,6 +30,7 @@
 	<script src="../lineup_experiment_two.js"></script>
 
 	<script src="../utils.js"></script>
+	<script src="colormap_toggle.js"></script>
 	<!--<script src="block_seeds.js"></script>-->
 
 	<style>
@@ -219,6 +220,7 @@
 		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 6;
+		var ENABLE_COLOR_TOGGLE = true;
 
 		// path to shaders
 		SHADER_PATH = "../../";
@@ -542,6 +544,9 @@
 						d3.select("#modalText2").html(text2);
 						setModalCallback(function() {
 							stimulusReady = Date.now();
+							if (ENABLE_COLOR_TOGGLE) {
+								resetColormapToggle(true);
+							}
 						});
 						displayModal();
 					}
@@ -613,6 +618,10 @@
 						// force a min of 250 ms delay to clear out participants' iconic memory
 						setTimeout(function()
 						{
+							if (ENABLE_COLOR_TOGGLE) {
+								resetColormapToggle();
+							}
+
 							// show lineup
 							d3.select("#lineupTable").style('visibility', null);
 
@@ -782,13 +791,10 @@
 			d3.select("#confirm").style('visibility', null);
 		}
 
-
 		function initExperiment()
 		{
 			// trial sequence
 			createTrialSequence();
-
-
 
 			// keyboard events
 			d3.select(document).on('keydown', function()
@@ -873,6 +879,16 @@
 								correlation: b.correlation,
 
 							};
+
+							if (ENABLE_COLOR_TOGGLE)
+							{
+								accumLastColormapTime();
+								record.initialColormap = INITIAL_COLORMAP_I + 1
+								record.finalColormap = CURRENT_COLORMAP_I + 1;
+								record.colormap1Time = COLORMAP_TIME[0];
+								record.colormap2Time = COLORMAP_TIME[1];
+								record.colormapSwitch = COLORMAP_SWITCH_COUNT;
+							}
 
 							//copyModelGenParams(b, record);
 

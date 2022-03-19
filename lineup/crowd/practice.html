@@ -30,6 +30,8 @@
 	<script src="../lineup_experiment_two.js"></script>
 
 	<script src="../utils.js"></script>
+	<script src="colormap_toggle.js"></script>
+
 	<!--<script src="block_seeds.js"></script>-->
 
 	<style>
@@ -219,6 +221,7 @@
 		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 6;
+		var ENABLE_COLOR_TOGGLE = true;
 
 		// path to shaders
 		SHADER_PATH = "../../";
@@ -261,7 +264,7 @@
 			{center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noiseAmplitude: 1.2},
 			{center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noiseAmplitude: 1.5},
 			{center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noiseAmplitude: 1.8},
-			
+
 			{center: .09, correlation: 0, perturbModel: 1},
                         {center: .12, correlation: 0, perturbModel: 1},
                         {center: .17, correlation: 0, perturbModel: 1},
@@ -555,6 +558,10 @@
 						d3.select("#modalText2").html(text2);
 						setModalCallback(function() {
 							stimulusReady = Date.now();
+							if (ENABLE_COLOR_TOGGLE) {
+								resetColormapToggle(true);
+							}
+
 						});
 						if (!TRAINING) displayModal();
 					}
@@ -626,6 +633,10 @@
 						// force a min of 250 ms delay to clear out participants' iconic memory
 						setTimeout(function()
 						{
+							if (ENABLE_COLOR_TOGGLE) {
+								resetColormapToggle();
+							}
+							
 							// show lineup
 							d3.select("#lineupTable").style('visibility', null);
 

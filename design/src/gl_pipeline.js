@@ -157,7 +157,11 @@ GLPipeline.prototype.run = function()
 					uniform.value = value;
 				}
 				else if (uniformID == 'randomSeed') {
-					uniform.value = Math.random();
+					if (uniform.value < 0) {
+						// Could also change everytime, although not necesserily
+						// since the strcuture of the field is changing anyway
+						uniform.value = Math.random();
+					}
 				}
 			}
 
