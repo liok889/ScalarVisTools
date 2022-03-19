@@ -7,6 +7,27 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 {
 	(function(_path, _name, _object, _callback)
 	{
+		// see if shader code is available inline
+		var inline = false;
+		if (d3) {
+			var idtag = "#shader_" + _name;
+			var inlineCode = d3.select(idtag);
+			if (inlineCode.size() > 0)
+			{
+				console.log("loading shader " + _name + " from inline code.")
+				_object.shaders[_name] = inlineCode.html();
+				if (_callback) {
+					setTimeout(_callback, 50, null);
+				}
+				inline = true;
+			}
+
+		}
+
+		if (inline) {
+			return;
+		} else { console.log('noinline code for ' + _name);}
+
 		d3.text(_path).then(function(text, error)
 		{
 			if (error) {
@@ -17,7 +38,7 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 				if (_callback) _callback(null);
 
 			}
-		})
+		});
 	})(shaderPath, shaderName, object, callback);
 }
 
