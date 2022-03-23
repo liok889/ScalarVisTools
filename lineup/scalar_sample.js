@@ -152,7 +152,7 @@ ScalarSample.prototype.setSamplingFidelity = function(fidelity)
     this.localN = fidelity;
 }
 
-ScalarSample.prototype.sampleModel = function(_fidelity, model)
+ScalarSample.prototype.sampleModel = function(_fidelity, model, invert)
 {
     if (!model) {
         model = this.model;
@@ -184,6 +184,9 @@ ScalarSample.prototype.sampleModel = function(_fidelity, model)
                 p = 1-p;
             }
             field[i] = p;
+        }
+        if (invert) {
+            this.field.invert();
         }
 
         this.field.updated();

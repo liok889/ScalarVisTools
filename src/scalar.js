@@ -585,6 +585,42 @@ ScalarField.prototype.normalize = function(__minmax)
 	}
 }
 
+ScalarField.prototype.invert = function()
+{
+	this.normalize();
+	var view = this.view;
+
+	/*
+	for (var i=0; i<view.length; i++) {
+		view[i] = 1-view[i];
+	}
+	*/
+
+	// mirror vertically
+	var bytesPerPixel = this.doublePrecision ? 8 : 4;
+
+	// create a buffer
+	var buffer = new ArrayBuffer(bytesPerPixel * this.w * 1);
+	var tempRow = this.doublePrecision ? new Float64Array(buffer) : new Float32Array(buffer);
+	for (var r=0, rows=Math.floor(this.h/2); r<rows; r++)
+	{
+		var r2 = this.h-1-r;
+		for (var c=0; c<this.w; c++)
+		{
+			tempRow[c] = view[r*this.w+c];
+		}
+
+		for (var c=0; c<this.w; c++)
+		{
+			var c2 = this.w-1-c;
+
+			view[r*this.w+c2] = view[r2*this.w+c];
+			view[r2*this.w+c] = tempRow[c2];
+		}
+	}
+	this.updated();
+}
+
 ScalarField.prototype.normalizeToPercentile = function(upperPercentile)
 {
 	var view = this.view;

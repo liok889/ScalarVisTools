@@ -216,6 +216,41 @@
 		}
 		setSamplers();
 
+		var canvases = [], I;
+		function invertFields()
+		{
+			var samplers = lineupExp.lineup.samplers;
+			for (var i=0; i<samplers.length; i++) {
+				samplers[i].sampleModel(null, null, true);
+				samplers[i].vis();
+			}
+
+			// scramble canvases
+			var canvasSelection = d3.select("#lineupTable").selectAll('canvas');
+			canvases = [];
+			canvasSelection.each(function(d) {
+				canvases.push(d3.select(this).node())
+			})
+			canvasSelection.remove();
+
+			for (var i=0; i<1000; i++) {
+				var c1 = Math.floor(Math.random()*canvases.length);
+				var c2 = Math.floor(Math.random()*canvases.length);
+				if (c1 != c2) {
+					var t = canvases[c1];
+					canvases[c1] = canvases[c2];
+					canvases[c2] = t;
+				}
+			}
+
+			I = 0;
+			d3.select('#lineupTable').selectAll('td').each(function(d) {
+				d3.select(this).node().appendChild(canvases[I++]);
+			});
+
+
+		}
+
 		function randomLineup()
 		{
 			var start = Date.now();
