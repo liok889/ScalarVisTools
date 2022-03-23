@@ -113,7 +113,7 @@ GaborContour.prototype.eval = function(x, y)
 var NOISE_AMP_MULTIPLIER = 1.1;
 
 // how much to expend/contract noise ring by
-var NOISE_PERTURB = 1.75;
+var NOISE_PERTURB = 1.9;
 
 var NOISE_THICKNESS = .1;
 
@@ -121,7 +121,7 @@ var NOISE_THICKNESS = .1;
 var NOISE_COMPLEXITY = 1.7;
 
 // number of noise clusters to perturb
-var NOISE_PERTURB_COUNT = 2;
+var NOISE_PERTURB_COUNT = 1;
 
 function ClusterOfGauss(x, y, clusterSize, gaussCount, amplitude)
 {
