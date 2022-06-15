@@ -93,7 +93,7 @@
 
 		<div id="prompt">
 			<p>Progress: <span id="stimulusNum"></span>
-			<p>Click on the image that <b>doesn't belong</b>. Press any key (other than ENTER) to <b>switch colors</b>.
+			<p>Click on the image that <b>doesn't belong</b>. <!--Press any key (other than ENTER) to <b>switch colors</b>.-->
 		</div>
 
 		<img id="imgLoading" src="../../img/loading2.gif" style="position: absolute; top: 220px; left: 350px" />
@@ -220,7 +220,7 @@
 		var SAMPLE_FIDELITY=40000 * 3//14000;
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 6;
-		var ENABLE_COLOR_TOGGLE = true;
+		var ENABLE_COLOR_TOGGLE = false;
 
 		// path to shaders
 		SHADER_PATH = "../../";
@@ -233,6 +233,9 @@
 		];
 
 		var ALL_COLORMAPS = [
+			'cubehelix_1',
+			'cubehelix_15',
+			'cubehelix_25',
 
 			'blues',
 			'purples',
@@ -252,7 +255,7 @@
 			'rainbowcie'
 		];
 
-		var COLOR_COMBINATION = 'ddff';
+		var COLOR_COMBINATION = 'abc';
 		var VIS_COMBINATION = 'd';
 
 		var RANDOMIZE_COLOR = true;
@@ -274,12 +277,15 @@
             {center: 0, correlation: 0, noisePerturbCount: 3, perturbModel: 2, noisePerturb: 1.9},
 			*/
 
-			//{center: 0.098716, correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: null},
+			{center: 0.098716, correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: null},
+			/*
 			{center: 0.098716, correlation: 0, noisePerturbCount: 0, noisePerturb: 0, perturbModel: 1},
 			{center: 0       , correlation: 0, noisePerturbCount: 1, noisePerturb: 1.9, perturbModel: 2},
+			*/
 
 		];
-		var trialPerSubblock = 4;
+		//NOISE_AMP_MULTIPLIER=1.1;
+		var trialPerSubblock = 12;
 
 		// OLD: create lineup experiment
 		// this will be done from within changeVisType()
@@ -415,7 +421,7 @@
 					})
 				}
 
-				lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
+				lineup = new LineupExperimentTwo(WIDTH, HEIGHT, LINEUP_N, null, null, null, null/*table*/);
 				lineup.enableSelection(true);
 
 				// set feedback
