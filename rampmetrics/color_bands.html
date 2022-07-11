@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+	<script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+
+	<!--<script src="../design/lib/d3-color.v1.min.js"></script>-->
+	<script src="../design/lib/d3-interpolate.v1.min.js"></script>
+	<script src="../design/lib/d3-cam02.js"></script>
+
+	<script src="../src/scalar.js"></script>
+	<script src="../design/src/colormap.js"></script>
+	<script src="../design/src/gl_pipeline.js"></script>
+	<script src="../design/src/coloranalysis.js"></script>
+	<script src="../design/src/scalarvis.js"></script>
+	<script src="../jnd/lib/three.min.js"></script>
+	<script src="../src/perlin.js"></script>
+	<script src="../src/noisegen.js"></script>
+
+	<!-- Danielle's color utility scripts -->
+	<script src="c3.js"></script>
+	<script src="palettes.js"></script>
+	<script src="analyzer.js"></script>
+	<script src="utils.js"></script>
+	<script src="cubehelix.js"></script>
+
+	<style>
+		.dendogramLine {
+			fill:  none;
+			stroke: black;
+			stroke-width:  1px;
+			pointer-events: none
+		}
+		body {
+			font-family: Helvetica;
+			font-size:  10px;
+		}
+		.term {
+			font-size: 15px;
+		}
+	</style>
+
+</head>
+<body>
+
+	<div>
+		<svg id="svgDendogram" width="500" height="150" style=""></svg><br>
+		<canvas id="colormapCanvas" width="400" height="50" style=""></canvas><br>
+		<svg id="rampMetrics" width="400" height="50" style="border: solid 1px black"></svg>
+	</div>
+
+	<p><svg width="100" height="100" style="border: solid 1px black">
+		<rect id="colorSample" width="200" height="200"></rect>
+	</svg>
+
+	<p><svg id="bandingStats" width="500" height="500">
+
+	</svg>
+
+
+	<div style="position: absolute; left: 510px; top: 50px">
+		<b>Colorband clustering</b><br>
+		band clustering coef: <span id="labelBandClustering"></span><div id="sliderBandClustering" style="width: 150px"></div><br>
+		band sampling: <span id="labelBandSamples"></span><div id="sliderBandSamples" style="width: 150px"></div><br>
+
+
+
+
+		<b>Cubehelix</b><br>
+		start: <span id="labelStart"></span><div id="sliderStart" style="width: 150px"></div><br>
+		rots:  <span id="labelRots"></span><div id="sliderRots"  style="width: 150px"></div><br>
+		hues:  <span id="labelHues"></span><div id="sliderHues"  style="width: 150px"></div>
+
+	</div>
+
+
+
+
+	<script type="text/javascript">
+		COLOR_PRESETS.jet = COLOR_PRESETS.rainbowjet;
+		COLOR_PRESETS.blue = COLOR_PRESETS.singlehue;
+		COLOR_PRESETS['blue-orange'] = COLOR_PRESETS.blueorange;
+
+		function nameSalience(c) 
+		{
+			var minE = -4.5;
+			var maxE = 0.0;
+
+			var i = index(c);
+			var ent = c3.color.entropy(i);
+
+			return (ent - minE) / (maxE-minE);
+		}
+		function nameDistance(c1, c2) 
+		{
+			var i1 = index(c1);
+			var i2 = index(c2);
+			return 1 - c3.color.cosine(i1, i2);
+		}
+		function labDistance(c1, c2)
+		{
+			var d = Math.pow(c1.l-c2.l, 2) + Math.pow(c1.a-c2.a, 2) + Math.pow(c1.b-c2.b, 2);
+			return Math.sqrt(d);
+		}
+		function jabDistance(c1, c2)
+		{
+			j1 = d3.jab(d3.rgb(c1));
+			j2 = d3.jab(d3.rgb(c2));
+			return Math.sqrt(
+				Math.pow(j1.J-j2.J, 2) +
+				Math.pow(j1.a-j2.a, 2) +
+				Math.pow(j1.b-j2.b, 2)
+			);
+			//return j1.de(j2);
+		}
+
+
+		function termDistribution(c)
+		{
+			var i = index(c);
+			var terms = c3.terms;
+			var dist = [];
+
+			for (var w=0; w<terms.length; w++) 
+			{
+				var name = terms[w];
+				var probability = c3.terms.prob(name, i);
+
+				dist.push({
+					term: terms[w],
+					p: c3.terms.prob(w, i)
+				})
+			}
+			dist.sort(function(a, b) { return b.p-a.p});
+			return dist;
+		}
+
+		function localNameDistances(colors)
+		{
+			var nameDistances = [];
+			for (var i=0; i<colors.length-1; i++) 
+			{
+				var c0 = colors[i];
+				var c1 = colors[i+1];
+
+				var d = nameDistance(c0, c1);
+				nameDistances.push(d)
+			}
+			return nameDistances;
+		}
+
+		function plotRampCurve(data, svg, color, accessor)
+		{
+			var w = +svg.attr('width'), h = +svg.attr('height');
+
+			var m0 = d3.min(data, function(d){return accessor ? accessor(d) : d.y; });
+			var m1 = d3.max(data, function(d){return accessor ? accessor(d) : d.y; });
+
+			var yScale = d3.scaleLinear()
+				.domain([m1, m0]).range([0, h]);
+			var xScale = d3.scaleLinear()
+				.domain([0, 1]).range([0, w]);
+			var lineGenerator = d3.line()
+				.x(function(d) { return xScale(d.x); })
+				.y(function(d) { return yScale(accessor ? accessor(d) : d.y); });
+			
+			return svg.append('path')
+				.attr('fill', 'none')
+				.attr('stroke', color || 'red')
+				.style('stroke-width', '1px')
+				.attr('class', 'rampCurve')
+				.attr('d', lineGenerator(data));
+		}
+
+		function plotCurves(colormap)
+		{
+
+			var samples = colormap.sampleRamp(50);
+			var distances = localNameDistances(samples);	
+			var curves = [];
+			for (var i=0, len = distances.length; i<len; i++)
+			{
+				var padding = 1/(len+1);
+				var x = padding + i/(len+1);
+				var c = d3.lab(colormap.mapValue(x));
+
+				curves.push({
+					x: x,
+					nameDistance: distances[i],
+					luminance: c.l
+				});
+			}
+			plotRampCurve(curves, d3.select("#rampMetrics"), "red", function(d) { return d.nameDistance; });
+			plotRampCurve(curves, d3.select("#rampMetrics"), "black", function(d) { return d.luminance; });
+
+		}
+
+		function findMeanStd(colors) 
+		{
+				var meanJab = d3.jab(0, 0, 0);
+
+				var mean = {
+					l: 0, a: 0, b: 0
+				};
+				var std = 0;
+
+				for (var i=0; i<colors.length; i++) 
+				{
+					var c = colors[i];
+					mean.l += c.l;
+					mean.a += c.a;
+					mean.b += c.b;
+
+					var cJab = d3.jab(c);
+					meanJab.J += cJab.J;
+					meanJab.a += cJab.a;
+					meanJab.b += cJab.b;
+						
+				}
+
+				if (colors.length > 0) 
+				{
+					var k = 1/colors.length;
+					mean.l *= k;
+					mean.a *= k;
+					mean.b *= k;
+
+					meanJab.J *= k;
+					meanJab.a *= k;
+					meanJab.b *= k;
+
+				}
+				mean.L = mean.l;
+
+				for (var i=0; i<colors.length; i++) {
+					var c = colors[i];
+					var d = Math.pow(c.l - mean.l, 2) + Math.pow(c.a - mean.a, 2) + Math.pow(c.b - mean.b, 2);
+					std += d;
+				}
+				if (colors.length > 0) {
+					std *= 1/colors.length;
+				}
+				return {
+					mean: d3.lab(mean.l, mean.a, mean.b), //d3.lab(meanJab.rgb()),
+					std: Math.sqrt(std)
+				};
+		}
+
+		var BAND_SAMPLES = 100;
+		var BAND_CLUSTERING_COEFFICIENT = .55;
+
+		function clusterBands(colormap)
+		{
+			function findMinIndex(arr, start) {
+				var m = arr[start];
+				var i = start;
+				for (j=start+1; j<arr.length; j++) {
+					if (m>arr[j]) {
+						m=arr[j];
+						i=j;
+					}
+				}
+				return i;
+			}
+			
+
+			var maxNameDistance = BAND_CLUSTERING_COEFFICIENT;
+			var SMALL_CLUSTER = Math.floor(.5 + .015 * BAND_SAMPLES);
+
+			var samples = colormap.sampleRamp(BAND_SAMPLES);
+			var distances = localNameDistances(samples);
+			
+			var clusters = [];
+			var clusterID = 0;
+			for (var i=0, len=samples.length; i<samples.length; i++) 
+			{
+				var x = i/(len) + .5*(1/len);
+				clusters.push({
+					x: x,
+					mean: d3.lab(samples[i]),
+					std: 999999,
+					stdErr: 999999,
+					centroid: d3.lab(samples[i]),
+					members: [d3.lab(samples[i])],
+					level: 0,
+					children: null,
+					id: clusterID++,
+					e: i == 0 ? [0,0] : i==samples.length-1 ? [1,1] : [x, x]
+				});
+			}
+
+			while (clusters.length > 1) 
+			{
+				// find the cluster with the lowest distance
+				var i0, i1, c0, c1, cD;
+				var start = 0;
+
+				var merged = false
+				while (!merged && start < distances.length)
+				{
+
+					i0 = findMinIndex(distances, start);
+					i1 = i0+1;
+
+					// create a new cluster
+					c0 = clusters[i0];
+					c1 = clusters[i1];
+
+					// are clusters mergeable?
+					if (c0 === undefined || c1 === undefined) {
+						console.log("undefined cluster");
+					}
+					var nameD = nameDistance(c0.centroid, c1.centroid);
+
+					// interpolate between starting maxNameDistance and 0
+					var m = Math.max(c0.members.length, c1.members.length) / BAND_SAMPLES;
+					var iNameDistance = m*(-maxNameDistance) + maxNameDistance;
+
+					if (nameD <= maxNameDistance) 
+					{
+						merged = true;
+						cD = nameD;
+					}
+					else 
+					{
+						start = i0+1;
+					}
+				}
+
+				if (!merged) 
+				{
+					// find any small clusters and merge them
+					for (var j=0; j<clusters.length; j++ && !merged) 
+					{
+						if (clusters[j].members.length < SMALL_CLUSTER) 
+						{
+							var prevDistance = (j==0 ? Number.MAX_VALUE : distances[j-1]);
+							if (prevDistance < distances[j] || j==clusters.length-1) 
+							{
+								i0 = j-1;
+								i1 = j;
+
+								c0 = clusters[j-1];
+								c1 = clusters[j];
+								cD = prevDistance;
+							}
+							else
+							{
+								i0 = j;
+								j1 = j+1;
+
+								c0 = clusters[j];
+								c1 = clusters[j+1];
+								cD = distances[j];
+							}
+							merged = true;
+							break;
+						}
+					}
+					if (!merged) {
+						break;
+					}
+				}
+
+				newC = {
+					members: c0.members.splice(0),
+					level: Math.max(c0.level, c1.level)+1,
+					children: [c0, c1],
+					id: clusterID++
+				}
+				c0.parent = newC;
+				c1.parent = newC;
+
+				// c0 absorbs c1
+				for (var j=0; j<c1.members.length; j++) {
+					newC.members.push(c1.members[j]);
+				}
+
+				// geoemtric center in color scale
+				newC.x = (c0.x + c1.x) * 0.5;
+				newC.e = [
+					Math.min(c0.e[0], c1.e[0]),
+					Math.max(c0.e[1], c1.e[1])
+				];
+
+				// compute average color
+				var maxSalience = Number.MIN_VALUE;
+				var maxSalienceI = -1;
+				var mostSalient = null;
+
+				// pick the most salient color as the centroid
+				for (var j=0; j<newC.members.length; j++) 
+				{
+					var c = newC.members[j];
+					var salience = nameSalience(c);
+					if (maxSalience < salience) {
+						maxSalience = salience;
+						maxSalienceI = j;
+						mostSalient = c;
+					}
+				}
+				
+				/*
+				mostSalient = null;
+				for (var j=0, samps=200; j<samps; j++) 
+				{
+					var x = j/(samps-1) * (newC.e[1]-newC.e[0]) + newC.e[0]
+					var c = d3.lab(colormap.mapValue(x));
+					var salience = nameSalience(c);
+					if (!mostSalient || salience >= maxSalience) {
+						mostSalient = c;
+						maxSalience = salience;
+						maxSalienceI = x;
+					}
+
+				}
+				*/
+
+				// compute mean and standard deviation
+				var mean_s = findMeanStd(newC.members);
+				newC.mean = mean_s.mean;
+				/*
+				newC.std = mean_s.std;
+				newC.stdErr = newC.std / Math.sqrt(newC.members.length);
+				*/
+
+				
+				newC.distance = cD;
+
+
+				// centroid is the color with max salience among the members
+				newC.proto = newC.members[maxSalienceI];
+				newC.centroid = mostSalient; //newC.members[maxSalienceI];
+				//newC.centroid = newC.mean;
+				newC.term = termDistribution(newC.centroid)[0];
+
+				// update distances
+				if (i0 >= 1) 
+				{
+					distances[i0-1] = nameDistance(newC.centroid, clusters[i0-1].centroid);
+				}
+				
+				var newD = undefined;
+				if (i1+1 < clusters.length) {
+					newD = nameDistance(newC.centroid, clusters[i1+1].centroid);
+				}
+
+				clusters.splice(i0, 2, newC);
+				if (newD === undefined) {
+					distances.splice(i0, 2);
+				}
+				else {
+					distances.splice(i0, 2, newD);
+				}
+			}
+
+			// add left/right references
+			for (var i=0; i<clusters.length; i++)
+			{
+				var c = clusters[i];
+				if (i > 0) c.left = clusters[i-1];
+				if (i < clusters.length-1) c.right = clusters[i+1];
+			}
+			return clusters;
+		}
+
+		var DENDOGRAM_H = 5;
+		
+
+		function plotBands(bands, svg, width, height)
+		{
+			if (!width) {
+				width = +d3.select('#colormapCanvas').attr('width');
+			}
+			if (!height) {
+				height = +svg.attr('height');
+
+			}
+			for (var b=0; b<bands.length; b++) 
+			{
+				var band = bands[b];
+				var g = svg.append("g")
+					.attr('class', 'dendogramGroup')
+
+				drawDendogram(band, g, width, 0);
+
+				// push dendogram down so that it aligns with the bottom of the SVG
+				// (and also the color scale)
+				var y = height - (band.level) * DENDOGRAM_H;
+				g.attr('transform', 'translate(0,' + y + ')');
+			}
+			
+			svg.selectAll('text.term').remove();
+			svg.selectAll('line.linkLine').remove();
+			svg.selectAll('text.term').data(bands).enter().append('text')
+				.attr('class', 'term')
+				.attr('x', function(band) { return 0.5 * (band.e[0]+band.e[1]) * width; })
+				.attr('y', function(band) 
+				{
+					band.nameHeight = height - (band.level) * DENDOGRAM_H-3
+					return band.nameHeight;
+				})
+				.html(function(band) {
+					// get color name for the centrid of the band
+					var terms = termDistribution(band.centroid);
+					var name = terms[0].term;
+					return name;
+				})
+				.each(function() 
+				{
+					var thisWidth = this.getComputedTextLength()
+					var txt = d3.select(this);
+					var x = +txt.attr('x')
+					txt.attr('x', x-thisWidth/2);
+				})
+				
+				.on('mousedown', function(band) 
+				{
+					band.mouseDown = d3.mouse(d3.select('body').node())
+					band.text = d3.select(this);
+					
+					d3.select(document)
+						.on('mousemove.moveText', function() 
+						{
+							var y = +band.text.attr('y');
+							var mouse = d3.mouse(d3.select('body').node());
+							var dY = mouse[1] - band.mouseDown[1];
+							band.mouseDown = mouse;
+							band.text.attr('y', y+dY);
+
+							if (Math.abs(y+dY - band.nameHeight) > 2) 
+							{
+								if (!band.line) 
+								{
+									band.line=d3.select("#svgDendogram").append('line')
+										.attr('class', 'dendogramLine linkLine');
+								}
+								var x = 0.5 * (band.e[0]+band.e[1]) * width;
+								console.log('x: ' + x  +", bandE: " + (band.e[0]+band.e[1]) + ', width: ' + width);
+
+								band.line
+									.attr('x1', x)
+									.attr('x2', x)
+									.attr('y1', +band.text.attr('y')+2)
+									.attr('y2', band.nameHeight+3)
+								
+							}
+							else {
+								if (band.line) {
+									band.line.remove();
+									band.line = null;
+								}
+							}
+						})
+						.on('mouseup.moveText', function() {
+							d3.select(document)
+								.on('mousemove.moveText', null)
+								.on('mouseup.moveText', null);
+						})
+				})
+				
+
+		}
+
+
+		var minGlobalD = Number.MAX_VALUE, maxGlobalD = Number.MIN_VALUE;
+		function computeBandingScore(bands, svg)
+		{
+			if (bands.length < 2) return 0;
+
+			var distinctiveness;
+		
+			distinctiveness = 0, count=0, pairwise = [], minD = Number.MAX_VALUE, maxD = Number.MIN_VALUE;
+			for (var i=1; i < bands.length; i++)
+			{
+				var row = [];
+				for (var j=0; j<i; j++, count++) 
+				{
+					var d = labDistance(bands[i].centroid, bands[j].centroid);
+					distinctiveness +=  d;
+
+					row.push(d);
+					maxD = Math.max(maxD, d);
+					minD = Math.min(minD, d);
+				}
+				pairwise.push(row);
+			}
+			distinctiveness /= count;
+			console.log('perceptual disc.: ' + distinctiveness);
+			var bandingScore = distinctiveness * bands.length;
+
+			minGlobalD = Math.min(minGlobalD, minD);
+			maxGlobalD = Math.max(maxGlobalD, maxD);
+			
+			
+			if (svg) {
+				svg.selectAll("*").remove();
+				var R = 20;
+				var R_PAD=0;
+				var I_PAD1=3;
+				var I_PAD2=0;
+
+				var cmap = getColorPreset('greyscale');
+				svg.selectAll('rect').data(bands).enter().append('rect')
+					.attr('width', R - I_PAD1*2)
+					.attr('height', R - I_PAD1*2)
+					.attr('x', function(d,i) { return i*(R+R_PAD) + I_PAD1})
+					.attr('y', function(d,i) { return i*(R+R_PAD) + I_PAD1})
+					.style('fill', function(d) { 
+						var c = d.centroid; 
+						return c;
+					})
+					.style('stroke', 'black')
+					.style('stroke-width', '0.5px')
+				var g = svg.selectAll('g').data(pairwise).enter().append('g')
+					.attr('class', 'rows')
+					.attr('transform', function(d, i) { return 'translate(0,' + (i+1)*(R+R_PAD) + ')'});
+				
+				g.each(function(d) {
+					d3.select(this).selectAll('rect.distance').data(d).enter().append('rect')
+						.attr('x', function(d,i) { return i*(R+R_PAD)+I_PAD2 })
+						.attr('y', I_PAD2)
+						.attr('width', R - 2*I_PAD2)
+						.attr('height', R - 2*I_PAD2)
+						.style('fill', function(d) {
+							var c= cmap.mapValue(1- ( (d-minGlobalD) / (maxGlobalD-minGlobalD))); 
+							return c;
+						})
+				})
+
+
+			}
+
+			return bandingScore;
+
+		}
+
+		function drawDendogram(cluster, g, w, curH)
+		{
+			function getRoot(c)
+			{
+				if (!c.parent) {
+					return c;
+				}
+				else {
+					return getRoot(c.parent);
+				}
+			}
+
+			var H=DENDOGRAM_H;
+
+			if (cluster.children) 
+			{
+				var c0 = cluster.children[0];
+				var c1 = cluster.children[1];
+
+				//var parent = cluster.parent;
+				//var hLine = H * (parent?parent.level-cluster.level-1:0) + curH
+				var myGroup = g.append('g');
+
+				var clusterID = "cluster_" + cluster.id;
+				
+				myGroup.append('rect')
+					.attr('width', (cluster.e[1]-cluster.e[0])*w)
+					.attr('height', cluster.level * H)
+					.attr('x', cluster.e[0]*w)
+					.attr('y', curH)
+					.style('fill', 'white')
+					.attr('class', clusterID)
+
+				myGroup.append('line')
+					.attr('x1', w*c0.x).attr('x2', w*c1.x)
+					.attr('y1', curH)
+					.attr('y2', curH)
+					.attr('id', 'cluster_' + cluster.id)
+					.attr('class', 'dendogramLine ' + clusterID)
+
+				
+
+				var h0 = (cluster.level-c0.level)*H;
+				var h1 = (cluster.level-c1.level)*H;
+
+				myGroup.append('line')
+					.attr('x1', w*c0.x).attr('x2', w*c0.x)
+					.attr('y1', curH).attr('y2', curH+h0)
+					.attr('class', 'dendogramLine ' + clusterID);
+
+				myGroup.append('line')
+					.attr('x1', w*c1.x).attr('x2', w*c1.x)
+					.attr('y1', curH).attr('y2', curH+h1)
+					.attr('class', 'dendogramLine ' + clusterID);
+
+				(function(_clusterID, _myGroup, _cluster) 
+				{
+					d3.selectAll('rect.' + _clusterID)
+						.on('mouseover', function() 
+						{
+							var root = getRoot(_cluster);
+							var R = root.right ? root.right.centroid : null;
+							var L = root.left ? root.left.centroid : null;
+							var dR = R ? nameDistance(root.centroid, R).toFixed(2) : '--'
+							var dL = L ? nameDistance(root.centroid, L).toFixed(2) : '--'
+
+							var pR = R ? labDistance(root.centroid, R).toFixed(2) : '--';
+							var pL = L ? labDistance(root.centroid, L).toFixed(2) : '--'
+
+							console.log('dist: ' + dL + " " + dR + ', p: ' + pL + ", " + pR)
+
+							//console.log('name salience: ' + nameSalience(_cluster.centroid));
+							_myGroup.selectAll('line')
+								.style('stroke', 'red');
+
+							d3.select("#colorSample")
+								.style('fill', d3.rgb(_cluster.centroid));
+
+						})
+						.on('mouseout', function() {
+							_myGroup.selectAll('line')
+								.style('stroke', null);
+						})
+				})(clusterID, myGroup, cluster);
+
+				drawDendogram(c0, myGroup, w, curH+h0);
+				drawDendogram(c1, myGroup, w, curH+h1);
+
+				g
+			}
+		}
+
+		var curColormap = null;
+		var resBands = null;
+		function changeColormap(colormap)
+		{
+			if (!colormap) {
+				colormap = curColormap;
+			}
+
+			// remove earlier data
+			d3.selectAll('.rampCurve').remove();
+			d3.selectAll('.dendogramGroup').remove();
+
+			if (typeof colormap === 'string')
+			{
+				colormap = getColorPreset(colormap);
+			}
+			var colormapCanvas = d3.select("#colormapCanvas");
+			var w = +colormapCanvas.attr('width');
+			var h = +colormapCanvas.attr('height');
+			colormap.drawColorScale(w, h, w,'horizontal', colormapCanvas.node());
+			curColormap = colormap;
+
+			plotCurves(colormap);
+
+			/*
+			var samples = colormap.sampleRamp(50);
+			var distances = localNameDistances(samples);	
+			var nameDCurve = [];
+			for (var i=0, len = distances.length; i<len; i++)
+			{
+				var padding = 1/(len+1);
+				nameDCurve.push({
+					x: padding + i/(len+1),
+					y: distances[i]
+				});
+			}
+			plotRampCurve(nameDCurve, d3.select("#rampMetrics"));
+			*/
+
+			// cluster the colormap into bands
+			var bands = clusterBands(colormap);
+
+			// plot a dendogram
+			plotBands(bands, d3.select("#svgDendogram"));
+
+			// print score
+			resBands = bands;
+			console.log('banding score: ' + computeBandingScore(bands, d3.select("#bandingStats")));
+		}
+
+		function makeCubehelix(start, rots, hues)
+		{
+			if (!hues) hues = 1.0;
+			if (!rots) rots = -1.5;
+			if (!start) start = 0.5;
+			
+			var startAngle = (start - 1) * 120;
+			var endingAngle = (start - 1) * 120 + rots * 360;
+			var saturation = hues / 2.0;
+
+			var helix = d3.scaleCubehelix()
+				.domain([0, 1])
+				.range([d3.hsl(startAngle,saturation,0), d3.hsl(endingAngle, saturation, 1)]);
+
+			//var helix = d3.interpolateCubehelix("hsl(300,50%,0%)", "hsl(-240,50%,100%)");
+			var colorSeq = [];
+			for (var i=0; i<100; i++) {
+				var t = helix(i/(100-1));
+				var c = d3.rgb(t);
+
+				colorSeq.push([c.r, c.g, c.b]);
+			}
+
+			COLOR_PRESETS['cubehelix1'] = colorSeq;
+
+			// plot cubehelix
+			var cubehelix1 = getColorPreset('cubehelix1', undefined, undefined, true);
+			changeColormap(cubehelix1);
+		}
+
+
+	</script>
+
+	<script type="text/javascript">
+		changeColormap('rainbowjet');
+
+		function makeUI()
+		{
+			var START = 0.5;
+			var ROTS = -1.5;
+			var HUE = 1.0;
+
+			function updateCubehelix()
+			{
+				var start = $('#sliderStart').slider('value');
+				var rots = $('#sliderRots').slider('value');
+				var hues = $('#sliderHues').slider('value');
+
+				d3.select('#labelStart').html(start);
+				d3.select("#labelRots").html(rots);
+				d3.select("#labelHues").html(hues);
+
+				makeCubehelix(start, rots, hues);
+
+			}
+
+			$('#sliderBandClustering').slider({ 
+				step: 0.01, min: 0.00, max: 1, value: BAND_CLUSTERING_COEFFICIENT, 
+				slide: function() { 
+					BAND_CLUSTERING_COEFFICIENT = $('#sliderBandClustering').slider('value');
+					changeColormap(); 
+					d3.select("#labelBandClustering").html(BAND_CLUSTERING_COEFFICIENT);
+
+				}
+			});
+
+			$('#sliderBandSamples').slider({ 
+				step: 1, min: 3, max: 400, value: BAND_SAMPLES, 
+				slide: function() { 
+					BAND_SAMPLES = $('#sliderBandSamples').slider('value');
+					changeColormap(); 
+					d3.select("#labelBandSamples").html(BAND_SAMPLES);
+
+				}
+			});
+
+
+
+			$('#sliderStart').slider({ step: 0.01, min: 0.01, max: 4, value: START, slide: updateCubehelix, change: function(event, ui) {} });
+			$('#sliderRots').slider({ step: 0.01, min: -7, max: 7, value: ROTS, slide: updateCubehelix, change: function(event, ui) { } });
+			$('#sliderHues').slider({ step: 0.01, min: 0.01, max: 3.0, value: HUE, slide: updateCubehelix, change: function(event, ui) { } });
+
+			d3.select("#labelBandClustering").html(BAND_CLUSTERING_COEFFICIENT);
+			d3.select('#labelStart').html(START);
+			d3.select("#labelRots").html(ROTS);
+			d3.select("#labelHues").html(HUE);
+
+		}
+		makeUI();
+
+
+		function simulateBanding()
+		{
+			var DEF_SAMPLES = BAND_SAMPLES;
+			var DEF_CLUSTERING = BAND_CLUSTERING_COEFFICIENT;
+
+			var colormaps = ['blue', 'cubehelix_05', 'viridis', 'cubehelix_15', 'blue-orange', 'cubehelix_25', 'jet'];
+
+			var samples = [100, 200];
+			var samples_step = 2;
+			
+			var clustering = [0.6, 0.7];
+			var clustering_step = 0.1/2;
+
+			var results = [];
+			for (i=0; i<colormaps.length; i++)
+			{
+				var colors = getColorPreset(colormaps[i]);
+				var scores = [];
+				var avgScore = 0, stdScore = 0;
+				var count = 0;
+
+				for (var s=samples[0]; s<= samples[1]; s+= samples_step)
+				{
+					for (var c=clustering[0]; c<=clustering[1]; c+=clustering_step, count++)
+					{
+						BAND_SAMPLES=s;
+						BAND_CLUSTERING_COEFFICIENT=c;
+
+						var bands = clusterBands(colors);
+						var score = computeBandingScore(bands);
+
+						scores.push(score);
+						avgScore += score;
+					}
+				}
+				avgScore /= count;
+
+
+				// compute standard deviation
+				for (var s=0, _count=1/count; s<count; s++) 
+				{
+					stdScore += Math.pow(scores[s] - avgScore, 2) * _count;
+				}
+				stdScore = Math.sqrt(stdScore);
+
+
+				BAND_SAMPLES = DEF_SAMPLES;
+				BAND_CLUSTERING_COEFFICIENT = DEF_CLUSTERING;
+
+				results.push({
+					mean: avgScore, std: stdScore, n: count, colormap: colormaps[i], ideal: computeBandingScore(clusterBands(colors))
+				});
+				console.log( (100*i/(colormaps.length-1)).toFixed(1) + "%" )
+			}
+
+
+			return results;
+		}
+	</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
