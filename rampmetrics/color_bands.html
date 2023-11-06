@@ -50,7 +50,9 @@
 <body>
 
 	<div>
-		<svg id="svgDendogram" width="500" height="150" style=""></svg><br>
+
+		<p style="font-size: 14px">Color cat score: <b><span id="labelScore"></span></b>
+		<p><svg id="svgDendogram" width="500" height="150" style=""></svg><br>
 		<canvas id="colormapCanvas" width="400" height="50" style=""></canvas><br>
 		<svg id="rampMetrics" width="400" height="50" style="border: solid 1px black"></svg>
 	</div>
@@ -520,6 +522,7 @@
 					txt.attr('x', x-thisWidth/2);
 				})
 				
+				.style('cursor', 'move')
 				.on('mousedown', function(band) 
 				{
 					band.mouseDown = d3.mouse(d3.select('body').node())
@@ -729,7 +732,7 @@
 				drawDendogram(c0, myGroup, w, curH+h0);
 				drawDendogram(c1, myGroup, w, curH+h1);
 
-				g
+				//g
 			}
 		}
 
@@ -780,7 +783,9 @@
 
 			// print score
 			resBands = bands;
-			console.log('banding score: ' + computeBandingScore(bands, d3.select("#bandingStats")));
+			var score = computeBandingScore(bands, d3.select("#bandingStats"));
+			console.log('banding score: ' + score);
+			d3.select("#labelScore").html(score.toFixed(3));
 		}
 
 		function makeCubehelix(start, rots, hues)
