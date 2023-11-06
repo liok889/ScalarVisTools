@@ -14,10 +14,13 @@
 	<script src="jnd/lib/three.min.js"></script>
 	<script src="lineup/gaussmix.js"></script>
 	<script src="lineup/gaussmix_bivariate.js"></script>
+	<script src="lineup/gauss_w_noise.js"></script>
 	<script src="lineup/scalar_sample.js"></script>
 	<script src="lineup/lineup.js"></script>
+	<script src="lineup/lineup_two.js"></script>
 	<script src="lineup/sim.js"></script>
 	<script src="lineup/lineup_experiment.js"></script>
+	<script src="lineup/lineup_experiment_two.js"></script>
 
 	<style>
 		body {font-family: arial; font-size: 15px;}
@@ -61,7 +64,7 @@
 					<td><span id="sliderNValue"></span></td>
 				</tr>
 				<tr>
-					<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; randomLineup();" checked></input>blur
+					<td colspan="3"><input type="checkbox" id="checkBlur" onclick="BLUR=!BLUR; randomLineup();"></input>blur
 				</tr>
 
 				<tr>
@@ -116,9 +119,9 @@
 
 
 	</div>
-	<div style="margin-top: 10px; height: 260px">
+	<div id="allContainer" style="margin-top: 10px; height: 260px">
 	<div style="position: relative;">
-		<svg width="550" id="svgModel" height="250" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
+		<svg width="750" id="svgModel" height="350" style="z-index: 20; position: absolute; top: 0px; left: 0px;">
 			<!-- a transparent grey drop-shadow that blends with the background colour -->
 			<defs>
 			<filter id="dropshadow" x="0" y="0" width="200%" height="200%">
@@ -129,13 +132,8 @@
 			</defs>
 
 
-			<g transform="translate(50,50)">
-				<g id="mainModelSVG"></g>
-			</g>
-
-			<g transform="translate(300,50)">
-				<g id="decoyModelSVG"></g>
-			</g>
+			<g id="mainModelSVG"></g>
+			<g id="decoyModelSVG"></g>
 
 			<g id="hideOverlay" style="visibility: hidden">
 				<rect width="550" height="250" fill="white"></rect>
@@ -146,10 +144,10 @@
 
 		</svg>
 
-		<canvas id="mainCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 50px; border: solid 1px black;">
+		<canvas id="mainCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 10px; left: 50px; border: solid 1px black;">
 		</canvas>
 
-		<canvas id="decoyCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 50px; left: 300px; border: solid 1px black;">
+		<canvas id="decoyCanvas" width="200" height="200" style="z-index: 10; position: absolute; top: 10px; left: 350px; border: solid 1px black;">
 		</canvas>
 	</div>
 	</div>
@@ -165,17 +163,35 @@
 		var WIDTH=200;
 		var HEIGHT=200;
 		var ROTATE = false;
+		var OFFSET = 10;
+		var MODEL_TYPE = GaussMixWithNoise;
+
+		// position elements according to width/height of canvas
+		d3.select("#svgModel")
+			.attr('width', WIDTH * 2 + 2*OFFSET)
+			.attr('height', HEIGHT + 2*OFFSET);
+
+		d3.select("#mainCanvas").style("left", OFFSET + "px")
+		d3.select("#decoyCanvas").style("left", (OFFSET+WIDTH) + "px");
+		d3.select("#mainModelSVG")
+			.attr('transform', 'translate(' + OFFSET + ',' + OFFSET + ')');
+		d3.select("#decoyModelSVG")
+			.attr('transform', 'translate(' + (OFFSET+WIDTH) + ',' + OFFSET + ')');
+		d3.select("#allContainer")
+			.style('height', (HEIGHT + 10) + 'px');
+
 
 		var BIVARIATE = window.location.href.search('univariate') >-1 ? false : true;
-		var ModelType = BIVARIATE ? GaussMixBivariate : GaussMix;
+		//var ModelType = BIVARIATE ? GaussMixBivariate : GaussMix;
 
 		// number of samples per pixel
 		var goodN = 10*WIDTH*HEIGHT;
 		var N=22000;
-		var LINEUP_N = 4;
+		var LINEUP_N = 6;
 
 		// one "main" and one decoy model
-		var lineupExp = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N,
+		var lineupExp = new LineupExperimentTwo(
+			WIDTH, HEIGHT, LINEUP_N,
 			d3.select("#mainModelSVG"),
 			d3.select("#decoyModelSVG")
 		);
@@ -189,14 +205,51 @@
 		function setSamplers()
 		{
 			mainSample = new ScalarSample(WIDTH, HEIGHT, d3.select('#mainCanvas').node());
+			mainSample.highFidelity = true;
 			mainSample.setSamplingFidelity(goodN);
 			mainSample.setModel(lineupExp.getMain());
 
 			decoySample = new ScalarSample(WIDTH, HEIGHT, d3.select("#decoyCanvas").node());
+			decoySample.highFidelity = true;
 			decoySample.setSamplingFidelity(goodN);
 			decoySample.setModel(lineupExp.getDecoy());
 		}
 		setSamplers();
+
+		var canvases = [], I;
+		function invertFields()
+		{
+			var samplers = lineupExp.lineup.samplers;
+			for (var i=0; i<samplers.length; i++) {
+				samplers[i].sampleModel(null, null, true);
+				samplers[i].vis();
+			}
+
+			// scramble canvases
+			var canvasSelection = d3.select("#lineupTable").selectAll('canvas');
+			canvases = [];
+			canvasSelection.each(function(d) {
+				canvases.push(d3.select(this).node())
+			})
+			canvasSelection.remove();
+
+			for (var i=0; i<1000; i++) {
+				var c1 = Math.floor(Math.random()*canvases.length);
+				var c2 = Math.floor(Math.random()*canvases.length);
+				if (c1 != c2) {
+					var t = canvases[c1];
+					canvases[c1] = canvases[c2];
+					canvases[c2] = t;
+				}
+			}
+
+			I = 0;
+			d3.select('#lineupTable').selectAll('td').each(function(d) {
+				d3.select(this).node().appendChild(canvases[I++]);
+			});
+
+
+		}
 
 		function randomLineup()
 		{
@@ -205,8 +258,8 @@
 
 			// arm feedbacks
 			lineupExp.setClickFeedback(
-				function() {
-					d3.select("#answer").html('<font color="green"><b>Correct!</b></font>');
+				function(model) {
+					d3.select("#answer").html('<font color="green"><b>Correct! ' + model + '</b></font>');
 				},
 				function() {
 					d3.select("#answer").html('<font color="red"><b>Incorrect</b></font>');
@@ -215,6 +268,10 @@
 
 			lineupExp.randomLineup(N, d3.select('#lineupTable'));
 			console.log("lineup took: " + Math.floor(Date.now() - start) + " m. seconds");
+
+			var stats = lineupExp.getComputationTime();
+			console.log("\tsampling: " + stats.samplingTime);
+			console.log("\tvis: " + stats.visTime);
 		}
 
 		function randomModel()
@@ -261,8 +318,8 @@
 
 		function showColormaps() {
 			var COLORMAPS = [
-				'purples', 'reds',
-				'viridis', 'rainbowjet', 'coolwarm', 'redpurple', 'blues', 'plasma', 'greyred'
+				'turbo', 'rainbowcie',
+				'rainbowjet', 'viridis', 'blueorange', 'coolwarm', 'redpurple', 'singlehue', 'plasma', 'greyred'
 			];
 			var MAP_W=100, MAP_H=15, MAP_PAD=5;
 			d3.select('#svgColormaps').selectAll('image').data(COLORMAPS)

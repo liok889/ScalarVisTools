@@ -69,6 +69,7 @@ LineupExperiment.prototype.setClickFeedback = function(correct, incorrect)
 
 LineupExperiment.prototype.randomModel = function()
 {
+    this.decoy.flipDensity = false;
     this.curDistance = null;
     this.main.init();
     this.copyToDecoy();
@@ -84,28 +85,53 @@ LineupExperiment.prototype.getAnswer = function() {
     return this.answer;
 }
 
+LineupExperiment.prototype.clearAnswer = function() {
+    this.answer = null;
+    if (this.tdSelection) {
+        this.tdSelection.style('background-color', null);
+    }
+}
+
 LineupExperiment.prototype.highlightCorrect = function(show)
 {
     this.domSelection.selectAll('td').style('background-color', null);
     d3.select('div.nullOption').style('border', 'solid 1px black');
 
-    var correctID = '#sample' + this.lineup.getCorrectAnswer();
-    var td = d3.select(correctID).node().parentNode;
-    if (this.trialHasDecoy) {
-
-        d3.select(td)
-            .style('background-color', show ? '#aaaaaa' : null);
-    }
-    else
+    var correctAnswer = this.lineup.getCorrectAnswer();
+    if (!Array.isArray(correctAnswer))
     {
-        d3.select('div.nullOption')
-            .style('border', show ? 'solid 10px #aaaaaa' : 'solid 1px black');
+        correctAnswer = [correctAnswer];
+    }
+
+    for (var i=0; i<correctAnswer.length; i++)
+    {
+        var correctID = 'canvas.index' + correctAnswer[i];
+        var td = d3.select(correctID).node().parentNode;
+        if (this.trialHasDecoy)
+        {
+            d3.select(td)
+                .style('background-color', show ? '#aaaaaa' : null);
+        }
+        else
+        {
+            d3.select('div.nullOption')
+                .style('border', show ? 'solid 10px #aaaaaa' : 'solid 1px black');
+        }
     }
     // 00cc66
 }
+
+LineupExperiment.prototype.getComputationTime = function()
+{
+    return {
+        samplingTime: this.lineup.samplingTime,
+        visTime: this.lineup.visTime
+    };
+}
+
 LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDecoy)
 {
-    var SEL_BORDER = "#ff623b"//"solid 4px #fcbd00";
+    var SEL_BORDER = "#ff623b";
 
     // new lineup
     this.trialHasDecoy = noDecoy ? false : true;
@@ -117,49 +143,61 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
 
     // clear out old selection / answer
     this.answer = null;
-    if (!this.tdSelection) {
-        this.tdSelection = domSelection.selectAll('td')
-    }
 
     var canvasType = 'canvas';
     if (typeof CANVAS_TYPE === 'string') {
         canvasType = CANVAS_TYPE
     }
 
-    if (!this.canvasSelection) {
-        this.canvasSelection = domSelection.selectAll(canvasType)
-    }
-    if (!this.nullSelection) {
-        this.nullSelection = domSelection.selectAll('div.nullOption');
-    }
+    this.tdSelection = domSelection.selectAll('td')
+    this.canvasSelection = domSelection.selectAll(canvasType);
+    this.nullSelection = domSelection.selectAll('div.nullOption');
 
+    // clear earlier selection
     this.tdSelection.style('background-color', null);
 
     // setup callbacks
     (function(lineup, dom, noDecoy, correctAnswer)
     {
-        var canvasType = 'canvas';
-        if (typeof CANVAS_TYPE === 'string') {
-            canvasType = CANVAS_TYPE
-        }
-
-        dom.selectAll(canvasType).on('click', function()
+        lineup.canvasSelection.on('click', function()
         {
-            console.log('click');
-            if (lineup.incorrect) lineup.incorrect();
+            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
+
+            // check if this is the correct answer
+            lineup.answer = '0';
+            lineup.answerModel = '0';
+
+            //console.log('canvasIndex: ' + lineup.canvasIndex + ', correct: ' + correctAnswer);
+
+            if (!Array.isArray(correctAnswer)) {
+                correctAnswer = [correctAnswer];
+            }
+            for (var i=0; i<correctAnswer.length; i++)
+            {
+                if (!noDecoy && correctAnswer[i] == +lineup.canvasIndex)
+                {
+                    lineup.answer = '1';
+                    lineup.answerModel = i+1;
+                    if (lineup.correct) lineup.correct(lineup.answerModel);
+                    break;
+                }
+            }
+            if (lineup.answer == '0' && lineup.incorrect())
+            {
+                lineup.incorrect()
+            }
+
             if (lineup.canMakeSelection)
             {
                 lineup.tdSelection.style('background-color', null);
                 lineup.nullSelection.style('border', 'solid 1px black');
                 d3.select(this.parentNode).style('background-color', SEL_BORDER);
             }
-            lineup.answer = "0";
-            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
         });
-        
+
         dom.selectAll('div.nullOption').on('click', function()
         {
-            if (noDecoy && lineup.correct) lineup.correct();
+            if (noDecoy && lineup.correct) lineup.correct(0);
             else if (!noDecoy && lineup.incorrect) lineup.incorrect();
 
             lineup.answer = noDecoy ? '1' : '0';
@@ -168,23 +206,6 @@ LineupExperiment.prototype.randomLineup = function(fidelity, domSelection, noDec
             lineup.canvasIndex = '98';
         });
 
-    })(this, domSelection, noDecoy, this.correctAnswer);
-
-
-    (function(lineup, dom, noDecoy, correctAnswer)
-    {
-        d3.select('#sample' + correctAnswer).on('click', function()
-        {
-            if (lineup.correct) lineup.correct();
-            if (lineup.canMakeSelection)
-            {
-                lineup.tdSelection.style('background-color', null);
-                lineup.nullSelection.style('border', 'solid 1px black');
-                d3.select(this.parentNode).style('background-color', SEL_BORDER);
-            }
-            lineup.answer = noDecoy ? '0' : '1';
-            lineup.canvasIndex = d3.select(this).attr('class').substr(5);
-        })
     })(this, domSelection, noDecoy, this.correctAnswer);
 }
 
@@ -202,9 +223,9 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
     var converged = false;
     var distance = null;
     var iterations = 0;
-    
+
     this.answer = null;
-  
+
     for (var round=0; !converged && round<LINEUP_MAX_ROUNDS; round++)
     {
         for (var trial=0; !converged && trial<LINEUP_MAX_TRIAL; trial++, iterations++)
@@ -212,30 +233,35 @@ LineupExperiment.prototype.modelWithExpectation = function(expectation)
             this.randomModel();
             distance = this.modelDecoyDistance();
 
-            if (!expectation) 
+            if (!expectation)
             {
                 console.log("no expectaiton. Converged");
                 converged = true;
+                expectation = 0.0;
+            }
+            else if (expectation < 0)
+            {
+                converged = true;
+                this.decoy.flipDensity = true;
             }
             else
             {
-                if (range && distance >= expectation[0] && distance <= expectation[1]) 
+                if (range && distance >= expectation[0] && distance <= expectation[1])
                 {
                     converged = true;
                 }
-                if (Math.abs(distance-expectation) <= tolerance) 
+                if (Math.abs(distance-expectation) <= tolerance)
                 {
                     converged = true;
                 }
             }
         }
 
-        if (!converged) 
+        if (!converged)
         {
             tolerance *= 2;
         }
     }
-
 
     //console.log("[" + iterations + "]: requested: " + expectation + ", got: " + distance);
     this.curDistance = distance;

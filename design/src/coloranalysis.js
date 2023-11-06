@@ -7,6 +7,27 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 {
 	(function(_path, _name, _object, _callback)
 	{
+		// see if shader code is available inline
+		var inline = false;
+		if (d3) {
+			var idtag = "#shader_" + _name;
+			var inlineCode = d3.select(idtag);
+			if (inlineCode.size() > 0)
+			{
+				console.log("loading shader " + _name + " from inline code.")
+				_object.shaders[_name] = inlineCode.html();
+				if (_callback) {
+					setTimeout(_callback, 50, null);
+				}
+				inline = true;
+			}
+
+		}
+
+		if (inline) {
+			return;
+		} else { console.log('noinline code for ' + _name);}
+
 		d3.text(_path).then(function(text, error)
 		{
 			if (error) {
@@ -17,7 +38,7 @@ function gLoadShader(object, shaderPath, shaderName, callback)
 				if (_callback) _callback(null);
 
 			}
-		})
+		});
 	})(shaderPath, shaderName, object, callback);
 }
 
@@ -27,6 +48,8 @@ ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 	this.field = field;
 	this.shaders = {};
 	this.pipelines = null;
+	this.additionalTextures = [];
+
 
 	// list of canvases to copy results to at the end of analysis (optional)
 	this.copyList = [];
@@ -79,6 +102,13 @@ ColorAnalysis = function(field, glCanvas, _readyCallback, _shaderList)
 	})(this, _readyCallback, _shaderList)
 }
 
+ColorAnalysis.prototype.addTexture = function(name, field)
+{
+	this.additionalTextures.push({
+		name: name,
+		field: field
+	});
+}
 ColorAnalysis.prototype.clearCanvas = function() {
 	var gl = this.glCanvas.getContext('webgl');
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -245,12 +275,33 @@ ColorAnalysis.prototype.run = function(analysis)
 	for (var i=0; i<pipeline.getStageCount(); i++)
 	{
 		var s = pipeline.getStage(i);
-		var u = s.getUniforms();
+		if (s.cpuComputation) {
+			// skip uniforms since this is a cpu computation stage
+			continue;
+		}
+		else {
+			var u = s.getUniforms();
 
-		// does this stage require a colormap?
-		if (u.colormap) {
-			// if so, give it the current colormap associated with the scalar field
-			u.colormap.value = this.field.gpuColormapTexture;
+			// does this stage require a colormap?
+			if (u.colormap) {
+				// if so, give it the current colormap associated with the scalar field
+				u.colormap.value = this.field.gpuColormapTexture;
+			}
+
+			// other textures?
+			for (var t=0; t<this.additionalTextures.length; t++)
+			{
+				var text = this.additionalTextures[t];
+				var textName = text.name;
+				if (u[textName])
+				{
+					if (!text.field.gpuTexture)
+					{
+						text.field.createGPUTexture();
+					}
+					u[textName].value = text.field.gpuTexture;
+				}
+			}
 		}
 	}
 

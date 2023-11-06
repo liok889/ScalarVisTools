@@ -140,6 +140,43 @@ DiscreteMap.prototype.normalize = function()
 	}
 }
 
+DiscreteMap.prototype.computeValueHistogram = function(_bins)
+{
+	var low = this.lowCutoff;
+	var high = this.highCutoff;
+	var lowHighLen = 1/(high-low);
+
+	var BINS = _bins || 30;
+	var hist = [];
+	for (var b=0; b<BINS; b++) {
+		hist.push(0);
+	}
+
+	var listOfBins = this.listOfBins;
+	var values = this.binMap;
+	var areas = this.areas;
+
+	for (var i=0, len=listOfBins.length; i<len; i++) 
+	{
+		var I = listOfBins ? listOfBins[i] : I;
+		var v = values[I];
+		
+		if (v > high) 
+		{
+			v = 1;
+		} else if (v < low) {
+			v = 0;
+		}
+		else
+		{
+			v = (v-low) * lowHighLen;
+		}
+		var b = Math.min(BINS-1, Math.floor(v*(BINS-1)));
+		hist[b] += areas ? areas[I] : 1;
+	}
+	return hist;
+}
+
 DiscreteMap.prototype.percentileCutoff = function()
 {
 	var CUTOFF_PERCENT_LOW = .01/4;
@@ -432,7 +469,7 @@ GaussMixBiDiscrete.prototype.computeCDFs = function()
     this.updateCDFMap = true;
 }
 
-GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
+GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field, fieldUpperPercentile)
 {
 	var discreteMap = this.discreteMap;
     var pdf = this.pdf.view;
@@ -566,9 +603,15 @@ GaussMixBiDiscrete.prototype.sampleModel = function(iterations, _field)
     // normalize discrete map / field
     discreteMap.normalize();
 
-    if (_field) {
-    	_field.normalize();
-    	_field.updated();
+    if (_field) 
+    {
+    	if (fieldUpperPercentile) {
+    		_field.normalizeToPercentile(fieldUpperPercentile)
+    	}
+    	else
+    	{
+    		_field.normalize();
+    	}
     }
 }
 

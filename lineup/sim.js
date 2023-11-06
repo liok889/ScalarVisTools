@@ -7,6 +7,88 @@ var SIM_W = 120;
 var SIM_BIN_COUNT = 25;
 var DEF_SIM_ITERATIONS = 75;
 
+var SIM_HIST_BINS = 50;
+
+function runHistSimulation(itr, expDistance, _lineup)
+{
+    if (!_lineup) {
+        _lineup = lineupExp;
+    }
+    var HIST_W = 200;
+    var HIST_H = 150;
+
+    var samplers = _lineup.lineup.samplers;
+    var sums = 0;
+    var histogram = [];
+    var bins = SIM_HIST_BINS;
+
+    for (var b=0; b<bins; b++) {
+        histogram.push(0);
+    }
+
+    for (var i=0; i<itr; i++) 
+    {
+
+        if (expDistance) {
+            _lineup.modelWithExpectation(expDistance);
+        }
+        else {
+            _lineup.randomModel();
+        }
+
+        for (var s=0; s<samplers.length; s++) 
+        {
+            var sampler = samplers[s];
+            sampler.sampleModel();
+            var hist = sampler.computeValueHistogram(bins);
+            
+            for (var b=0; b<bins; b++) {
+                histogram[b] += hist[b]
+            }
+            sums++;
+        }
+    }
+
+    // normalize hist
+    var histData = [];
+    for (var b=0; b<bins; b++) 
+    {
+        histogram[b] /= sums;
+        histData.push({
+            y: histogram[b],
+            x: b/(bins-1)
+        })
+    }
+    histData.push({x: 1, y: 0});
+    histData.push({x: 0, y: 0});
+
+    // plot
+    var g = d3.select("#simulationResults");
+    g.selectAll('*').remove();
+
+    var lineGenerator = d3.line()
+        .curve(d3.curveLinearClosed)
+        .x(function(d) { return d.x*HIST_W})
+        .y(function(d) { return (1-(d.y/0.3))*HIST_H});
+
+    g.append('path')
+        .attr('d', lineGenerator(histData))
+        .style('stroke', '#4ad5ff')
+        .style('stroke-width', '1px')
+        .style('fill', '#4ad5ff')
+
+    g.append('line')
+        .attr('x1', 0).attr('x2', HIST_W)
+        .attr('y1', HIST_H).attr('y2', HIST_H)
+        .style('stroke', 'black');
+    g.append('line')
+        .attr('x1', 0).attr('x2', 0)
+        .attr('y1', 0).attr('y2', HIST_H)
+        .style('stroke', 'black');
+
+    return histogram;
+
+}
 
 function runSimulation(itr) {
     // turn of callbacks (so we can do the Simulation

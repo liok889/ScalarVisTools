@@ -1,3 +1,69 @@
+function renderLineup(width, height, table, rows, cols, n, randomCanvases, canvasType, nullOption)
+{
+    // remove everything in the table
+    table.selectAll('*').remove();
+    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
+
+    var rs = d3.range(rows);
+    table.selectAll('tr').data(rs)
+        .enter().append('tr')
+        .each(function(d, thisRow)
+        {
+            (function(rowNum, thisRow)
+            {
+                d3.select(thisRow).selectAll('td').data(d3.range(cols))
+                    .enter().append('td').each(function(d, i) {
+                        var index = i + rowNum*cols;
+                        if (index < n)
+                        {
+                            var canvas = randomCanvases[index];
+                            if (!canvas) {
+                                var c = d3.select(this).append(canvasType);
+                                c
+                                    .attr('width', width)
+                                    .attr('height', height)
+                                    .attr('id', "sample" + index);
+
+                                randomCanvases[canvas] = c;
+                            }
+
+                            this.appendChild( randomCanvases[index] );
+                            d3.select(randomCanvases[index])
+                                .attr('class', 'index' + index);
+                        }
+                    });
+
+                if (rowNum==0 && nullOption)
+                {
+                    var w_div = +d3.select(randomCanvases[0]).attr('width')
+                    var w = 25 + w_div;
+                    var h = +d3.select(randomCanvases[0]).attr('height');
+                    var tdNull = d3.select(thisRow).append('td')
+                        .attr('rowSpan', rows)
+                        .attr('width', w);
+
+                    var div = tdNull.append('div')
+                        .style('margin', '0 auto')
+                        .style('width', w + 'px');
+                    div.append('div')
+                        .style('margin-top', ((rows*h)/2-h/1) + 'px')
+                        .style('margin-left', 'auto')
+                        .style('margin-right', 'auto')
+                        .attr('class', 'nullOption')
+                        .style('text-align', 'center')
+                        .style('vertical-align', 'middle')
+                        .style('width', w_div + 'px')
+                        .style('height', h + 'px')
+                        .style('border', 'solid 1px black')
+                        .style('font-size', '35px')
+                        .style('color', "#bbbbbb")
+                        .style('font-weight', 'bold')
+                        .html('no discernible difference between images');
+                }
+            })(d, this);
+        });
+}
+
 function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
 {
     // total number of exposures (n-1 actual + 1 decoy)
@@ -24,7 +90,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
     }
 
     // initialize random canvases
-    for (var i=0; i<n; i++) 
+    for (var i=0; i<n; i++)
     {
         this.canvases.push(null);
     }
@@ -36,7 +102,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
     {
         var canvas = this.canvases[i];
         if (!canvas) {
-        
+
             canvas = document.createElement(canvasType);
 
             if (canvasType == 'svg')
@@ -50,7 +116,7 @@ function Lineup(w, h, n, realModel, decoyModel, nullOption, table)
                 canvas.width = w;
                 canvas.height = h;
             }
-        
+
             canvas.id="sample" + i;
             this.canvases[i] = ( canvas );
         }
@@ -74,16 +140,27 @@ Lineup.prototype.getCorrectAnswer = function() {
     return this.correctSample;
 }
 
-Lineup.prototype.sample = function(samplingRate, noDecoy) 
+Lineup.prototype.sample = function(samplingRate, noDecoy)
 {
     if (noDecoy) {
         console.log('sampling no decoy (fidelity: ' + samplingRate + ')');
     }
+
+    var samplingTime = 0, visTime = 0;
+
     for (var i=0; i<this.samplers.length; i++)
     {
+        var start = Date.now();
         this.samplers[i].sampleModel(samplingRate, noDecoy ? this.realModel : undefined);
+        samplingTime += Date.now() - start;
+
+        start = Date.now();
         this.samplers[i].vis();
+        visTime += Date.now() - start;
     }
+
+    this.samplingTime = samplingTime;
+    this.visTime = visTime;
 }
 
 var LINEUP_PADDING = 6;
@@ -94,89 +171,38 @@ Lineup.prototype.layoutCanvases = function(table)
     if (!table) {
         table = this.table;
     }
-    var randomCanvases = this.canvases.slice();
-    var decoyCanvas = randomCanvases.pop();
+    this.table = table;
+
+    this.randomizeSamples();
+    this.placeLineupInDOM();
+}
+
+Lineup.prototype.randomizeSamples = function()
+{
+    this.randomizedCanvases = this.canvases.slice();
+    var decoyCanvas = this.randomizedCanvases.pop();
 
     // reinsert
-    var insertPos = Math.floor( Math.random() * (randomCanvases.length+1) );
-    randomCanvases.splice(insertPos, 0, decoyCanvas);
+    var insertPos = Math.floor( Math.random() * (this.randomizedCanvases.length+1) );
+    this.randomizedCanvases.splice(insertPos, 0, decoyCanvas);
+    this.correctSample = insertPos;
+}
 
+Lineup.prototype.placeLineupInDOM = function()
+{
     var canvasType = 'canvas';
     if (typeof CANVAS_TYPE === 'string') {
         canvasType = CANVAS_TYPE;
     }
 
-
-    // remove everything in the table
-    table.selectAll('*').remove();
-    table.attr('cellpadding', LINEUP_PADDING).attr("cellspacing", LINEUP_SPACING);
-
     // how many rows
     var rows = 2;
     var cols = Math.ceil(this.n/2);
-
-    (function(width, height, table, rows, cols, n, randomCanvases, nullOption)
-    {
-        var rs = d3.range(rows);
-        table.selectAll('tr').data(rs)
-            .enter().append('tr')
-            .each(function(d, thisRow) 
-            {
-                (function(rowNum, thisRow) 
-                {
-                    d3.select(thisRow).selectAll('td').data(d3.range(cols))
-                        .enter().append('td').each(function(d, i) {
-                            var index = i + rowNum*cols;
-                            if (index < n) 
-                            {
-                                var canvas = randomCanvases[index];
-                                if (!canvas) {
-                                    var c = d3.select(this).append(canvasType);
-                                    c
-                                        .attr('width', width)
-                                        .attr('height', height)
-                                        .attr('id', "sample" + index);
-
-                                    randomCanvases[canvas] = c;
-                                }
-
-                                this.appendChild( randomCanvases[index] );
-                                d3.select(randomCanvases[index])
-                                    .attr('class', 'index' + index);
-                            }
-                        });
-
-                    if (rowNum==0 && nullOption) 
-                    {
-                        var w_div = +d3.select(randomCanvases[0]).attr('width')
-                        var w = 25 + w_div;
-                        var h = +d3.select(randomCanvases[0]).attr('height');
-                        var tdNull = d3.select(thisRow).append('td')
-                            .attr('rowSpan', rows)
-                            .attr('width', w);
-
-                        var div = tdNull.append('div')
-                            .style('margin', '0 auto')
-                            .style('width', w + 'px');
-                        div.append('div')
-                            .style('margin-top', ((rows*h)/2-h/1) + 'px')
-                            .style('margin-left', 'auto')
-                            .style('margin-right', 'auto')
-                            .attr('class', 'nullOption')
-                            .style('text-align', 'center')
-                            .style('vertical-align', 'middle')
-                            .style('width', w_div + 'px')
-                            .style('height', h + 'px')
-                            .style('border', 'solid 1px black')
-                            .style('font-size', '35px')
-                            .style('color', "#bbbbbb")
-                            .style('font-weight', 'bold')
-                            .html('no discernible difference between images');
-                    }
-                })(d, this);
-            });
-    })(this.w, this.h, table, rows, cols, this.n, randomCanvases, this.nullOption);
-    this.table = table;
+    renderLineup(
+        this.w, this.h, this.table,
+        rows, cols, this.n,
+        this.randomizedCanvases, canvasType, this.nullOption
+    );
 }
 
 function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
@@ -199,12 +225,12 @@ function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
         this.canvasType = CANVAS_TYPE;
     }
     var samplerType = ScalarSample;
-    if (typeof SAMPLER_TYPE !== 'undefined') 
+    if (typeof SAMPLER_TYPE !== 'undefined')
     {
         samplerType = SAMPLER_TYPE;
     }
 
-    (function(_table, canvases, canvasType) 
+    (function(_table, canvases, canvasType)
     {
         var selectionSize = table.selectAll(canvasType).size();
         if (selectionSize != n) {
@@ -237,12 +263,12 @@ function LineupFixed(w, h, n, realModel, decoyModel, nullOption, table)
 
 LineupFixed.prototype = Object.create(Lineup.prototype);
 
-LineupFixed.prototype.randomAssignCorrect = function() 
+LineupFixed.prototype.randomAssignCorrect = function()
 {
     // generate random number
     var correctIndex = Math.floor(Math.random() * this.canvases.length);
-    
-    for (var i=0; i<this.n; i++) 
+
+    for (var i=0; i<this.n; i++)
     {
         var dontVis = true;
         if (i == correctIndex) {
@@ -256,8 +282,7 @@ LineupFixed.prototype.randomAssignCorrect = function()
     this.correctSample = correctIndex;
 }
 
-LineupFixed.prototype.layoutCanvases = function() 
+LineupFixed.prototype.layoutCanvases = function()
 {
     this.randomAssignCorrect();
 }
-

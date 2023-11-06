@@ -25,7 +25,7 @@
 	<script src="design/src/gl_pipeline.js"></script>
 	<script src="design/src/coloranalysis.js"></script>
 	<script src="design/src/colormath.js"></script>
-	
+
 	<!-- design tool -->
 	<script src="design/src/picker.js"></script>
 	<script src="design/src/colormap.js"></script>
@@ -81,7 +81,7 @@
 		}
 
 		.colormapCurve {
-			stroke: #01188e; 
+			stroke: #01188e;
 			stroke-width: 2px;
 			fill: none;
 		}
@@ -135,7 +135,7 @@
 						<canvas id="colorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 0px black"></canvas>
 
 						<svg id="svgColorCanvas" width="300" height="300" style="position: absolute; left: 10px; border: solid 0px black; z-index: 100"></svg>
-						
+
 						<canvas id="channelCanvas" width="30" height="300" style="position: absolute; left: 312px; border: solid 0px black"></canvas>
 					</div>
 
@@ -148,7 +148,7 @@
 						<input type="radio" name="luminanceProfile" id="luminanceManual" value="manual">
 					</div>
 
-					
+
 					<div style="width: 315px; height: 300px; margin-top: 10px">
 						<canvas id="threeDCanvas" width="250" height="250" style="border: solid 1px black"></canvas>
 					</div>
@@ -198,7 +198,7 @@
 			inputs.each(function(d) {
 				d3.select(this).attr('checked', null);
 				var id = d3.select(this).attr('id');
-				for (var i=0; i<L_PROFILES.length; i++) 
+				for (var i=0; i<L_PROFILES.length; i++)
 				{
 					if (profile == L_PROFILES[i].p && id== L_PROFILES[i].selector) {
 						d3.select(this).attr('checked', 'checked');
@@ -209,18 +209,18 @@
 			//picker.changeLuminanceProfile(profile);
 		}
 
-		function exportColormap() 
+		function exportColormap()
 		{
 			// create a json object
 			var out = { colorset: [] };
 			var colormap = ramp.getColorMap();
 			var colors = colormap.getColorSet();
-			
+
 			out.interpolation = colormap.interpType;
-			
+
 			// how many samples?
 			var SAMPLES = 100;
-			for (var i=0; i<SAMPLES; i++) 
+			for (var i=0; i<SAMPLES; i++)
 			{
 				var v = i/(SAMPLES-1);
 				var c = colormap.mapValue(v, true);
@@ -268,7 +268,7 @@
 		}
 
 		// see where to switch the luminance profile at: clicker picker or ramp designer
-		function changeLuminanceProfile(profile) 
+		function changeLuminanceProfile(profile)
 		{
 			picker.changeLuminanceProfile(profile);
 			/*
@@ -317,14 +317,14 @@
 		}
 
 		// function to re-draw scalar field
-		var renderGL = true;	
-		
-		function visualizeScalarField(_field) 
+		var renderGL = true;
+
+		function visualizeScalarField(_field)
 		{
-			var theField = _field || field			
+			var theField = _field || field
 			theField.setColorMap(ramp.getColorMap());
 
-			if (renderGL) 
+			if (renderGL)
 			{
 				if (colorPipeline.ready()) {
 					// compute color difference
@@ -334,21 +334,21 @@
 					// visualize the field
 					colorPipeline.run('vis');
 				}
-			} 
+			}
 		}
-		
+
 		// color analysis pipeline
 		var colorPipeline = null;
-		function initColorAnalysis(callback) 
+		function initColorAnalysis(callback)
 		{
 			colorPipeline = new ColorAnalysis(
-				field, 
+				field,
 				d3.select("#fieldCanvas").node(),
 				callback
 			);
 		}
 
-		function visualizeContour(t) 
+		function visualizeContour(t)
 		{
 			var visUniforms = colorPipeline.getUniforms('vis', 0);
 			if (t >=0 && t <= 1) {
@@ -365,7 +365,7 @@
 
 	<script type="text/javascript">
 		var SHIFT=false;
-		$(document).ready(function() 
+		$(document).ready(function()
 		{
 			$( "input" ).checkboxradio({
 				icon: false
@@ -421,10 +421,10 @@
 
 
 		// initialize color analysis pipeline
-		initColorAnalysis(function() 
+		initColorAnalysis(function()
 		{
 			// visualize the initial scalar field upon loading color analysis pipeline
-			visualizeScalarField(field);		
+			visualizeScalarField(field);
 		});
 
 

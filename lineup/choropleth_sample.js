@@ -21,7 +21,6 @@ function DiscreteSampler(w, h, svg, model, colormap)
 
 DiscreteSampler.prototype = Object.create(ScalarSample.prototype);
 
-
 DiscreteSampler.prototype.vis = function()
 {
 	if (!this.model) {
@@ -34,6 +33,17 @@ DiscreteSampler.prototype.vis = function()
 	}
 	var discreteMap = this.model.discreteMap
 	this.selectionCache = discreteMap.visTheMap(this.svg, this.colormap, this.selectionCache);
+}
+
+DiscreteSampler.prototype.computeValueHistogram = function(_bins)
+{
+	var discreteMap = this.model.discreteMap;
+	var hist = discreteMap.computeValueHistogram(_bins || HISTOGRAM_BINS);
+	var histSum = d3.sum(hist);
+    for (var i=0; i<hist.length; i++) {
+        hist[i] /= histSum;
+    }
+    return hist;
 }
 
 DiscreteSampler.prototype.setColorMap = function(colormap)

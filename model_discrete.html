@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<head>
+
+	<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+	<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+	<script src="https://d3js.org/d3-queue.v3.min.js"></script>
+	<script src="jnd/lib/d3.min.js"></script>
+
+	<script src="https://d3js.org/d3-axis.v1.min.js"></script>
+	<script src="https://d3js.org/topojson.v1.min.js"></script>
+	<script src="https://d3js.org/d3-array.v1.min.js"></script>
+	<script src="https://d3js.org/d3-geo.v1.min.js"></script>
+
+	<script src="src/scalar.js"></script>
+	<script src="design/src/colormap.js"></script>
+	<script src="design/src/gl_pipeline.js"></script>
+	<script src="design/src/coloranalysis.js"></script>
+	<script src="jnd/lib/three.min.js"></script>
+	<script src="lineup/gaussmix.js"></script>
+	<script src="lineup/gaussmix_bivariate.js"></script>
+	<script src="lineup/gaussmix_bi_discrete.js"></script>
+	<script src="lineup/scalar_sample.js"></script>
+	<script src="lineup/lineup.js"></script>
+	<script src="lineup/sim.js"></script>
+	<script src="lineup/lineup_experiment.js"></script>
+	<style>
+		.county {
+			fill: none;
+			stroke: black;
+			stroke-width: 0.5px;
+		}
+		.choroplethBin {
+
+		}
+	</style>
+</head>
+
+<body>
+
+	<canvas width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	</canvas>	
+	<svg id="vis" width="350" height="250" style="position: absolute; top: 10px; left: 10px; border: solid 1px black">
+	</svg>
+
+	<svg id="model" width="350" height="250" style="position: absolute; top: 270px; left: 10px; border: solid 2px black"></svg>
+
+
+<script>
+
+	
+</script>
+	<script type="text/javascript">
+
+		var WIDTH = 350;
+		var HEIGHT = 250;
+
+		var theCounties = null;
+		var theStates = null;
+		var theProjection = null;
+
+
+
+		d3.json("lineup/maps/us.json").then(drawChoropleth);
+
+		function initModel()
+		{
+			d3.json('lineup/maps/us')
+		}
+
+		// filter out Alaska, Hawaii, and Puerto Rico	
+		function filterStates(d) 
+		{
+			if (typeof(d.id) == 'string')
+			{
+				var stateID = d.id.substr(0, 2)
+				if (stateID == "02" || stateID == "15" || stateID =="72") 
+				{
+					return false;
+				}
+				else {
+					return true;
+				}
+			}
+			else
+			{
+				d = d.id;
+
+				if ((d>=2000 && d<3000) || (d>=15000 && d <16000) || (d>=72000&&d<73000)) {
+					return false;
+				}
+				else {
+					return true;
+				}
+			}
+		}
+
+		function drawChoropleth(us) {
+
+			// simplify the geometry 
+			(topojson.presimplify(us));
+
+			var area = 70, simplify = d3.geoTransform({
+				point: function(x, y, z) {
+					if (z >= area) this.stream.point(x/2, y/2);
+				}
+			});
+			var counties = topojson.feature(us, us.objects.counties);
+
+
+			// get list of counties. Also filter out AK, HI, and Puerto Rico (so that we only show)
+			counties.features = counties.features.filter(filterStates);
+
+			theCounties = counties;
+			//theStates = topojson.feature(us, us.objects.states)
+			//theStates.features = theStates.features.filter(filterStates);
+
+			var projection = d3.geoAlbersUsa()
+				.translate([WIDTH / 2, HEIGHT / 2])
+				.scale([480]);
+
+			var path = d3.geoPath()
+				.projection(projection);
+			theProjection = projection;
+
+			console.log("appending...")
+			var svg = d3.select('svg');
+			var countyShapes = svg.selectAll(".county")
+				.data(theCounties.features)
+				.enter()
+				.append("path")
+					.attr("class", "county")
+					.attr("d", path)
+					.attr('id', function(d) {
+						return "county_" + d.id;
+					});
+			console.log("done appending");
+
+
+
+		}
+
+		var pix2County = null;
+		var countyMap = null;
+
+		function testContainment()
+		{
+			var canvas = d3.select('canvas');
+			var width = +canvas.attr('width');
+			var height = +canvas.attr('height');
+			var totalPixels = width * height;
+			var curPixel = 0;
+
+			var mapSize = width * height * Int32Array.BYTES_PER_ELEMENT;
+			pix2County = new Int32Array(new ArrayBuffer(mapSize));
+
+
+			var counties = theCounties;
+			var context = canvas.node().getContext('2d');
+			var imgd = context.getImageData(0, 0, width, height);
+			var pixels = imgd.data;
+
+			var inCount = 0;
+			var countyLength = 0;
+			var counter = 0;
+			var lastHit = null;
+
+			for (var r=0; r<height; r++) 
+			{
+				for (var c=0; c<width; c++, curPixel++) 
+				{
+					var K = (r*width + c);
+					var I = K * 4;
+					pixels[I] = 255;
+					pixels[I+1] = 255;
+					pixels[I+2] = 255;
+					pix2County[K]=0;
+
+					// convert pixel coordinates to lat/long
+					var theP = theProjection.invert([c, r]);
+
+					if (lastHit) 
+					{
+						if (d3.geoContains(lastHit, theP)) {
+							inCount++;
+							pixels[I] = 255;
+							pixels[I+1] = 0;
+							pixels[I+2] = 0;
+							pixels[I+3] = 255;
+							pix2County[K] = lastHit.id;
+							continue;
+						}
+					}
+					else {
+						lastHit = null;
+					}
+
+					for (var county = 0, len=counties.features.length; county < len; county++)
+					{
+						var theC = counties.features[county];
+						var test = d3.geoContains(theC, theP);
+
+						counter++;
+						if (counter%10000 == 0) {
+							console.log((100 * curPixel/totalPixels).toFixed(1) + '%, ' + I);
+							counter = 0;
+						}
+
+						if (test) 
+						{
+							inCount++;
+							pixels[I] = 255;
+							pixels[I+1] = 0;
+							pixels[I+2] = 0;
+							pixels[I+3] = 255;
+							lastHit = theC;
+							pix2County[K] = lastHit.id;
+							break;
+						}
+
+
+					}
+				}
+			}
+			context.putImageData(imgd, 0, 0);
+			console.log("inCount: " + inCount);
+
+			// convert pix2County to a standard array
+			var buffer = [], binMap = {}, listOfBins = [];
+			for (var i=0, len=pix2County.length; i<len; i++) 
+			{
+				var bin = pix2County[i]
+				buffer.push(bin);
+				if (bin > 0) {
+					if (!binMap[bin]) {
+						binMap[bin] = true;
+						listOfBins.push(bin);
+					}
+				}
+			}
+
+			// sort list of bins
+			listOfBins.sort(function(a,b) { return a-b });
+
+			countyMap = {
+				width: width,
+				height: height,
+				pixelMap: buffer,
+				listOfBins: listOfBins,
+			};
+		}
+
+console.save = function(data, filename){
+
+    if(!data) {
+        console.error('Console.save: No data')
+        return;
+    }
+
+    if(!filename) filename = 'console.json'
+
+    if(typeof data === "object"){
+        data = JSON.stringify(data, undefined, 4)
+    }
+
+    var blob = new Blob([data], {type: 'text/json'}),
+        e    = document.createEvent('MouseEvents'),
+        a    = document.createElement('a')
+
+    a.download = filename
+    a.href = window.URL.createObjectURL(blob)
+    a.dataset.downloadurl =  ['text/json', a.download, a.href].join(':')
+    e.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null)
+    a.dispatchEvent(e)
+ }
+
+	</script>
+</body>
+</html>

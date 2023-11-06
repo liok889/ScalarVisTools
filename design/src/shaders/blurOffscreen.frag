@@ -34,28 +34,5 @@ void main()
 		dot(data2, BLUR_KERNEL2) +
 		dot(data3, BLUR_KERNEL1)
 	);
-
-
-	/*
-	float val=0.0;
-	for (int r=-2; r<=2; r++) {
-		for (int c=-2; c<=2; c++) {
-			val += texture2D(scalarField, oTexCoord + vec2(float(c),float(r)) * pitch).r;
-		}
-	}
-	val *= 1.0 / (5.0*5.0);
-	*/
-
-
-
-	vec2 colormapCoord = vec2(val, 0.5);
-	if (val >= 0.0)
-	{
-		// blur with surround
-		gl_FragColor = texture2D(colormap, colormapCoord);
-	}
-	else
-	{
-		gl_FragColor = vec4(1.0);
-	}
+	gl_FragColor = vec4(val);
 }

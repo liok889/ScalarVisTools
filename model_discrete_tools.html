@@ -147,7 +147,7 @@
 		var LINEUP_N = 4;
 
 		// number of sampling iterations
-		var ITER = 18000 * 3;
+		var ITER = 40000 * 3;
 		var N = ITER;
 
 		// 'good' sampling iterations to show a better representation of the model (for debugging)
@@ -159,7 +159,7 @@
 		// 'fieldSmooth': smooth rectangle
 		// 'fieldDiscrete': binned rectangle (10x10 pixel bins)
 		
-		var VIS_TYPE = 'fieldSmooth';
+		var VIS_TYPE = 'mapDiscrete';
 		setRepresentationType(VIS_TYPE);
 
 		// create lineup elements
@@ -167,7 +167,7 @@
 
 		// give them a thin border
 		d3.select('#lineupTable').selectAll(CANVAS_TYPE)
-			.style('border', 'solid 1px black');
+			//.style('border', 'solid 1px black');
 
 		// prevent auto rendering when model us updated 
 		var CALLBACK_SAMPLE = false;
