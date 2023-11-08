@@ -77,7 +77,10 @@
 		<b>Cubehelix</b><br>
 		start: <span id="labelStart"></span><div id="sliderStart" style="width: 150px"></div><br>
 		rots:  <span id="labelRots"></span><div id="sliderRots"  style="width: 150px"></div><br>
-		hues:  <span id="labelHues"></span><div id="sliderHues"  style="width: 150px"></div>
+		hues:  <span id="labelHues"></span><div id="sliderHues"  style="width: 150px"></div><br>
+
+		<b>Preset</b><br>
+		<input id="colorPresetChooser" style="width: 150px;"/><br>
 
 	</div>
 
@@ -869,6 +872,16 @@
 			$('#sliderStart').slider({ step: 0.01, min: 0.01, max: 4, value: START, slide: updateCubehelix, change: function(event, ui) {} });
 			$('#sliderRots').slider({ step: 0.01, min: -7, max: 7, value: ROTS, slide: updateCubehelix, change: function(event, ui) { } });
 			$('#sliderHues').slider({ step: 0.01, min: 0.01, max: 3.0, value: HUE, slide: updateCubehelix, change: function(event, ui) { } });
+
+			$('#colorPresetChooser').autocomplete({
+				source: Object.keys(COLOR_PRESETS),
+				change: function (event, ui) {
+					changeColormap(ui.item.value);
+				},
+				select: function (event, ui) {
+					changeColormap(ui.item.value);
+				},
+			});
 
 			d3.select("#labelBandClustering").html(BAND_CLUSTERING_COEFFICIENT);
 			d3.select('#labelStart').html(START);
