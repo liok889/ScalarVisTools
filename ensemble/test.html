@@ -1,0 +1,186 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="lib/jquery-ui.css">
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/jquery-ui.js"></script>
+    <script src="lib/d3.v5.min.js"></script>
+    <script src="lib/d3-queue.v3.min.js"></script>
+    <script src="lib/three.js"></script>
+
+    <script src="lib/scalar.js"></script>
+    <script src="lib/colormap.js"></script>
+    <script src="lib/gl_pipeline.js"></script>
+    <script src="lib/coloranalysis.js"></script>
+    <script src="lib/scalarvis.js"></script>
+    <script src="lib/terrain.js"></script>
+    <script src="lib/perlin.js"></script>
+    <script src="lib/noisegen.js"></script>
+
+    <script src="datagen.js"></script>
+    <style>
+        body {
+            font-family: Arial, monospace;
+            font-size: 14px;
+        }
+
+        #noiseCanvas {
+            border: solid 1px black;
+        }
+
+        .histRect {
+            fill: #cccccc;
+            stroke: none;
+        }
+        .clearBoth {
+            clear: both;
+        }
+    </style>
+</head>
+
+<body>
+    <div stlye="width: 100%; padding: 1em; overflow: auto;">
+        <div style="width: 270px; float: left">
+            <canvas id="noiseCanvas" width="257" height="257"></canvas>
+        </div>
+
+        <div style="width: 200px; float: left">
+            Noise scale:
+            <div id="sliderScale" style="width: 100px"></div>
+
+            <p>
+            Exp:
+            <div id="sliderExp" style="width: 100px"></div>
+        </div>
+        <div class="clearBoth"></div>
+
+    </div>
+
+    <div stlye="width: 100%; padding-top: 15px; overflow: auto; margin-top: 15px">
+        <div style="width: 270px; float: left">
+            <svg id="svgMain" width="255" height="255"></svg>
+        </div>
+
+        <div style="width: 200px; float: left">
+            histogram bins:
+            <div id="sliderHist" style="width: 100px"></div>
+        </div>
+        <div class="clearBoth"></div>
+
+    </div>
+
+
+    <script>
+
+        var DEFAULT_SCALE = noiseScale;
+        var DEFAULT_EXP = exponentWeight;
+        var HIST_BINS = 50;
+
+        $( "#sliderScale").slider({
+            min: 1, max: 10, step: 0.01,
+            value: DEFAULT_SCALE,
+            slide: function(e, ui) { updateNoiseParams(ui.value); }
+        });
+
+        $( "#sliderExp").slider({
+            min: 0, max: 10, step: 0.001,
+            value: DEFAULT_EXP,
+            slide: function(e, ui) { updateNoiseParams(null, ui.value); }
+        });
+
+        $( "#sliderHist").slider({
+            min: 2, max: 200, step: 1,
+            value: HIST_BINS,
+            slide: function(e, ui) { HIST_BINS = ui.value; plotHist(); }
+        });
+
+        // noise generator
+        var canvas = d3.select("#noiseCanvas").node();
+        var noiseField = new NoiseGenerator(null, canvas, 2);
+
+        var HIST_H = 50;
+        var HIST_W = 255;
+
+        function plotHist()
+        {
+
+
+            // compute histogram
+            var hist = noiseField.field.calcAmplitudeFrequency(HIST_BINS);
+            var maxHist = 0;
+            for (var i=0; i<hist.length; i++) {
+                maxHist = Math.max(maxHist, hist[i]);
+            }
+
+            (function(_hist, _maxHist) {
+                d3.select('#svgMain').selectAll('rect').remove();
+                var sel = d3.select('#svgMain').selectAll('rect.hist').data(_hist);
+                //sel.exit().remove();
+
+                sel = sel.enter().append('rect').merge(sel);
+                sel
+                    .attr('class', 'histRect')
+                    .attr('x', function(d, i) { return i*(HIST_W/_hist.length);})
+                    .attr('y', function(d, i) { return HIST_H - (d/_maxHist)*HIST_H; })
+                    .attr('height', function(d, i) { return (d/_maxHist)*HIST_H; })
+                    .attr('width', function(d, i) { return (HIST_W/_hist.length); });
+
+            })(hist, maxHist)
+        }
+
+        function refreshNoise() {
+            noiseField.generate();
+            noiseField.vis();
+            plotHist();
+        }
+        // update noise parameters
+        function updateNoiseParams(scale, exponent) {
+            if (scale !== null && scale !== undefined) {
+                if (noiseField.setNoiseScale) {
+                    noiseField.setNoiseScale(scale);
+                }
+            }
+
+            if (exponent !== null && exponent !== undefined) {
+                if (noiseField.setExp) {
+                    noiseField.setExp(exponent);
+                }
+            }
+            refreshNoise();
+
+        }
+
+        function colormapToImage(colormap, imageSelection, direction)
+        {
+            var canvas = colormap.drawColorScale(
+                +imageSelection.attr('width'),
+                +imageSelection.attr('height'),
+                +imageSelection.attr('width'),
+                direction || 'horizontal'
+            )
+            imageSelection.attr("xlink:href", canvas.toDataURL());
+        }
+
+
+
+        refreshNoise();
+
+        // create placeholder for colormap
+        d3.select("#svgMain").append('image')
+            .attr('id', 'imgColormap')
+            .attr('y', HIST_H)
+            .attr('width', HIST_W)
+            .attr('height', 30);
+
+        var colormap = null;
+        function changeColormap(preset) {
+            colormap = getColorPreset(preset);
+            ScalarVis.setUniversalColormap(colormap);
+            colormapToImage(colormap, d3.select('#imgColormap'));
+        }
+        changeColormap('greyscale');
+
+    </script>
+</body>
+
+</html>
