@@ -441,6 +441,27 @@ ScalarField.prototype.randomize = function()
 	this.minmax = null;
 }
 
+ScalarField.prototype.getBasicStats = function()
+{
+	var view = this.view;
+	var mean = 0, std = 0;
+	for (var i=0, len=view.length; i<len; i++) {
+		mean += view[i];
+	}
+	mean /= view.length;
+
+	for (var i=0, len=view.length; i<len; i++) {
+		var d = view[i]-mean;
+		std += d*d;
+	}
+	std = Math.sqrt(std/view.length);
+	return {
+		mean: mean,
+		std: std
+	}
+
+}
+
 ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 {
 	var view = this.view;
@@ -450,6 +471,11 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 	var count = 0;
 	var w_1 = this.w-1;
 	var h_1 = this.h-1;
+
+	if (!x) x=0;
+	if (!y) y=0;
+	if (!w) w=this.w;
+	if (!h) h=this.h;
 
 	// min/max and mean
 	for (var r=y, rr=y+h; r<rr; r++)
@@ -492,7 +518,7 @@ ScalarField.prototype.getSubregionStats = function(x, y, w, h)
 				var gx = -qqq - 2*aaa -zzz +eee +2*ddd +ccc;
 				var gy =  qqq + 2*www +eee -zzz -2*xxx -ccc;
 				var g = Math.abs(gx) + Math.abs(gy);
-				steepness += 100 * g;
+				steepness += g;
 				steepnessCount++;
 				maxSteepness = Math.max(g, maxSteepness);
 			}

@@ -4,7 +4,7 @@ var noiseSimplex = false;
 var inversion = false;
 
 var exponentWeight = 2.0;
-var noiseScale = 4;
+var noiseScale = 3;
 var noiseWeights = [1, 0.75, 0.3/2, 0.1/3, 0.05/5];
 var noiseOctaves = [1, 2, 4, 8, 16];
 
@@ -43,7 +43,7 @@ function noiseGenerate(x, y, w, h)
 function makeNoise(scalarField, _noiseScale, _exponentWeight)
 {
 	//console.log("noiseScale: " + noiseScale);
-	setNoiseOffset(Math.random()*1000, Math.random()*1000);
+	//setNoiseOffset(Math.random()*2000-1000, Math.random()*2000-1000);
 
 	var data = scalarField.view;
 	var w = scalarField.w;
@@ -84,8 +84,8 @@ function makeNoise(scalarField, _noiseScale, _exponentWeight)
 	//analyzeImage();
 }
 
-function seedNoise() {
-	var theSeed = Math.random()
+function seedNoise(_seed) {
+	var theSeed = _seed !== undefined && _seed !== null ? _seed : Math.random();
 	noise.seed(theSeed);
 	return theSeed;
 }

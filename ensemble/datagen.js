@@ -14,8 +14,18 @@ function DataGenerator(field, canvas)
         this.canvas = canvas;
         this.scalarVis = new ScalarVis(this.field, this.canvas);
     }
-
 }
+DataGenerator.prototype.getField = function() {
+    return this.field;
+}
+DataGenerator.prototype.getData = function() {
+    return this.data;
+}
+DataGenerator.prototype.getSeed = function() {
+    //console.error("undefined seed");
+    return undefined;
+}
+
 DataGenerator.prototype.generate = function() {
     console.error("DataGenerator abstract not implemented");
 }
@@ -41,6 +51,15 @@ TerrainGenerator.prototype.generate = function(param)
     this.terrainGen.generate(1);
     this.field.normalize();
 }
+TerrainGenerator.prototype.getExp = function() {
+    return null;
+}
+TerrainGenerator.prototype.getNoiseScale = function() {
+    return null;
+}
+TerrainGenerator.prototype.getNoiseOffset = function() {
+    return [null,null];
+}
 
 function NoiseGenerator(field, canvas, _ns, _exp)
 {
@@ -50,16 +69,43 @@ function NoiseGenerator(field, canvas, _ns, _exp)
 }
 NoiseGenerator.prototype = Object.create(DataGenerator.prototype);
 
+NoiseGenerator.prototype.getSeed = function()
+{
+    return this.seed;
+}
+
+
 NoiseGenerator.prototype.setNoiseScale = function(_ns) {
     this.noiseScale = _ns;
+}
+
+NoiseGenerator.prototype.getNoiseScale = function(_ns) {
+    return this.noiseScale;
 }
 
 NoiseGenerator.prototype.setExp = function(exponent) {
     this.exponent = exponent;
 }
+NoiseGenerator.prototype.getExp = function(exponent) {
+    return this.exponent;
+}
 
-NoiseGenerator.prototype.generate = function()
+NoiseGenerator.prototype.getNoiseOffset = function() {
+    return this.offset;
+}
+NoiseGenerator.prototype.generate = function(_seed, _offset, _scale, _exponent)
 {
-    seedNoise();
-    makeNoise(this.field, this.noiseScale, this.exponent);
+    // seed
+    this.seed = seedNoise(_seed);
+
+    // offset
+    this.offset = _offset || [Math.random()*2000-1000, Math.random()*2000-1000];
+    setNoiseOffset(this.offset[0], this.offset[1])
+
+    // scale and exponent
+    var scale = _scale !== undefined && _scale !== null ? _scale : this.noiseScale;
+    var exponent = _exponent !== undefined && _exponent !== null ? _exponent : this.exponent;
+
+    // generate noise
+    makeNoise(this.field, scale, exponent);
 }

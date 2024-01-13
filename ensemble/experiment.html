@@ -1,0 +1,60 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="lib/jquery-ui.css">
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/jquery-ui.js"></script>
+    <script src="lib/d3.v5.min.js"></script>
+    <script src="lib/d3-queue.v3.min.js"></script>
+    <script src="lib/three.js"></script>
+
+    <script src="lib/scalar.js"></script>
+    <script src="lib/colormap.js"></script>
+    <script src="lib/gl_pipeline.js"></script>
+    <script src="lib/coloranalysis.js"></script>
+    <script src="lib/scalarvis.js"></script>
+    <script src="lib/terrain.js"></script>
+    <script src="lib/perlin.js"></script>
+    <script src="lib/noisegen.js"></script>
+
+    <script src="datagen.js"></script>
+    <script src="simulate.js"></script>
+    <script src="experiment.js"></script>
+
+    <style>
+        .stimulusCanvas {
+            border: solid 1px black;
+        }
+        .scaleCanvas {
+            border: solid 1px black;
+        }
+        .selectedCanvas {
+            border: solid 5px red;
+        }
+    </style>
+</head>
+
+<body style="font-family: sans-serif; font-size: 16px" >
+
+    <div style="width: 700px; margin-left: 40px">
+
+        <div style="margin: 20px">
+            Select the image that has higher terrain on average
+        </div>
+        <div width: 100%; padding: 1em; overflow: auto;>
+            <div style="width: 300px; float: left">
+                <canvas id="canvasLeft" width="250" height="250" class="dataCanvas"></canvas>
+            </div>
+            <div style="width: 300px; float: left">
+                <canvas id="canvasRight" width="250" height="250" class="dataCanvas"></canvas>
+            </div>
+
+            <div style="width: 50px float: left; text-align: center">
+                color<br>scale<br>
+                <canvas id="canvasScale" width="30" height="80"></canvas>
+            </div>
+            <div style="clear: both"></div>
+        </div>
+    </div>
+</body>
+</html>

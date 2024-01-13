@@ -18,7 +18,10 @@
     <script src="lib/noisegen.js"></script>
 
     <script src="datagen.js"></script>
+    <script src="simulate.js"></script>
+
     <style>
+
         body {
             font-family: Arial, monospace;
             font-size: 14px;
@@ -35,21 +38,31 @@
         .clearBoth {
             clear: both;
         }
+        .selection {
+            stroke: red;
+            fill: red;
+            opacity: 0.2;
+        }
+        .brush {
+            stroke: white;
+            opacity: 0.1;
+            fill: #cccccc;
+        }
     </style>
 </head>
 
 <body>
     <div stlye="width: 100%; padding: 1em; overflow: auto;">
         <div style="width: 270px; float: left">
-            <canvas id="noiseCanvas" width="257" height="257"></canvas>
+            <canvas id="noiseCanvas" width="250" height="250"></canvas>
         </div>
 
         <div style="width: 200px; float: left">
-            Noise scale:
+            Noise scale: <span id="labelScale"></span>
             <div id="sliderScale" style="width: 100px"></div>
 
             <p>
-            Exp:
+            Exp:  <span id="labelExp"></span>
             <div id="sliderExp" style="width: 100px"></div>
         </div>
         <div class="clearBoth"></div>
@@ -58,80 +71,84 @@
 
     <div stlye="width: 100%; padding-top: 15px; overflow: auto; margin-top: 15px">
         <div style="width: 270px; float: left">
-            <svg id="svgMain" width="255" height="255"></svg>
+            <svg id="svgMain" width="255" height="350"></svg>
         </div>
 
         <div style="width: 200px; float: left">
-            histogram bins:
+            histogram bins: <span id="labelBins"></span>
             <div id="sliderHist" style="width: 100px"></div>
         </div>
         <div class="clearBoth"></div>
 
     </div>
+    <p>
+        <button onclick="sim(100);">Sim 100</button>
+        <button onclick="simScale(100);">Sim scale</button>
+        <button onclick="simExp(100);">Sim exp</button>
+        <button onclick="simulator.clearStats();">clear stats</button>
 
-
+    <p>
+        <svg id="svgMatrix" width="600" height="300" style="">
+            <g id="groupScatter" transform="translate(150,0)"></g>
+        </svg>
     <script>
 
         var DEFAULT_SCALE = noiseScale;
         var DEFAULT_EXP = exponentWeight;
-        var HIST_BINS = 50;
+        var COLORMAP_H = 30;
 
         $( "#sliderScale").slider({
             min: 1, max: 10, step: 0.01,
             value: DEFAULT_SCALE,
-            slide: function(e, ui) { updateNoiseParams(ui.value); }
+            slide: function(e, ui) {
+                d3.select("#labelScale").html(ui.value)
+                updateNoiseParams(ui.value);
+            }
         });
 
         $( "#sliderExp").slider({
             min: 0, max: 10, step: 0.001,
             value: DEFAULT_EXP,
-            slide: function(e, ui) { updateNoiseParams(null, ui.value); }
+            slide: function(e, ui) {
+                d3.select("#labelExp").html(ui.value)
+                updateNoiseParams(null, ui.value);
+            }
         });
 
         $( "#sliderHist").slider({
             min: 2, max: 200, step: 1,
             value: HIST_BINS,
-            slide: function(e, ui) { HIST_BINS = ui.value; plotHist(); }
+            slide: function(e, ui) {
+                d3.select("#labelBins").html(ui.value)
+                HIST_BINS = ui.value;
+                plotValHist();
+            }
         });
+
+        function plotValHist() {
+            var hist = noiseField.field.calcAmplitudeFrequency(HIST_BINS);
+            plotHist(d3.select("#groupVal"), hist)
+        }
 
         // noise generator
         var canvas = d3.select("#noiseCanvas").node();
-        var noiseField = new NoiseGenerator(null, canvas, 2);
-
-        var HIST_H = 50;
-        var HIST_W = 255;
-
-        function plotHist()
-        {
+        var noiseField = new NoiseGenerator(null, canvas, DEFAULT_SCALE, DEFAULT_EXP);
 
 
-            // compute histogram
-            var hist = noiseField.field.calcAmplitudeFrequency(HIST_BINS);
-            var maxHist = 0;
-            for (var i=0; i<hist.length; i++) {
-                maxHist = Math.max(maxHist, hist[i]);
-            }
 
-            (function(_hist, _maxHist) {
-                d3.select('#svgMain').selectAll('rect').remove();
-                var sel = d3.select('#svgMain').selectAll('rect.hist').data(_hist);
-                //sel.exit().remove();
+        // a group to displayt amplitude hisogram
+        var groupValHist = d3.select("#svgMain").append('g')
+            .attr('id', 'groupVal')
 
-                sel = sel.enter().append('rect').merge(sel);
-                sel
-                    .attr('class', 'histRect')
-                    .attr('x', function(d, i) { return i*(HIST_W/_hist.length);})
-                    .attr('y', function(d, i) { return HIST_H - (d/_maxHist)*HIST_H; })
-                    .attr('height', function(d, i) { return (d/_maxHist)*HIST_H; })
-                    .attr('width', function(d, i) { return (HIST_W/_hist.length); });
-
-            })(hist, maxHist)
-        }
+        var groupSim = d3.select("#svgMain").append('g')
+            .attr('transform', 'translate(0,' + (COLORMAP_H+5+HIST_H) + ')')
+            .attr('id', 'groupSim')
 
         function refreshNoise() {
             noiseField.generate();
             noiseField.vis();
-            plotHist();
+
+            plotValHist();
         }
         // update noise parameters
         function updateNoiseParams(scale, exponent) {
@@ -170,7 +187,7 @@
             .attr('id', 'imgColormap')
             .attr('y', HIST_H)
             .attr('width', HIST_W)
-            .attr('height', 30);
+            .attr('height', COLORMAP_H);
 
         var colormap = null;
         function changeColormap(preset) {
@@ -179,6 +196,84 @@
             colormapToImage(colormap, d3.select('#imgColormap'));
         }
         changeColormap('greyscale');
+
+        var simulator = new Simulate(noiseField);
+
+        function sim(n)
+        {
+            //simulator = new Simulate(noiseField);
+            simulator.simulate(n);
+            plotScatterMatrix();
+
+        }
+
+        var EXP_RANGE = [0, 3];
+        var SCALE_RANGE = [1, 4];
+
+        function simExp(n)
+        {
+            if (!n) n=100;
+            //simulator.clearStats();
+            simulator.simSteps(n, EXP_RANGE);
+            plotScatterMatrix(1);
+        }
+        function simScale(n) {
+            if (!n) n=100;
+            //simulator.clearStats();
+            simulator.simSteps(n, undefined, SCALE_RANGE);
+            plotScatterMatrix(1);
+        }
+
+        function simMatrix() {
+            simulator.clearStats();
+            simulator.simMatrix(100, EXP_RANGE, SCALE_RANGE);
+
+        }
+
+        function plotScatterMatrix(subsample)
+        {
+            var g = d3.select("#groupScatter");
+            g.selectAll("*").remove()
+            plotScatter(
+                g, simulator,
+                function(d) { return d.std },
+                function(d) { return d.steepness },
+                subsample, 'std', 'steepness'
+            );
+
+            var g2 = g.append('g')
+                .attr('transform', 'translate(0,' + (SCATTER_H+SCATTER_PAD) + ")")
+            plotScatter(
+                g2, simulator,
+                function(d) { return d.std },
+                function(d) { return d.mean },
+                subsample, 'std', 'mean'
+            );
+
+            var g3 = g.append('g')
+                .attr('transform', 'translate(' + (SCATTER_W+SCATTER_PAD+30) + "," + (SCATTER_H+SCATTER_PAD) + ")")
+            plotScatter(
+                g3, simulator,
+                function(d) { return d.steepness },
+                function(d) { return d.mean },
+                subsample, 'steepness', 'mean'
+            );
+
+        }
+
+        d3.select(window)
+            .on('keydown', function() {
+                if (d3.event.shiftKey) {
+                    d3.selectAll('.brushGroup')
+                        .attr('pointer-events', 'none');
+                }
+            })
+            .on('keyup', function() {
+                if (!d3.event.shiftKey) {
+                    d3.selectAll('.brushGroup')
+                        .attr('pointer-events', 'all');
+                }
+            })
 
     </script>
 </body>
