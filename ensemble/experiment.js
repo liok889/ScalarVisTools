@@ -17,7 +17,7 @@ var ATTN_CHECK_PERCENTILE = .025;
 var DIFF_TOLERANCE = .01/4;
 
 // STEP is 5% of full range
-var DIFFICULTY_STEP = .05;
+var DIFFICULTY_STEP = .075;
 
 // attention checks
 var ATTN_CHECK_PER_BLOCK=2;
@@ -29,6 +29,9 @@ var PROMPTS = {
 }
 function permute(arr, count)
 {
+    if (!count) {
+        count = 5000;
+    }
     if (arr.length == 1) {
         return arr;
     }
@@ -42,7 +45,7 @@ function permute(arr, count)
         }
     }
     else {
-        for (var i=0, len=arr.length, iters = count || 10000; i<count; i++) {
+        for (var i=0, len=arr.length; i<count; i++) {
             var i1 = Math.floor(Math.random() * len);
             var i2 = Math.floor(Math.random() * len);
             if (i1!=i2) {
@@ -91,7 +94,7 @@ function Experiment(stimulusData, statistic, splits, colormaps)
     this.generatorRight.generate(); this.generatorRight.vis();
 
     // set difficulty tolerance to 20x the mean of difficulty diff in data
-    DIFF_TOLERANCE = 10 * this.calcDifficultyDiff();
+    DIFF_TOLERANCE = 20 * this.calcDifficultyDiff();
 
     // scale step/attention difficulty by the statistic range
     DIFFICULTY_STEP *= this.statisticRange[1]-this.statisticRange[0];
@@ -213,7 +216,7 @@ Experiment.prototype.enterResponse = function()
 Experiment.prototype.ready = function()
 {
     var splitSeq = permute(d3.range(this.splits));
-    var colormapSeq = this.colormaps || ['greyscale'];
+    var colormapSeq = permute(this.colormaps || ['greyscale']);
     var blockSeq = [];
 
     for (var i=0; i<colormapSeq.length; i++)
@@ -296,16 +299,13 @@ Experiment.prototype.pickCheck = function()
     var range1 =
         [0, Math.ceil(this.orderedList.length*ATTN_CHECK_PERCENTILE)+1];
     var range2 =
-        [this.orderedList.length-Math.ceil(this.orderedList.length*ATTN_CHECK_PERCENTILE), this.orderedList.length]
+        [this.orderedList.length-Math.ceil(this.orderedList.length*ATTN_CHECK_PERCENTILE), this.orderedList.length];
 
-    console.log('\t range1: ' + range1);
-    console.log('\t range2: ' + range2);
+    var i1 = Math.floor(Math.random() * (range1[1]-range1[0])) + range1[0];
+    var i2 = Math.floor(Math.random() * (range2[1]-range2[0])) + range2[0];
 
-    var r1 = Math.floor(Math.random() * (range1[1]-range1[0])) + range1[0];
-    var r2 = Math.floor(Math.random() * (range2[1]-range2[0])) + range2[0];
-
-    this.target = this.orderedList[r2];
-    this.reference = this.orderedList[r1];
+    this.target = this.orderedList[i2];
+    this.reference = this.orderedList[i1];
 
     if (Math.random() < .5)
     {
@@ -585,7 +585,7 @@ Experiment.prototype.nextTrial = function()
     else {
         if (this.isAttentionCheck())
         {
-            console.log("that was attention check");
+            //console.log("that was attention check");
         }
         else {
             this.currentTrial++;
@@ -598,7 +598,7 @@ Experiment.prototype.nextTrial = function()
     // select next stimulus
     if (this.isAttentionCheck())
     {
-        console.log('ENGAGEMENT');
+        //console.log('ENGAGEMENT');
         this.pickCheck();
     }
     else {

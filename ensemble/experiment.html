@@ -75,8 +75,13 @@
     <script type="text/Javascript">
         var STIMULI = null;
         var STATISTIC = 'mean';
-        var SPLITS = 2;
-        var COLORMAPS = null;
+        var SPLITS = 3;
+        var COLORMAPS = [
+            'greyscale',
+            'turbo',
+            'bluebrownFull',
+            'viridis'
+        ];
 
         var exp = null;
 
@@ -88,7 +93,8 @@
                 exp = new Experiment(
                     STIMULI,
                     STATISTIC,
-                    SPLITS
+                    SPLITS,
+                    COLORMAPS
                 );
             });
 
