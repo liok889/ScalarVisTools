@@ -1,9 +1,9 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 10;
+var TRIAL_PER_BLOCK = 4;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1000; // m. seconds
-var FIXATION_TIME = [1000, 1500];
+var FIXATION_TIME = [800, 1200];
 
 // training session?
 var TRAINING = false;
@@ -11,8 +11,8 @@ var TRAINING = false;
 // initial difference set to 30% of full statistic range
 var INITIAL_DIFFICULTY = .3;
 
-// attentin check is at 40%
-var ATTN_CHECK_DIFFICULTY = .4;
+// attentin is picked from 2.5% of extreme stimuli
+var ATTN_CHECK_PERCENTILE = .025;
 
 var DIFF_TOLERANCE = .01/4;
 
@@ -93,7 +93,7 @@ function Experiment(stimulusData, statistic, splits, colormaps)
     // set difficulty tolerance to 20x the mean of difficulty diff in data
     DIFF_TOLERANCE = 10 * this.calcDifficultyDiff();
 
-    // scale step by the statistic range
+    // scale step/attention difficulty by the statistic range
     DIFFICULTY_STEP *= this.statisticRange[1]-this.statisticRange[0];
 
     this.clearSelection();
@@ -136,6 +136,8 @@ function flash(side)
     })(side)
 }
 
+
+
 Experiment.prototype.clearSelection = function()
 {
     // arm events
@@ -177,29 +179,33 @@ Experiment.prototype.enterResponse = function()
     // store the result
     this.storeTrialData();
 
-    if (this.isCorrect())
+    if (!this.isAttentionCheck())
     {
-        // make the next trial harder
-        if (this.difficulty > DIFFICULTY_STEP) {
-            this.difficulty -= DIFFICULTY_STEP;
-        }
-        else {
-            var step = DIFFICULTY_STEP/1.5;
-            var iters = 0;
-            while (this.difficulty < step && (iters++<50)) {
-                step /= 1.5;
+        if (this.isCorrect())
+        {
+            // make the next trial harder
+            if (this.difficulty > DIFFICULTY_STEP) {
+                this.difficulty -= DIFFICULTY_STEP;
             }
-            this.difficulty -= step;
+            else {
+                var step = DIFFICULTY_STEP/1.5;
+                var iters = 0;
+                while (this.difficulty < step && (iters++<50)) {
+                    step /= 1.5;
+                }
+                this.difficulty -= step;
+            }
+        } else {
+            // make the next trial easier
+            this.difficulty += DIFFICULTY_STEP*3;
+            //console.log("incorrect");
         }
-    } else {
-        // make the next trial easier
-        this.difficulty += DIFFICULTY_STEP*3;
-        console.log("incorrect");
     }
     console.log("difficulty: " + this.difficulty);
 
     if (this.nextTrial()) {
         console.log("END!");
+        this.endExperiment();
     }
 }
 
@@ -285,15 +291,48 @@ Experiment.prototype.nextBlock = function()
     return false;
 }
 
-Experiment.prototype.pickStimulus = function()
+Experiment.prototype.pickCheck = function()
 {
-    var blockInfo = this.blocks[this.currentBlock];
-    var difficulty = this.difficulty;
-    if (blockInfo.trialSeq[this.currentStimulus] == 'C') {
-        difficulty = ATTN_CHECK_DIFFICULTY;
-        console.log("Attention difficulty: " + difficulty);
+    var range1 =
+        [0, Math.ceil(this.orderedList.length*ATTN_CHECK_PERCENTILE)+1];
+    var range2 =
+        [this.orderedList.length-Math.ceil(this.orderedList.length*ATTN_CHECK_PERCENTILE), this.orderedList.length]
+
+    console.log('\t range1: ' + range1);
+    console.log('\t range2: ' + range2);
+
+    var r1 = Math.floor(Math.random() * (range1[1]-range1[0])) + range1[0];
+    var r2 = Math.floor(Math.random() * (range2[1]-range2[0])) + range2[0];
+
+    this.target = this.orderedList[r2];
+    this.reference = this.orderedList[r1];
+
+    if (Math.random() < .5)
+    {
+        this.left = this.target;
+        this.right = this.reference;
+        this.correct = 'left';
+    } else
+    {
+        this.right = this.target;
+        this.left = this.reference;
+        this.correct = 'right';
     }
 
+}
+Experiment.prototype.pickStimulus = function()
+{
+    var difficulty = this.difficulty;
+
+    // use full available stimulus range, but restrict one stimulus to be within
+    // the base range defined by the current group split
+    var stimulusList = this.orderedList;
+    var splitStart = this.blocks[this.currentBlock].split * this.splitBinSize;
+    var splitEnd = Math.min(stimulusList.length, splitStart+this.splitBinSize);
+    var stimulusRange = [splitStart, splitEnd];
+
+    // or
+    //stimulusRange = [0, stimulusList.length]
 
     // number of stimulus generation tries before giving up
     var TRIES = 500;
@@ -306,12 +345,13 @@ Experiment.prototype.pickStimulus = function()
     for (var iter=0; iter<TRIES && !converged; iter++)
     {
         var approach = Math.random() < .5 ? -1 : 1;
-        var stimulus1 = Math.floor(Math.random() * this.stimulusList.length);
+        //var stimulus1 = Math.floor(Math.random() * this.stimulusList.length);
+        var stimulus1 = Math.floor(Math.random() * (stimulusRange[1]-stimulusRange[0])) + stimulusRange[0];
         var d1 = this.data[stimulus1][this.statistic];
 
         for (
             var stimulus2 = stimulus1 + approach;
-            stimulus2 >= 0 && stimulus2 < this.stimulusList.length;
+            stimulus2 >= 0 && stimulus2 < stimulusList.length;
             stimulus2 += approach
         )
         {
@@ -390,15 +430,29 @@ Experiment.prototype.isCorrect = function()
         return false;
     }
 }
+Experiment.prototype.isAttentionCheck = function()
+{
+    var blockInfo = this.blocks[this.currentBlock];
+    if (blockInfo.trialSeq[this.currentStimulus]=='C')
+    {
+        // attention check
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
 
 Experiment.prototype.storeTrialData = function()
 {
-    var blockInfo = this.blocks[this.currentBlock];
-    if (blockInfo.trialSeq[this.currentStimulus]=='C') {
+    if (this.isAttentionCheck())
+    {
         // attention check
-        this.attentionScores.push(this.isCorrect());
+        this.attentionScores.push(this.isCorrect() ? 1 : 0);
     }
     else {
+        var blockInfo = this.blocks[this.currentBlock];
         this.results.push({
             responseTime: Date.now()-this.readyTime,
             difficulty: this.difficulty,
@@ -430,6 +484,7 @@ Experiment.prototype.renderStimulus = function()
         clearTimeout(this.exposureTimeout);
         this.exposureTimeout = undefined;
     }
+    this.clearSelection();
     (function(obj) {
 
         if (FIXATION_TIME) {
@@ -468,12 +523,12 @@ Experiment.prototype.renderStimulus = function()
             // reveal canvas
             d3.select("#canvasLeft").style('visibility', null);
             d3.select("#canvasRight").style('visibility', null);
+            d3.select('body').classed('nocursor', false);
 
             if (EXPOSURE_TIME) {
                 d3.select("#textPrompt").style('visibility', 'hidden');
                 d3.select("#divScale").style('visibility', 'hidden');
             } else {
-                d3.select('body').classed('nocursor', false);
                 d3.select("#textPrompt").style('visibility', null);
                 d3.select("#divScale").style('visibility', null);
             }
@@ -490,6 +545,7 @@ Experiment.prototype.renderStimulus = function()
 
                     var glLeft = d3.select("#canvasLeft").node().getContext('webgl');
                     var glRight = d3.select("#canvasRight").node().getContext('webgl');
+
 
                     glLeft.clearColor(1, 1, 1, 1);
                     glRight.clearColor(1, 1, 1, 1);
@@ -509,19 +565,26 @@ Experiment.prototype.renderStimulus = function()
     })(this);
 }
 
+Experiment.prototype.endExperiment = function()
+{
+    this.clearSelection();
+    d3.selectAll("canvas").style('visibility', 'hidden');
+
+}
+
 Experiment.prototype.nextTrial = function()
 {
     this.trialsRemaining--;
 
-    if (this.trialsRemaining < 0) {
+    if (this.trialsRemaining <= 0) {
         var done = this.nextBlock();
         if (done) {
             return true;
         }
     }
     else {
-        var blockInfo = this.blocks[this.currentBlock];
-        if (blockInfo.trialSeq[this.currentStimulus] == 'C') {
+        if (this.isAttentionCheck())
+        {
             console.log("that was attention check");
         }
         else {
@@ -533,7 +596,14 @@ Experiment.prototype.nextTrial = function()
     }
 
     // select next stimulus
-    this.pickStimulus();
+    if (this.isAttentionCheck())
+    {
+        console.log('ENGAGEMENT');
+        this.pickCheck();
+    }
+    else {
+        this.pickStimulus();
+    }
 
     // render stimulus
     this.renderStimulus();
