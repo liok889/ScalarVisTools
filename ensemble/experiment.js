@@ -16,8 +16,8 @@ var ATTN_CHECK_PERCENTILE = .025;
 
 var DIFF_TOLERANCE = .01/4;
 
-// STEP is 5% of full range
-var DIFFICULTY_STEP = .075;
+// STEP is 7.5% of full range
+var DIFFICULTY_STEP = .05;
 
 // attention checks
 var ATTN_CHECK_PER_BLOCK=0;
@@ -63,9 +63,11 @@ function permute(arr, count)
 
 function Experiment(stimulusData, statistic, splits, colormaps)
 {
+    // trial results + attention scores
     this.results = [];
     this.attentionScores = [];
 
+    // stimulus data and target statistic
     this.data = stimulusData.data;
     this.statistic = statistic;
     this.orderedList = stimulusData[ statistic + 'List'];
@@ -74,6 +76,23 @@ function Experiment(stimulusData, statistic, splits, colormaps)
         this.data[this.orderedList[this.data.length-1]][statistic]
     ];
 
+    // confound statistic, if any
+    if (statistic == 'std' || statistic == 'steepness') {
+        this.confoundStatistic = 'mean';
+        this.confoundRange = [
+            this.data[this.orderedList[0]][this.confoundStatistic],
+            this.data[this.orderedList[this.data.length-1]][this.confoundStatistic]
+        ];
+    }
+    else {
+        this.confoundStatistic = 'std';
+        this.confoundRange = [
+            this.data[this.orderedList[0]][this.confoundStatistic],
+            this.data[this.orderedList[this.data.length-1]][this.confoundStatistic]
+        ];
+    }
+
+    // list of colormap to test
     this.colormaps = colormaps;
 
     // split the statistic intensity into n splits
@@ -196,10 +215,11 @@ Experiment.prototype.enterResponse = function()
                 this.difficulty -= DIFFICULTY_STEP;
             }
             else {
-                var step = DIFFICULTY_STEP/1.5;
+                var step = DIFFICULTY_STEP/1.2;
                 var iters = 0;
-                while (this.difficulty < step && (iters++<50)) {
-                    step /= 1.5;
+                while (this.difficulty <= step && (iters<50)) {
+                    step /= 1.2;
+                    iters++;
                 }
                 this.difficulty -= step;
             }
@@ -347,6 +367,7 @@ Experiment.prototype.pickStimulus = function()
     var bestS1, bestS2;
     var lastDiff = undefined;
     var bestDiff = Number.MAX_VALUE;
+
     for (var iter=0; iter<TRIES && !converged; iter++)
     {
         var approach = Math.random() < .5 ? -1 : 1;
@@ -363,6 +384,16 @@ Experiment.prototype.pickStimulus = function()
             var d2 = this.data[stimulus2][this.statistic];
             var statDiff = Math.abs(d1-d2);
             var difficultyDiff = Math.abs(statDiff-difficulty)
+
+            // consider confounding statistic, if specified
+            var confoundDiff = 0;
+            if (this.confoundStatistic && !this.isAttentionCheck()) {
+                confoundDiff = Math.abs(
+                    this.data[stimulus1][this.confoundStatistic] -
+                    this.data[stimulus2][this.confoundStatistic]);
+                confoundDiff /= this.confoundRange[1]-this.confoundRange[0];
+            }
+
             if ( difficultyDiff <= DIFF_TOLERANCE)
             {
                 converged = true;
@@ -370,17 +401,23 @@ Experiment.prototype.pickStimulus = function()
                 //bestS2 = stimulus2;
                 //break;
             }
+            var score =
+                .6 * difficultyDiff / (this.statisticRange[1]-this.statisticRange[0]) +
+                .4 * confoundDiff / (this.confoundRange ? this.confoundRange[1]-this.confoundRange[0] : 1)
+            //var score = difficultyDiff;
 
+            /*
             if (lastDiff !== undefined && difficultyDiff > lastDiff)
             {
                 // starting to exceed difference, stop searching
                 break;
             }
-            lastDiff = difficultyDiff;
+            //lastDiff = difficultyDiff;
+            */
 
-            if (bestDiff > difficultyDiff)
+            if (bestDiff > score)
             {
-                bestDiff = difficultyDiff;
+                bestDiff = score;
                 bestS1 = stimulus1;
                 bestS2 = stimulus2;
             }
@@ -498,12 +535,13 @@ Experiment.prototype.renderStimulus = function()
             d3.select("#divScale").style('visibility', 'hidden');
             d3.select("#canvasLeft").style('visibility', 'hidden');
             d3.select("#canvasRight").style('visibility', 'hidden');
+            d3.select("#crosshair").style('visibility', 'visible');
 
             d3.select('body').classed('nocursor', true);
         }
         var fixationTime = FIXATION_TIME ? Math.round(.5+Math.random()*(FIXATION_TIME[1]-FIXATION_TIME[0]))+FIXATION_TIME[0] : 0
         if (obj.currentBlock==0 && obj.currentTrial==0) {
-            fixationTime = Math.floor(fixationTime*1.5);
+            fixationTime = Math.floor(fixationTime*1.7);
         }
         obj.fixationTimeout = setTimeout(function()
         {
@@ -531,6 +569,8 @@ Experiment.prototype.renderStimulus = function()
             // reveal canvas
             d3.select("#canvasLeft").style('visibility', null);
             d3.select("#canvasRight").style('visibility', null);
+            d3.select("#crosshair").style('visibility', 'hidden');
+
             d3.select('body').classed('nocursor', false);
 
             if (EXPOSURE_TIME) {

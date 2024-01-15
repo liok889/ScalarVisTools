@@ -531,7 +531,7 @@ Simulate.prototype.download = function()
     document.body.removeChild(element);
 }
 
-var ESTEPS = 25;
+var ESTEPS = 50;
 var SSTEPS = 25;
 
 Simulate.prototype.simSteps = function(n, _expRange, _scaleRange)
