@@ -37,6 +37,46 @@
             background-color: #888888;
         }
         .nocursor { cursor:none; }
+
+        /* The Modal (background) */
+        .modal {
+          display: none; /* Hidden by default */
+          position: fixed; /* Stay in place */
+          z-index: 1; /* Sit on top */
+          padding-top: 100px; /* Location of the box */
+          left: 0;
+          top: 0;
+          width: 100%; /* Full width */
+          height: 100%; /* Full height */
+          overflow: auto; /* Enable scroll if needed */
+          background-color: rgb(0,0,0); /* Fallback color */
+          background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+
+        /* Modal Content */
+        .modal-content {
+          background-color: #fefefe;
+          margin: auto;
+          padding: 20px;
+          border: 1px solid #888;
+          width: 80%;
+        }
+
+        /* The Close Button */
+        .close {
+          color: #aaaaaa;
+          float: right;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+          color: #000;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
     </style>
 </head>
 
@@ -61,7 +101,7 @@
             <div style="width: 50px float: left; text-align: center; padding-top: 60px">
                 <div id="divScale">
                     &nbsp<br>&nbsp<br>
-                    <canvas id="canvasScale" width="30" height="80"></canvas>
+                    <canvas id="canvasScale" width="30" height="80" style="visibility: hidden"></canvas>
                 </div>
             </div>
             <div style="clear: both"></div>
@@ -72,10 +112,56 @@
 
     </div>
 
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+
+      <!-- Modal content -->
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <p id="textPercent">You have completed <span id="textPercentComplete">percent</span> of the experiment.
+        <p>You will now see maps colored with this scheme. The maps will stay visible for about 1 second.</p>
+        <p>
+            Low terrain&nbsp;<canvas id="canvasScale2" width="175" height="20"></canvas>&nbsp;High terrain
+        <p><u>Remember, your task</u>: <span id="textPrompt2"></span>
+
+
+
+      </div>
+    </div>
+
+
     <script type="text/Javascript">
+
+        function showModal(callback) {
+
+            var modal = document.getElementById("myModal");
+
+            // Get the button that opens the modal
+            var btn = document.getElementById("myBtn");
+
+            // Get the <span> element that closes the modal
+            var span = document.getElementsByClassName("close")[0];
+
+            // When the user clicks on <span> (x), close the modal
+            span.onclick = function() {
+              modal.style.display = "none";
+              if (callback) callback();
+            }
+
+            // When the user clicks anywhere outside of the modal, close it
+            window.onclick = function(event) {
+              if (event.target == modal) {
+                modal.style.display = "none";
+                if (callback) callback();
+              }
+            }
+
+            // When the user clicks the button, open the modal
+            modal.style.display = "block";
+        }
         var STIMULI = null;
         var STATISTIC = 'mean';
-        var SPLITS = 3;
+        var SPLITS = 2;
         var COLORMAPS = [
             'greyscale',
             'turbo',

@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 4;
+var TRIAL_PER_BLOCK = 5;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1000; // m. seconds
@@ -20,12 +20,15 @@ var DIFF_TOLERANCE = .01/4;
 var DIFFICULTY_STEP = .075;
 
 // attention checks
-var ATTN_CHECK_PER_BLOCK=2;
+var ATTN_CHECK_PER_BLOCK=0;
+
+// break between color blocks?
+var BREAK_COLOR = true;
 
 var PROMPTS = {
-    mean: "Select the image that showed HIGHER terrain on average",
-    std: "Select the image that showed MORE terrain variation on average",
-    steepness: "Select the image that showed STEEPER terrain on average"
+    mean: "Select the map that shows HIGHER terrain on average",
+    std: "Select the map that shows MORE terrain variation on average",
+    steepness: "Select the map that shows STEEPER terrain on average"
 }
 function permute(arr, count)
 {
@@ -83,7 +86,9 @@ function Experiment(stimulusData, statistic, splits, colormaps)
     }
 
     // text prompt
-    d3.select("#textPrompt").html(PROMPTS[this.statistic]);
+    var prompt = PROMPTS[this.statistic];
+    d3.select("#textPrompt").html(prompt);
+    d3.select("#textPrompt2").html(prompt);
 
     // create two generators
     this.generatorLeft = new NoiseGenerator(null, d3.select("#canvasLeft").node());
@@ -285,7 +290,7 @@ Experiment.prototype.nextBlock = function()
     var config = this.blocks[this.currentBlock];
     if (config.colormap != this.colormap)
     {
-        changeColormap(config.colormap);
+        this.changeColormap(config.colormap);
         this.colormap = config.colormap;
     }
     var splitIndex = config.split * this.splitBinSize;
@@ -497,6 +502,9 @@ Experiment.prototype.renderStimulus = function()
             d3.select('body').classed('nocursor', true);
         }
         var fixationTime = FIXATION_TIME ? Math.round(.5+Math.random()*(FIXATION_TIME[1]-FIXATION_TIME[0]))+FIXATION_TIME[0] : 0
+        if (obj.currentBlock==0 && obj.currentTrial==0) {
+            fixationTime = Math.floor(fixationTime*1.5);
+        }
         obj.fixationTimeout = setTimeout(function()
         {
             obj.fixationTimeout = undefined;
@@ -572,14 +580,46 @@ Experiment.prototype.endExperiment = function()
 
 }
 
-Experiment.prototype.nextTrial = function()
+Experiment.prototype.estimatePercent = function()
 {
-    this.trialsRemaining--;
+    var trials = (TRIAL_PER_BLOCK+ATTN_CHECK_PER_BLOCK)
+    var total = trials*this.blocks.length;
+    var complete = this.currentBlock*trials + this.currentStimulus;
+
+    var percent = Math.min(100,Math.round(.5 + (complete/total)*100));
+    return percent;
+}
+
+Experiment.prototype.nextTrial = function(dontCount)
+{
+    this.clearSelection();
+    if (!dontCount) {
+        this.trialsRemaining--;
+    }
 
     if (this.trialsRemaining <= 0) {
         var done = this.nextBlock();
         if (done) {
             return true;
+        }
+        else if (this.colorChanged && BREAK_COLOR)
+        {
+
+            this.colorChanged = false;
+
+            (function(expObj) {
+                d3.select("#textPercent")
+                    .style('visibility', expObj.currentBlock==0 ? 'hidden' : 'visible')
+                d3.select("#textPercentComplete")
+                    .html(expObj.estimatePercent() + '%')
+
+                showModal(function()
+                {
+                    console.log('model callback')
+                    expObj.nextTrial(true);
+                });
+            })(this);
+            return false;
         }
     }
     else {
@@ -588,11 +628,15 @@ Experiment.prototype.nextTrial = function()
             //console.log("that was attention check");
         }
         else {
-            this.currentTrial++;
+            if (!dontCount) {
+                this.currentTrial++;
+            }
         }
-        this.currentStimulus++;
+        if (!dontCount) {
+            this.currentStimulus++;
+        }
 
-        this.clearSelection();
+
     }
 
     // select next stimulus
@@ -612,10 +656,21 @@ Experiment.prototype.nextTrial = function()
     this.readyTime = Date.now();
 }
 
+Experiment.prototype.changeColormap = function(preset)
+{
+    changeColormap(preset);
+    this.colorChanged = true;
+}
+
 function changeColormap(preset)
 {
     var cmap = getColorPreset(preset);
     var scaleCanvas = d3.select("#canvasScale").node();
     cmap.drawColorScale(+scaleCanvas.width, +scaleCanvas.height, +scaleCanvas.height, 'vertical', scaleCanvas);
+
+    var scaleCanvas2 = d3.select("#canvasScale2").node();
+    cmap.drawColorScale(+scaleCanvas2.width, +scaleCanvas2.height, +scaleCanvas2.width, 'horizontal', scaleCanvas2);
+
     ScalarVis.setUniversalColormap(cmap);
+
 }
