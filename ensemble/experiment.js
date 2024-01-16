@@ -26,7 +26,7 @@ var ATTN_CHECK_PER_BLOCK=2;
 var BREAK_COLOR = true;
 
 // URL to send results to
-var DATA_URL = "";
+var DATA_URL = "store_data.php";
 
 var PROMPTS = {
     attention: "You must select the [SIDE] image for attention check",
@@ -812,7 +812,7 @@ Experiment.prototype.sendResults = function()
 
         // stimulus accuracy information
         stimulusTotal: this.blocks.length * TRIAL_PER_BLOCK,
-        sitmulusAccuracy: stimulusAcc,
+        stimulusAccuracy: stimulusAcc,
         meanResponseTime: Math.floor(.5 + meanResponseTime)
     };
 
