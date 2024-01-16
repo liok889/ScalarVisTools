@@ -130,6 +130,22 @@
     </div>
 
     <script type="text/Javascript">
+        function heartbeat()
+        {
+            setTimeout(function() {
+
+                if (exp) {
+                    $.post('heartbeat.php', {
+                        totalComplete: exp.results.length,
+                        totalAll: exp.blocks.length * TRIAL_PER_BLOCK
+                    }, function(data, status) {
+                        //console.log("heartbeat: " + data + ", status: " + status);
+                    });
+                }
+
+                heartbeat();
+            }, 15*1000);
+        }
 
         function showModal(callback) {
 
@@ -184,9 +200,9 @@
             SPLITS = 1;
             COLORMAPS = [
                 'viridis',
-                'bluebrownFull',
+                'bluered',
             ];
-            TRIAL_PER_BLOCK=12;
+            TRIAL_PER_BLOCK=10;
         }
 
         // experient object

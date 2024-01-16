@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 40;
+var TRIAL_PER_BLOCK = 5;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
@@ -623,6 +623,11 @@ Experiment.prototype.storeTrialData = function()
             blockNumber: this.currentBlock+1,
             stimulusNumber: STIMULUS_SERIAL++,
 
+            targetStatistic: this.data[this.target][this.statistic],
+            referenceStatistic: this.data[this.reference][this.statistic],
+            targetID: this.target,
+            referenceID: this.reference
+
         });
     }
 }
@@ -824,7 +829,7 @@ Experiment.prototype.endExperiment = function()
     d3.selectAll("canvas").style('visibility', 'hidden');
 
     if (TRAINING) {
-        window.location.replace("tutorial_last?statistic=" + this.statistic);
+        window.location.replace("tutorial_last.html?statistic=" + this.statistic);
     }
     else {
         // send results to server
