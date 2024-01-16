@@ -625,6 +625,10 @@ Experiment.prototype.storeTrialData = function()
 
             targetStatistic: this.data[this.target][this.statistic],
             referenceStatistic: this.data[this.reference][this.statistic],
+
+            normTargetStatistic: this.data[this.target][this.statistic] / statRange,
+            normReferenceStatistic: this.data[this.reference][this.statistic] / statRange,
+
             targetID: this.target,
             referenceID: this.reference
 
