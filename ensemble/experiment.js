@@ -824,9 +824,23 @@ Experiment.prototype.sendResults = function()
 
 Experiment.prototype.endExperiment = function()
 {
-    this.ended = true;
+    // clear any pending timeouts
+    if (this.fixationTimeout) {
+        clearTimeout(this.fixationTimeout);
+        this.fixationTimeout = undefined;
+    }
+
+    if (this.exposureTimeout) {
+        clearTimeout(this.exposureTimeout);
+        this.exposureTimeout = undefined;
+    }
+
+    // clear selection and canvases
     this.clearSelection();
     d3.selectAll("canvas").style('visibility', 'hidden');
+
+    // mark end
+    this.ended = true;
 
     if (TRAINING) {
         window.location.replace("tutorial_last.html?statistic=" + this.statistic);
@@ -838,6 +852,8 @@ Experiment.prototype.endExperiment = function()
         d3.select("#textResponse")
             .html("Experiment complete")
             .style('visibility', 'visible');
+        window.location.replace("colorvision.html");
+
     }
 }
 
