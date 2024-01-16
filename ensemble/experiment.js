@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 2;
+var TRIAL_PER_BLOCK = 40;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
@@ -20,7 +20,7 @@ var DIFF_TOLERANCE = .01/4;
 var DIFFICULTY_STEP = .05;
 
 // attention checks
-var ATTN_CHECK_PER_BLOCK=0;
+var ATTN_CHECK_PER_BLOCK=2;
 
 // break between color blocks?
 var BREAK_COLOR = true;
@@ -29,6 +29,7 @@ var BREAK_COLOR = true;
 var DATA_URL = "";
 
 var PROMPTS = {
+    attention: "You must select the [SIDE] image for attention check",
     mean: "Select the map that shows HIGHER terrain on average",
     std: "Select the map that shows MORE terrain variation on average",
     steepness: "Select the map that shows STEEPER terrain on average"
@@ -587,6 +588,7 @@ Experiment.prototype.isAttentionCheck = function()
 }
 
 
+var STIMULUS_SERIAL = 1;
 Experiment.prototype.storeTrialData = function()
 {
     if (this.isAttentionCheck())
@@ -595,11 +597,19 @@ Experiment.prototype.storeTrialData = function()
         this.attentionScores.push(this.isCorrect() ? 1 : 0);
     }
     else {
+        var statRange = this.statisticRange[1]-this.statisticRange[0];
+
         var blockInfo = this.blocks[this.currentBlock];
-        this.results.push({
+        this.results.push(
+        {
             responseTime: Date.now()-this.readyTime,
-            difficulty: this.difficulty,
-            actualDifficulty: this.actualDifficulty,
+            exposureTime: EXPOSURE_TIME,
+            requestedDifficulty: this.difficulty,
+            difficulty: this.actualDifficulty,
+
+            normRequestedDifficulty: this.difficulty / statRange,
+            normDifficulty: this.actualDifficulty / statRange,
+
             targetLocation: this.correct,
             answeredLocation: this.getAnsweredCanvas(),
             correct: this.isCorrect() ? 1 : 0,
@@ -610,7 +620,8 @@ Experiment.prototype.storeTrialData = function()
             colormap: blockInfo.colormap,
 
             trialNumber: this.currentTrial+1,
-            blockNumber: this.currentBlock+1
+            blockNumber: this.currentBlock+1,
+            stimulusNumber: STIMULUS_SERIAL++,
 
         });
     }
@@ -678,7 +689,12 @@ Experiment.prototype.renderStimulus = function()
                 d3.select("#textPrompt").style('visibility', 'hidden');
                 d3.select("#divScale").style('visibility', 'hidden');
             } else {
-                d3.select("#textPrompt").style('visibility', null);
+
+                d3.select("#textPrompt")
+                    .html(obj.isAttentionCheck() ?
+                        PROMPTS.attention.replace("[SIDE]", obj.correct.toUpperCase()) :
+                        PROMPTS[obj.statistic])
+                    .style('visibility', null);
                 d3.select("#divScale").style('visibility', null);
             }
             obj.readyTime = Date.now();
@@ -693,8 +709,11 @@ Experiment.prototype.renderStimulus = function()
                     var canvasRight = d3.select("#canvasRight").node();
 
                     obj.clearStimuli();
-
-                    d3.select("#textPrompt").style('visibility', null);
+                    d3.select("#textPrompt")
+                        .html(obj.isAttentionCheck() ?
+                            PROMPTS.attention.replace("[SIDE]", obj.correct.toUpperCase()) :
+                            PROMPTS[obj.statistic])
+                        .style('visibility', null);
                     d3.select("#divScale").style('visibility', null);
                     d3.select('body').classed('nocursor', false);
 
@@ -823,7 +842,7 @@ Experiment.prototype.estimatePercent = function()
     var total = trials*this.blocks.length;
     var complete = this.currentBlock*trials + this.currentStimulus;
 
-    var percent = 100 * Math.min(1, Math.floor(.5 + complete/total));
+    var percent = Math.min(100, Math.floor(.5 + 100*complete/total));
     return percent;
 }
 
