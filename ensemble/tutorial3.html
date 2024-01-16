@@ -66,30 +66,40 @@
 <body>
 	<div style="width: 600px; margin:0 auto;">
 		<div style="font-weight: bold; font-size: 20px; background-color: #eeeeee; border: solid 1px black; width: 100%; height: 40px; padding-top: 20px; padding-bottom: 5px; padding: 5px 5px">
-			Please read the following instructions
+			Instructions (3 / 4)
 		</div>
 
-		<div style="height: 450px;">
+		<div style="height: 450px">
 
-			<p>Your objective in this study is to analyze color maps
-			depicting <b>terrain height</b>.
+			<p>Note that you will only see each map pair for a short duration.
 
-			<p>In this map, higher elevations are shown in Red, whereas
-				low elevation is depicted in Blue. Essentially, color
-				variation in the map tells you about differences in elevation.
+			<p>Your task is make a guess <b>as best as you can</b>
+				within this short time.
 
-			<p><img src="img/tutorial/tutorial1.jpg">
+			<p>We will now go through a few practice rounds. You will receive feedback on how you guessed during practice.
+
 		</div>
 
 		<p><table width="100%">
 			<tr>
-				<td align="left">&nbsp;</td>
-				<td align="right"><a id="nextLink" href="tutorial2.html">Next</td>
+				<td align="left"> <a href="tutorial2.html">Previous</td>
+				<td align="right"><a id="practiceLink" href="practice.html?statistic=">Next</td>
 			</tr>
 		</table>
 	</div>
-	<script>
+
+	<script type="text/javascript">
+
+		var urlParams = new URLSearchParams(window.location.search);
+		var statistic = urlParams.get('statistic');
+		if (!statistic) {
+			statistic = 'mean';
+		}
+		console.log('statistic ' + statistic);
+		document.getElementById("practiceLink").setAttribute('href', 'experiment.html?training=1&statistic=' + statistic);
 	</script>
+
+
 </body>
 
 </html>

@@ -71,14 +71,14 @@
 
 		<div style="height: 450px;">
 
-			<p>Your objective in this study is to analyze color maps
-			depicting <b>terrain height</b>.
+			<p>This study will test how quickly people can read color maps.
 
-			<p>In this map, higher elevations are shown in Red, whereas
-				low elevation is depicted in Blue. Essentially, color
-				variation in the map tells you about differences in elevation.
+			<p>The maps will depict
+				the <b>height of terrain</b> in color.
 
-			<p><img src="img/tutorial/tutorial1.jpg">
+			<p>In this example, higher areas are shown in brigh yellow. Green and blue depict areas with lower elevation.
+
+			<p><img width="400" src="img/tutorial1.png">
 		</div>
 
 		<p><table width="100%">
@@ -89,6 +89,14 @@
 		</table>
 	</div>
 	<script>
+		var urlParams = new URLSearchParams(window.location.search);
+		var statistic = urlParams.get('statistic');
+		if (!statistic) {
+			statistic = 'mean';
+		}
+		console.log('statistic ' + statistic);
+		document.getElementById("nextLink").setAttribute('href', 'tutorial2.html?statistic=' + statistic);
+
 	</script>
 </body>
 

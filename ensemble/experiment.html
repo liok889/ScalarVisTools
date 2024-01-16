@@ -118,17 +118,16 @@
       <!-- Modal content -->
       <div class="modal-content">
         <span class="close">&times;</span>
-        <p id="textPercent">You have completed <span id="textPercentComplete">percent</span> of the experiment.
-        <p>You will now see maps colored with this scheme. The maps will stay visible for about 1 second.</p>
+        <p id="textPercent">Feel free to rest your eyes for a moment if you like. You have completed <span id="textPercentComplete">percent</span> of the trials.
+        <p>You will now see maps colored with this scheme:
+        <p>&nbsp
         <p>
             Low terrain&nbsp;<canvas id="canvasScale2" width="175" height="20"></canvas>&nbsp;High terrain
-        <p><u>Remember, your task</u>: <span id="textPrompt2"></span>
-
-
+        <p>&nbsp;
+        <p>Remember, your task: <span id="textPrompt2"></span>
 
       </div>
     </div>
-
 
     <script type="text/Javascript">
 
@@ -159,8 +158,9 @@
             // When the user clicks the button, open the modal
             modal.style.display = "block";
         }
+
         var STIMULI = null;
-        var STATISTIC = 'steepness';
+        var STATISTIC;
         var SPLITS = 2;
         var COLORMAPS = [
             'greyscale',
@@ -169,9 +169,30 @@
             'viridis'
         ];
 
+        // get statistic from URL
+        var urlParams = new URLSearchParams(window.location.search);
+        STATISTIC = urlParams.get('statistic');
+        if (!STATISTIC) {
+            STATISTIC = 'mean';
+        }
+
+        var training = urlParams.get('training');
+        if (training==1 || training=='y' || training=='Y')
+        {
+            TRAINING=true;
+            ATTN_CHECK_PER_BLOCK=0;
+            SPLITS = 1;
+            COLORMAPS = [
+                'viridis',
+                'bluebrownFull',
+            ];
+            TRIAL_PER_BLOCK=12;
+        }
+
+        // experient object
         var exp = null;
 
-
+        // load stimulus data and start experiment
         d3.json("stimuli.json")
             .then(function(data) {
                 console.log('data ready');

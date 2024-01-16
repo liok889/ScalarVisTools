@@ -1,8 +1,8 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 5;
+var TRIAL_PER_BLOCK = 2;
 
 // amount of time stimulus is visible before it's cleared
-var EXPOSURE_TIME = 1000; // m. seconds
+var EXPOSURE_TIME = 1500; // m. seconds
 var FIXATION_TIME = [800, 1200];
 
 // training session?
@@ -24,6 +24,9 @@ var ATTN_CHECK_PER_BLOCK=0;
 
 // break between color blocks?
 var BREAK_COLOR = true;
+
+// URL to send results to
+var DATA_URL = "";
 
 var PROMPTS = {
     mean: "Select the map that shows HIGHER terrain on average",
@@ -63,6 +66,10 @@ function permute(arr, count)
 
 function Experiment(stimulusData, statistic, splits, colormaps)
 {
+    if (TRAINING) {
+        INITIAL_DIFFICULTY *=2;
+        DIFFICULTY_STEP /= 5;
+    }
     // trial results + attention scores
     this.results = [];
     this.attentionScores = [];
@@ -117,11 +124,11 @@ function Experiment(stimulusData, statistic, splits, colormaps)
     this.generatorLeft.generate(); this.generatorLeft.vis();
     this.generatorRight.generate(); this.generatorRight.vis();
 
-    // set difficulty tolerance to 20x the mean of difficulty diff in data
-    DIFF_TOLERANCE = 20 * this.calcDifficultyDiff();
-
     // scale step/attention difficulty by the statistic range
     DIFFICULTY_STEP *= this.statisticRange[1]-this.statisticRange[0];
+
+    // set difficulty tolerance to 1/3 step
+    DIFF_TOLERANCE = DIFFICULTY_STEP / 4;
 
     this.clearSelection();
     this.ready();
@@ -186,7 +193,7 @@ Experiment.prototype.clearSelection = function()
         {
             if (d3.event.keyCode == 32 || d3.event.keyCode == 13)
             {
-                if (_exp.getAnsweredCanvas()) {
+                if (_exp.getAnsweredCanvas() && !_exp.ended) {
                     _exp.enterResponse();
                 }
             }
@@ -198,6 +205,12 @@ Experiment.prototype.enterResponse = function()
 {
     if (TRAINING) {
         if (!this.isCorrect()) {
+
+            // re-reveal
+            this.generatorLeft.vis();
+            this.generatorRight.vis();
+
+            // highlight
             flash(exp.correct == 'left' ? 'Left' : 'Right');
             return;
         }
@@ -223,13 +236,15 @@ Experiment.prototype.enterResponse = function()
                 }
                 this.difficulty -= step;
             }
+            console.log("correct");
+
         } else {
             // make the next trial easier
             this.difficulty += DIFFICULTY_STEP*3;
-            //console.log("incorrect");
+            console.log("-");
         }
     }
-    console.log("difficulty: " + this.difficulty);
+    //console.log("difficulty: " + this.difficulty);
 
     if (this.nextTrial()) {
         console.log("END!");
@@ -343,8 +358,88 @@ Experiment.prototype.pickCheck = function()
         this.left = this.reference;
         this.correct = 'right';
     }
-
 }
+
+
+
+Experiment.prototype.pickStimulus2 = function()
+{
+    var TRIES = 500;
+    var KEEP = 50;
+
+    var candidates = [];
+    var difficulty = this.difficulty;
+
+    var stimulusList = this.orderedList;
+    var splitStart = this.blocks[this.currentBlock].split * this.splitBinSize;
+    var splitEnd = Math.min(stimulusList.length, splitStart+this.splitBinSize);
+    var stimulusRange = [splitStart, splitEnd];
+
+    // pick a random stimulus and approach
+    for (var iter=0; iter<TRIES && candidates.length < KEEP; iter++)
+    {
+        var lastDiff = undefined;
+        var converged = false;
+        var approach = Math.random() < .5 ? -1 : 1;
+        var stimulus1 = Math.floor(Math.random() * (stimulusRange[1]-stimulusRange[0])) + stimulusRange[0];
+        var d1 = this.data[stimulus1][this.statistic];
+        var c1 = this.confoundStatistic ? this.data[stimulus1][this.confoundStatistic] : 0;
+
+        for (
+            var stimulus2 = stimulus1 + approach;
+            stimulus2 >= 0 && stimulus2 < stimulusList.length;
+            stimulus2 += approach
+        )
+        {
+            var d2 = this.data[stimulus2][this.statistic];
+            var c2 = this.confoundStatistic ? this.data[stimulus2][this.confoundStatistic] : 0;
+            var statDiff = Math.abs(d1-d2);
+            var difficultyDiff = Math.abs(statDiff-difficulty);
+
+            if ( difficultyDiff <= DIFF_TOLERANCE)
+            {
+                converged = true;
+                candidates.push({
+                    stimulus1: stimulus1,
+                    stimulus2: stimulus2,
+                    d1: d1,
+                    d2: d2,
+                    c1: c1,
+                    c2: c2,
+                    difficultyDiff: difficultyDiff,
+                    cDiff: Math.abs(c1-c2)
+                })
+            }
+            else if (difficultyDiff > DIFF_TOLERANCE && converged) {
+                break;
+            }
+            else if (!converged && lastDiff !== undefined && difficultyDiff > lastDiff) {
+                break;
+            }
+            lastDiff = difficultyDiff;
+        }
+    }
+    //console.log("candidates: " + candidates.length);
+    if (candidates.length == 0) {
+        // default back to old method
+        this.pickStimulus();
+    }
+    else
+    {
+        // select the candidate with the smallest cDiff
+        var minCDiff = candidates[0].cDiff, minI = 0;
+        for (var i=1, len=candidates.length; i<len; i++)
+        {
+            if (minCDiff > candidates[i].cDiff) {
+                minI = i;
+            }
+        }
+
+        this.converged = true;
+        this.stageStimulus(candidates[minI].stimulus1, candidates[minI].stimulus2);
+    }
+}
+
 Experiment.prototype.pickStimulus = function()
 {
     var difficulty = this.difficulty;
@@ -401,10 +496,12 @@ Experiment.prototype.pickStimulus = function()
                 //bestS2 = stimulus2;
                 //break;
             }
-            var score =
-                .6 * difficultyDiff / (this.statisticRange[1]-this.statisticRange[0]) +
-                .4 * confoundDiff / (this.confoundRange ? this.confoundRange[1]-this.confoundRange[0] : 1)
-            //var score = difficultyDiff;
+            /*
+            var score = converged ?
+                1 * confoundDiff / (this.confoundRange ? this.confoundRange[1]-this.confoundRange[0] : 1) :
+                difficultyDiff / (this.statisticRange[1]-this.statisticRange[0])
+            */
+            var score = difficultyDiff;
 
             /*
             if (lastDiff !== undefined && difficultyDiff > lastDiff)
@@ -423,7 +520,12 @@ Experiment.prototype.pickStimulus = function()
             }
         }
     }
+    this.converged = converged;
+    this.stageStimulus(bestS1, bestS2);
+}
 
+Experiment.prototype.stageStimulus = function(bestS1, bestS2)
+{
     // radomly decide which one is the target
     var stat1 = this.data[bestS1][this.statistic];
     var stat2 = this.data[bestS2][this.statistic];
@@ -446,7 +548,6 @@ Experiment.prototype.pickStimulus = function()
         this.left = this.reference;
         this.correct = 'right';
     }
-    this.converged = converged;
 }
 
 Experiment.prototype.getAnsweredCanvas = function()
@@ -591,15 +692,7 @@ Experiment.prototype.renderStimulus = function()
                     var canvasLeft = d3.select("#canvasLeft").node();
                     var canvasRight = d3.select("#canvasRight").node();
 
-                    var glLeft = d3.select("#canvasLeft").node().getContext('webgl');
-                    var glRight = d3.select("#canvasRight").node().getContext('webgl');
-
-
-                    glLeft.clearColor(1, 1, 1, 1);
-                    glRight.clearColor(1, 1, 1, 1);
-
-                    glLeft.clear(glLeft.COLOR_BUFFER_BIT);
-                    glRight.clear(glRight.COLOR_BUFFER_BIT);
+                    obj.clearStimuli();
 
                     d3.select("#textPrompt").style('visibility', null);
                     d3.select("#divScale").style('visibility', null);
@@ -613,11 +706,115 @@ Experiment.prototype.renderStimulus = function()
     })(this);
 }
 
+Experiment.prototype.clearStimuli = function()
+{
+    var glLeft = d3.select("#canvasLeft").node().getContext('webgl');
+    var glRight = d3.select("#canvasRight").node().getContext('webgl');
+
+    glLeft.clearColor(1, 1, 1, 1);
+    glRight.clearColor(1, 1, 1, 1);
+
+    glLeft.clear(glLeft.COLOR_BUFFER_BIT);
+    glRight.clear(glRight.COLOR_BUFFER_BIT);
+}
+
+function sendData(data2send, TRIALS, callback)
+{
+    (function(_data2send, trial, _callback)
+    {
+        $.ajax({
+            type: "POST",
+            url: DATA_URL,
+            data: _data2send,
+            dataType: "json",
+            contentType: "application/json; charset=utf-8",
+
+            success: function(data)
+            {
+                console.log("sendData SUCCESS");
+                if (_callback) {
+                    _callback(true);
+                }
+            },
+
+            error: function(errMsg)
+            {
+                console.log("sendData failed: " + errMsg);
+                console.log("trials left: " + (trial));
+                if (trial > 0) {
+                    sendData(_data2send, trial-1, _callback);
+                }
+                else
+                {
+                    if (_callback) {
+                        _callback(false);
+                    }
+                }
+            }
+        });
+        //console.log("send complete");
+    })(data2send, TRIALS != undefined ? TRIALS : 3, callback);
+}
+
+Experiment.prototype.sendResults = function()
+{
+    var engagementAcc = 0;
+    if (this.attentionScores.length == 0) {
+        engagementAcc = 100;
+    }
+    else {
+        for (var i=0; i<this.attentionScores.length; i++) {
+            engagementAcc += this.attentionScores[i];
+        }
+        engagementAcc = Math.round(.5 + 100 * engagementAcc / this.attentionScores.length);
+    }
+
+    var stimulusAcc = 0, meanResponseTime = 0
+    for (var i=0; i<this.results.length; i++) {
+        stimulusAcc += this.results[i].correct;
+        meanResponseTime += this.results[i].responseTime;
+    }
+    stimulusAcc = Math.floor(.5 + 100 * stimulusAcc / this.results.length);
+    meanResponseTime /= this.results.length;
+
+    var packet =
+    {
+        // data
+        experimentData: this.results,
+
+        // engagement information
+        engagementTotal: this.attentionScores.length,
+        engagementAccuracy: engagementAcc,
+
+        // stimulus accuracy information
+        stimulusTotal: this.blocks.length * TRIAL_PER_BLOCK,
+        sitmulusAccuracy: stimulusAcc,
+        meanResponseTime: Math.floor(.5 + meanResponseTime)
+    };
+
+    sendData(JSON.stringify(packet), 3, function(status) {
+        console.log("send data status: " + status);
+        //window.location.replace("strategy.html");
+    });
+}
+
 Experiment.prototype.endExperiment = function()
 {
+    this.ended = true;
     this.clearSelection();
     d3.selectAll("canvas").style('visibility', 'hidden');
 
+    if (TRAINING) {
+        window.location.replace("tutorial_last?statistic=" + this.statistic);
+    }
+    else {
+        // send results to server
+        this.sendResults();
+
+        d3.select("#textResponse")
+            .html("Experiment complete")
+            .style('visibility', 'visible');
+    }
 }
 
 Experiment.prototype.estimatePercent = function()
@@ -626,7 +823,7 @@ Experiment.prototype.estimatePercent = function()
     var total = trials*this.blocks.length;
     var complete = this.currentBlock*trials + this.currentStimulus;
 
-    var percent = Math.min(100,Math.round(.5 + (complete/total)*100));
+    var percent = 100 * Math.min(1, Math.floor(.5 + complete/total));
     return percent;
 }
 
@@ -649,13 +846,13 @@ Experiment.prototype.nextTrial = function(dontCount)
 
             (function(expObj) {
                 d3.select("#textPercent")
-                    .style('visibility', expObj.currentBlock==0 ? 'hidden' : 'visible')
+                    .style('visibility', TRAINING || expObj.currentBlock==0 ? 'hidden' : 'visible')
                 d3.select("#textPercentComplete")
                     .html(expObj.estimatePercent() + '%')
 
+                expObj.clearStimuli();
                 showModal(function()
                 {
-                    console.log('model callback')
                     expObj.nextTrial(true);
                 });
             })(this);
@@ -686,7 +883,7 @@ Experiment.prototype.nextTrial = function(dontCount)
         this.pickCheck();
     }
     else {
-        this.pickStimulus();
+        this.pickStimulus2();
     }
 
     // render stimulus
