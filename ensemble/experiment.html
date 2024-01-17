@@ -195,14 +195,14 @@
         var training = urlParams.get('training');
         if (training==1 || training=='y' || training=='Y')
         {
-            TRAINING=true;
+            TRAINING = true;
             ATTN_CHECK_PER_BLOCK=0;
             SPLITS = 1;
             COLORMAPS = [
                 'viridis',
-                'bluered',
+                'bluered'
             ];
-            TRIAL_PER_BLOCK=10;
+            TRIAL_PER_BLOCK=8;
         }
 
         // experient object
