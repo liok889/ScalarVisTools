@@ -198,6 +198,16 @@ Experiment.prototype.clearSelection = function()
                     _exp.enterResponse();
                 }
             }
+            else {
+                if (d3.event.keyCode == 37) {
+                    // select left
+                    highlight('Left');
+                }
+                else if (d3.event.keyCode == 39) {
+                    // select right
+                    highlight('Right');
+                }
+            }
         });
     })(this);
 }
@@ -871,6 +881,10 @@ Experiment.prototype.estimatePercent = function()
     var complete = this.currentBlock*trials + this.currentStimulus;
 
     var percent = Math.min(100, Math.floor(.5 + 100*complete/total));
+
+    if (UPDATE_PROGRESS) {
+        updateProgress(percent/100);
+    }
     return percent;
 }
 
@@ -933,6 +947,10 @@ Experiment.prototype.nextTrial = function(dontCount)
 
     // render stimulus
     this.renderStimulus();
+
+    // update progress bar if desired
+    this.estimatePercent();
+
 
     // store time
     this.readyTime = Date.now();

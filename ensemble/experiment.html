@@ -112,6 +112,13 @@
 
     </div>
 
+    <div style="margin-left: 270px;">
+        <svg id="svgProgress" width="150" height="10">
+            <rect id="rectComplete" x="0" y="0" height="20" fill="#72a7fc"></rect>
+            <rect id="rectRemaining" x="0" y="0" height="20" fill="#cccccc"></rect>
+        </svg>
+    </div>
+
     <!-- The Modal -->
     <div id="myModal" class="modal">
 
@@ -130,6 +137,26 @@
     </div>
 
     <script type="text/Javascript">
+        var UPDATE_PROGRESS = false;
+        function updateProgress(complete)
+        {
+            var baseRate = .15;
+
+            var W = +d3.select("#svgProgress")
+                .attr('width');
+
+            var percent = baseRate + complete*(1-baseRate);
+            d3.select("#rectComplete")
+                .attr('width', percent*W);
+
+            d3.select("#rectRemaining")
+                    .attr('width', (1-percent)*W)
+                    .attr('x', percent*W)
+        }
+        if (UPDATE_PROGRESS) {
+            updateProgress(0);
+        }
+
         function heartbeat()
         {
             setTimeout(function() {
@@ -219,7 +246,9 @@
                     SPLITS,
                     COLORMAPS
                 );
-                heartbeat();
+                if (window.location.href.search('localhost:') == -1) {
+                    heartbeat();
+                }
             });
 
     </script>
