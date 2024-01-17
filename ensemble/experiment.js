@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 5;
+var TRIAL_PER_BLOCK = 25;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
@@ -14,13 +14,13 @@ var INITIAL_DIFFICULTY = .3;
 // attentin is picked from 2.5% of extreme stimuli
 var ATTN_CHECK_PERCENTILE = .025;
 
-var DIFF_TOLERANCE = .01/4;
-
-// STEP is 7.5% of full range
+// STEP is 5% of full range
 var DIFFICULTY_STEP = .05;
 
+var DIFF_TOLERANCE = .01/4;
+
 // attention checks
-var ATTN_CHECK_PER_BLOCK=2;
+var ATTN_CHECK_PER_BLOCK=1;
 
 // break between color blocks?
 var BREAK_COLOR = true;
@@ -248,7 +248,7 @@ Experiment.prototype.enterResponse = function()
     //console.log("difficulty: " + this.difficulty);
 
     if (this.nextTrial()) {
-        console.log("END!");
+        //console.log("END!");
         this.endExperiment();
     }
 }
@@ -587,7 +587,6 @@ Experiment.prototype.isAttentionCheck = function()
     }
 }
 
-
 var STIMULUS_SERIAL = 1;
 Experiment.prototype.storeTrialData = function()
 {
@@ -781,11 +780,12 @@ function sendData(data2send, TRIALS, callback)
             }
         });
         //console.log("send complete");
-    })(data2send, TRIALS != undefined ? TRIALS : 3, callback);
+    })(data2send, TRIALS !== undefined ? TRIALS : 3, callback);
 }
 
 Experiment.prototype.sendResults = function()
 {
+    // compute accuracy in engagement scores
     var engagementAcc = 0;
     if (this.attentionScores.length == 0) {
         engagementAcc = 100;
@@ -797,6 +797,7 @@ Experiment.prototype.sendResults = function()
         engagementAcc = Math.round(.5 + 100 * engagementAcc / this.attentionScores.length);
     }
 
+    // accuracy in analyzed trials
     var stimulusAcc = 0, meanResponseTime = 0
     for (var i=0; i<this.results.length; i++) {
         stimulusAcc += this.results[i].correct;
@@ -820,9 +821,10 @@ Experiment.prototype.sendResults = function()
         meanResponseTime: Math.floor(.5 + meanResponseTime)
     };
 
-    sendData(JSON.stringify(packet), 3, function(status) {
+    var sendTries = 3;
+    sendData(JSON.stringify(packet), sendTries, function(status) {
         console.log("send data status: " + status);
-        //window.location.replace("strategy.html");
+        window.location.replace("colorvision.html");
     });
 }
 
@@ -846,18 +848,19 @@ Experiment.prototype.endExperiment = function()
     // mark end
     this.ended = true;
 
-    if (TRAINING) {
+    if (TRAINING)
+    {
+        // end of training, go to last point in the tutorial
         window.location.replace("tutorial_last.html?statistic=" + this.statistic);
     }
-    else {
+    else
+    {
+        d3.select("#textResponse")
+            .html("Experiment complete.")
+            .style('visibility', 'visible');
+
         // send results to server
         this.sendResults();
-
-        d3.select("#textResponse")
-            .html("Experiment complete")
-            .style('visibility', 'visible');
-        window.location.replace("colorvision.html");
-
     }
 }
 
@@ -916,8 +919,6 @@ Experiment.prototype.nextTrial = function(dontCount)
         if (!dontCount) {
             this.currentStimulus++;
         }
-
-
     }
 
     // select next stimulus
