@@ -794,7 +794,7 @@ Experiment.prototype.sendResults = function()
         for (var i=0; i<this.attentionScores.length; i++) {
             engagementAcc += this.attentionScores[i];
         }
-        engagementAcc = Math.round(.5 + 100 * engagementAcc / this.attentionScores.length);
+        engagementAcc = Math.floor(.5 + 100 * engagementAcc / this.attentionScores.length);
     }
 
     // accuracy in analyzed trials
