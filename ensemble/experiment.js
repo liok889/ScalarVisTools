@@ -1,9 +1,10 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 25;
+var TRIAL_PER_BLOCK = 22;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
 var FIXATION_TIME = [800, 1000];
+var SOUND_EFFECTS = true;
 
 // training session?
 var TRAINING = false;
@@ -67,6 +68,12 @@ function permute(arr, count)
 
 function Experiment(stimulusData, statistic, splits, colormaps)
 {
+    if (SOUND_EFFECTS)
+    {
+        this.audioCorrect = new Audio('sound_correct.wav');
+        this.audioIncorrect = new Audio('sound_error.wav');
+    }
+
     if (TRAINING) {
         INITIAL_DIFFICULTY *=2;
         DIFFICULTY_STEP /= 5;
@@ -214,6 +221,17 @@ Experiment.prototype.clearSelection = function()
 
 Experiment.prototype.enterResponse = function()
 {
+    // play sound
+    if (SOUND_EFFECTS) {
+        if (this.isCorrect())
+        {
+            this.audioCorrect.play();
+        }
+        else {
+            this.audioIncorrect.play();
+        }
+    }
+
     if (TRAINING) {
         if (!this.isCorrect()) {
 
