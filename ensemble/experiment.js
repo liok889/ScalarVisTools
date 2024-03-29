@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 17;
+var TRIAL_PER_BLOCK = 25;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
@@ -834,7 +834,7 @@ Experiment.prototype.sendResults = function()
     var sendTries = 3;
     sendData(JSON.stringify(packet), sendTries, function(status) {
         console.log("send data status: " + status);
-        window.location.replace("colorvision.html");
+        window.location.replace("strategy.html");
     });
 }
 
