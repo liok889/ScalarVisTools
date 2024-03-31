@@ -1,5 +1,5 @@
 // number of trials per block
-var TRIAL_PER_BLOCK = 22;
+var TRIAL_PER_BLOCK = 25;
 
 // amount of time stimulus is visible before it's cleared
 var EXPOSURE_TIME = 1500; // m. seconds
