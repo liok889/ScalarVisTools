@@ -64,11 +64,17 @@
 		var N = SAMPLE_FIDELITY;
 		var LINEUP_N = 6;
 
+		/*
 		shaderList = [
 		    {name: 'vis',		path: '../design/src/shaders/vis.frag'},
 		    {name: 'vertex',	path: '../design/src/shaders/vertex.vert'},
-		    {name: 'blur',		path: '../design/src/shaders/blur.frag'}
+		    {name: 'blur',		path: '../design/src/shaders/blur.frag'},
+			{name: 'pdfPlot',	path: '../design/src/shaders/pdfPlot.glsl'},
+			{name: 'pdfPlot',	path: '../design/src/shaders/pdfPlot.glsl'},
 		];
+		*/
+		SHADER_PATH = "../";
+
 
 		var lineup = new LineupExperiment(WIDTH, HEIGHT, LINEUP_N);
 		lineup.enableSelection(true);
